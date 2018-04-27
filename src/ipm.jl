@@ -11,6 +11,8 @@ using an infeasible Primal-Dual Interior-Point algorithm.
 - `A`: constraint matrix
 - `b::Array{Float, 1}`: right-hand side
 - `c::Array{Float, 1}`: objective
+- `lb`: lower bounds
+- `ub`: upper bounds
 - `tol`: numerical tolerance
 - `verbose`: 0 means no output, 1 display logs at each iteration
 
@@ -19,6 +21,8 @@ function solve(
     A,
     b,
     c,
+    lb,
+    ub,
     tol=10.0^-8,
     verbose=0
 )
@@ -26,6 +30,8 @@ function solve(
     m, n = size(A)
     @assert length(b) == m
     @assert length(c) == n
+    @assert length(lb) == n
+    @assert length(ub) == n
 
     # pre-allocate memory
     n_iter = 0
@@ -184,7 +190,7 @@ function factorNormal(A, theta)
     Phi = Symmetric((A * spdiagm(theta)) * A')
 
     # Cholesky factorization
-    F = ldltfact(Phi)
+    F = cholfact(Phi)
     return F
 end
 
@@ -194,7 +200,7 @@ function factorNormal!(F, A, theta)
     Phi = Symmetric((A * spdiagm(theta)) * A')
 
     # Cholesky factorization
-    ldltfact!(F, Phi)
+    cholfact!(F, Phi)
     
     return nothing
 end
