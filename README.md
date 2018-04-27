@@ -1,2 +1,1 @@
-# tulip
-Interior-Point solver in Julia
+# Tulip
