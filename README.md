@@ -2,4 +2,4 @@
 
 # Tulip
 
-An interior point method in Julia
+An interior point method in Julia, for now
