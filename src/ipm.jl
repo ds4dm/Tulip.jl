@@ -1,281 +1,224 @@
+# import Tulip.Cholesky:
+#     AbstractCholeskyFactor, SimpleDenseCholeskyFactor, SimpleSparseCholeskyFactor
+
 """
-solve(A, b, c, x0, y0, s0)
+    TulipSolution contains a primal-dual point
+"""
+struct PrimalDualPoint{Tx<:Real, Ty<:Real, Ts<:Real, Tw<:Real, Tz<:Real}
 
-Infeasible predictor-corrector Interior-Point algorithm.
+    x::AbstractVector{Tx}  # primal variables
+    y::AbstractVector{Ty}  # dual variables
+    s::AbstractVector{Ts}  # dual variables wrt/ non-negativity of s
 
-Solves the (continuous) linear program
-    ``min c^{T} x`` s.t. ``Ax = b``
-using an infeasible Primal-Dual Interior-Point algorithm.
+    w::AbstractVector{Tw}  # primal slack wrt/ upper bounds
+    z::AbstractVector{Tz}  # dual variables wrt/ non-negativity of w
+end
+
+
+"""
+    AbstractTulipModel
+    Data structure for a model
+"""
+mutable struct Model{T1<:Real, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
+
+    # Problem Data
+    nconstr::Integer  # number of constraints
+    nvars::Integer  # number of variables
+    
+    A::AbstractMatrix{T1}  # constraint matrix
+    b::AbstractVector{T2}  # right-hand side
+    c::AbstractVector{T3}  # objective
+    uind::AbstractVector{Ti}  # indices of variables with upper bounds
+    uval::AbstractVector{T4}  # values of upper bounds on primal variables
+
+    # current solution
+    sol::PrimalDualPoint
+    status::Symbol  # optimization status
+
+end
+
+function Model(
+    A::AbstractMatrix{T1},
+    b::AbstractVector{T2},
+    c::AbstractVector{T3},
+    uind::AbstractVector{Ti},
+    uval::AbstractVector{T4}
+    ) where{T1<:Real, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
+    
+    (m, n) = size(A)
+    n == size(c, 1) || throw(DimensionMismatch("Expected c to have size $(n) but got $(size(c, 1))"))
+    m == size(b, 1) || throw(DimensionMismatch("Expected b to have size $(m) but got $(size(b, 1))"))
+    uind[end] <= n  || throw(DimensionMismatch("Model has $(n) vars but upper bound given for var $(uind[end])"))
+
+    s = PrimalDualPoint(similar(c), similar(b), similar(c), similar(uind), similar(uval))
+
+    model = Model(m, n, A, b, c, uind, uval, s, :Built)
+    return model
+
+end
+
+
+"""
+    solve(model, tol, verbose)
+
+Solve model m using an infeasible predictor-corrector Interior-Point algorithm.
 
 # Arguments
-- `A`: constraint matrix
-- `b::Array{Float, 1}`: right-hand side
-- `c::Array{Float, 1}`: objective
-- `lb`: lower bounds
-- `ub`: upper bounds
+- `model`: concrete model
 - `tol`: numerical tolerance
 - `verbose`: 0 means no output, 1 display logs at each iteration
-
 """
-function solve(
-    A,
-    b,
-    c,
-    lb,
-    ub,
-    tol=10.0^-8,
-    verbose=0
+function solve!(
+    model::Model;
+    tol::Float64 = 10.0^-8,
+    verbose::Int = 0
 )
-    # extract dimension
-    m, n = size(A)
-    @assert length(b) == m
-    @assert length(c) == n
-    @assert length(lb) == n
-    @assert length(ub) == n
 
-    # pre-allocate memory
-    n_iter = 0
-    mu = 0.0
+    N_ITER_MAX = 10  # maximum number of IP iterations
+    niter = 0  # number of IP iterations
 
-    theta = zeros(n)
-    b_norm = norm(b)
-    c_norm = norm(c)
+    # TODO: pre-optimization stuff
+
+    F = symbolic_cholesky(model.A)  # Symbolic factorization
+    θ = zeros(model.sol.x)
 
     # compute starting point
-    x, y, s = startingPoint(A, b, c)
+    compute_starting_point!(model, F)
 
-    rb = A * x - b   # primal residual
-    rc = (y' * A + s' - c')'  # dual residual
+    # TODO: check stopping criterion for possible early termination
 
-    eps_p = (norm(rb)) / (1.0 + b_norm)  # relative primal feasibility
-    eps_d = (norm(rc)) / (1.0 + b_norm)  # relative dual feasibility
-    eps_g = abs(dot(c, x) - dot(b, y)) / (1.0 + dot(c, x))  # relative gap
-
-    # X, Y and S are for analysis purposes
-    # can be deleted to increase speed (and memory)
-    X = [copy(x)]
-    Y = [copy(y)]
-    S = [copy(s)]
-
-    N_ITER_MAX = 100  # maximum number of iterations
-
-    println(" Itn      Primal Obj        Dual Obj    Prim Inf    Dual Inf\n")
+    # IPM log
+    println(" Itn      Primal Obj        Dual Obj  Prim Inf  Dual Inf  UBnd Inf\n")
 
     # main loop
-    while (
-        (
-            (eps_p > tol)  # primal feasibility
-            || (eps_d > tol)  # dual feasibility
-            || (eps_g > tol)  # optimality gap
-        )
-        && (n_iter < N_ITER_MAX)
-    )
-
-        # book-keeping
-        n_iter += 1
-        @assert minimum(x) > 0
-        @assert minimum(s) > 0
-
-        mu = dot(x, s) / n  # centrality parameter
-        theta = (x ./ s)
+    while niter < N_ITER_MAX
         
-        # I. Form normal equations
-        if n_iter == 1
-            F = factorNormal(A, theta)
-        else
-            factorNormal!(F, A, theta)  # re-use factor if available
-        end
-
-        # II.1 Compute predictor step
-        dx_aff, dy_aff, ds_aff = solveNormal(A, x, s, theta, -rc, -rb, -x.*s, F)
-
-        # compute step size
-        if minimum(dx_aff) >= 0.0
-            a_prim = 1.0
-        else
-            a_prim = clamp(minimum(-(x ./dx_aff)[dx_aff .< 0]), 0.0, 1.0)
-        end
-
-        if minimum(ds_aff) >= 0.0
-            a_dual = 1.0
-        else
-            a_dual = clamp(minimum(-(s ./ds_aff)[ds_aff .< 0]), 0.0, 1.0)
-        end
-
-        # update centrality parameter
-        mu_aff = dot(
-            x + a_prim * dx_aff,
-            s + a_dual * ds_aff
-        ) / n
-
-        # II.2 Compute corrector step
-        sigma = clamp((mu_aff / mu)^3, 10.0^-12, 1.0 - 10.0^-12)  # clamped for numerical stability
-
-        ## corrector direction.
-        dx_cc, dy_cc, ds_cc = solveNormal(
-            A, x, s, theta,
-            zeros(n), zeros(m),
-            sigma*mu*ones(n) - dx_aff .* ds_aff,
+        # I. Form and factor Newton System
+        compute_newton!(
+            model.A,
+            model.sol.x,
+            model.sol.s,
+            model.sol.w,
+            model.sol.z,
+            model.uind,
+            θ,
             F
         )
 
-        # compute step size
-        dx = dx_aff + dx_cc
-        dy = dy_aff + dy_cc
-        ds = ds_aff + ds_cc
+        # II. Compute and take step
+        compute_next_iterate!(model, F)
 
-        # compute step size
-        if minimum(dx) >= 0.0
-            a_prim = 1.0
-        else
-            a_prim = clamp(minimum(-(x ./dx)[dx .< 0]), 0.0, 1.0)
-        end
-
-        if minimum(ds) >= 0.0
-            a_dual = 1.0
-        else
-            a_dual = clamp(minimum(-(s ./ds)[ds .< 0]), 0.0, 1.0)
-        end
-
-        a_prim = min(0.99995 * a_prim, 1.0)
-        a_dual = min(0.99995 * a_dual, 1.0)
-
-        # III. Take step
-        x += a_prim * dx
-        y += a_dual * dy
-        s += a_dual * ds
-
-        push!(X, copy(x))
-        push!(Y, copy(y))
-        push!(S, copy(s))
-
-        # compute residuals and stopping criterion
-        rc = A' * y + s - c
-        rb = A * x - b
-        eps_p = (norm(rb)) / (1. + b_norm)
-        eps_d = (norm(rc)) / (1. + c_norm)
-        eps_g = abs(dot(c, x) - dot(b, y)) / (1. + abs(dot(c, x)))
-
+        # III. Book-keeping + display log
+        niter += 1
         if verbose == 1
-            print(@sprintf("%4.0f", n_iter))  # iteration count
-            print(@sprintf("%+16.7e", dot(c, x)))  # primal objective
-            print(@sprintf("%+16.7e", dot(b, y)))  # dual objective
-            print(@sprintf("%+12.3e", norm(rb)))  # primal infeas
-            print(@sprintf("%+12.3e", norm(rc)))  # dual infeas
+            print(@sprintf("%4d", niter))  # iteration count
+            print(@sprintf("%+18.8e", 0.0))  # TODO: primal objective
+            print(@sprintf("%+16.8e", 0.0))  # TODO: dual objective
+            print(@sprintf("%10.2e", 0.0))  # TODO: primal infeas
+            print(@sprintf("%9.2e", 0.0))  # TODO: dual infeas
+            print(@sprintf("%9.2e", 0.0))  # TODO: upper bound infeas
             print("\n")
+        end
+
+        # check status
+        if model.status == :Optimal
+            println("Optimal solution found.")
+            return model.status
         end
 
     end
 
-    # return solution
-    return x, y, s, X, Y, S
-end
+    # 
 
-
-"""
-factorNormal(
-    [F, ]
-    A, theta
-)
-
-Form and factor normal equations' matrix.
-
-# Arguments
-- [F, ]: Existing factorization
-- A: Matrix
-- theta: vector
-"""
-function factorNormal(A, theta)
-    # compute normal equations' matrix
-    Phi = Symmetric((A * spdiagm(theta)) * A')
-
-    # Cholesky factorization
-    F = cholfact(Phi)
-    return F
-end
-
-function factorNormal!(F, A, theta)
-
-    # compute normal equations' matrix
-    Phi = Symmetric((A * spdiagm(theta)) * A')
-
-    # Cholesky factorization
-    cholfact!(F, Phi)
+    return model.status
     
-    return nothing
 end
 
 
 """
-solveNormal(
-    A, x, s, theta, xi_d, xi_p, xi_mu, F
-)
-
-Solve normal equations using existing factorization
-
-# Arguments
-- `A`:
-- `x`:
-- `s`:
-- `theta`:
-- `xi_d`:
-- `xi_p`:
-- `xi_mu`:
-- `F`: Pre-computed factorization
+    compute_starting_point!
+    Compute a starting point
 """
-function solveNormal(
-    A,
-    x,
-    s,
-    theta,
-    xi_d,
-    xi_p,
-    xi_mu,
-    F
-)
+function compute_starting_point!(model::Model, F::Factorization)
+    warn("TODO: starting point implementation")
+    return model.sol
+end
 
-    # solve using the existing factorization
-    dy = F \ (xi_p + A * (- xi_mu ./ s + theta .* xi_d))
+function compute_next_iterate!(model::Model, F::Factorization)
+    warn("Implement computation of next iterate!")
+    return model.sol
+end
 
-    # back substitutions
-    dx = theta .* (xi_mu ./ x - xi_d + (dy' * A)')
-    ds = (xi_mu - s .* dx) ./ x
+"""
+    symbolic_cholesky
+    Compute Cholesky factorization of A*A'
+"""
+function symbolic_cholesky(A::AbstractMatrix{T}) where {T<:Real}
 
-    return dx, dy, ds
+    F = cholfact(Symmetric(A*A'))
+    return F
+
 end
 
 
 """
-startingPoint(A, b, c)
-
-Compute a (supposedly) good starting point for the IPM algorithm.
-
-This is based on [Mehrotra 1992, On the implementation of a Primal-Dual
-    Interior-point method], section 7.
+    compute_newton!
+    Form and factorize the Newton system, using the normal equations.
 """
-function startingPoint(A, b, c)
+function compute_newton!(
+    A::AbstractMatrix{Ta},
+    x::AbstractVector{Tx},
+    s::AbstractVector{Ts},
+    w::AbstractVector{Tw},
+    z::AbstractVector{Tz},
+    uind::AbstractVector{Ti},
+    θ::AbstractVector{T},
+    F::Factorization{Ta}
+    ) where {Ta<:Real, Tx<:Real, Ts<:Real, Tw<:Real, Tz<:Real, Ti<:Integer, T<:Real}
 
-    # compute and factor A*A'
-    Phi = A * A'
-    F = cholfact(Symmetric(Phi))
+    # Compute Θ = (X^{-1} S + W^{-1} Z)^{-1}
+    θ = x ./ s
+    # update coefficients for upper bounds
+    for (i, j) in enumerate(uind)
+        θ[j] = 1.0 / (s[j] / x[j] + z[i] / w[i])
+    end
 
-    # compute initial feasible point
-    y = F \ (A * c)
-    s = (c' - y'*A)'
-    x = F \ b
-    x = (x' * A)'
+    # Form the normal equations matrix and compute its factorization
+    Cholesky.cholesky!(A, θ, F)
 
-    # compute deltas
-    dx = max(-1.5*minimum(x), 0.0)
-    ds = max(-1.5*minimum(s), 0.0)
-    dx, ds = (
-        dx + 0.5 * dot(x+dx, s+ds) / sum(s + ds),
-        ds + 0.5 * dot(x+dx, s+ds) / sum(s + dx)
-    )
+    return θ
+end
 
-    # compute starting point
-    x += dx
-    s += ds
 
-    return x, y, s
+"""
+    solve_newton
+    Solve Newton system with the given right-hand side.
+    Overwrites the input d
+"""
+function solve_newton!(
+    A::AbstractMatrix{Ta},
+    θ::AbstractVector{T1},
+    F::Factorization{Ta},
+    Λ::PrimalDualPoint,
+    d::PrimalDualPoint,
+    uind::AbstractVector{Ti},
+    ξ_b::AbstractVector{T2},
+    ξ_c::AbstractVector{T3},
+    ξ_u::AbstractVector{T4},
+    ξ_xs::AbstractVector{T5},
+    ξ_wz::AbstractVector{T6},
+) where {Ta<:Real, T1<:Real, T2<:Real, T3<:Real, T4<:Real, T5<:Real, T6<:Real, Ti<:Integer}
+
+    ξ_tmp = ξ_c - (ξ_xs ./ Λ.x)
+    ξ_tmp[uind] += (ξ_wz - (Λ.z .* ξ_u)) ./ Λ.w
+
+    d.y = F \ (ξ_b + A * (θ .* ξ_tmp))
+
+    d.x = θ .* (A' * d.y - ξ_tmp)
+
+    d.z = (Λ.z .* (-ξ_u + d.x[uind]) + ξ_wz) ./ Λ.w
+    d.s = (ξ_xs - Λ.s .* d.x) ./ Λ.x
+    d.w = (ξ_wz - Λ.w .* d.z) ./ Λ.z
+
+    return d
 end
