@@ -12,6 +12,17 @@ function cholesky!(A::AbstractMatrix{Ta}, d::AbstractVector{Td}, F::Factorizatio
     return F
 end
 
+function cholesky!(A::Matrix{Ta}, d::AbstractVector{Td}, F::Base.LinAlg.Cholesky{Ta,Matrix{Ta}}) where{Ta<:Real, Td<:Real}
+    F = cholfact!(F, A*Diagonal(d)*A')
+    return F
+end
+
+function cholesky!(A::SparseMatrixCSC{Ta, Int64}, d::AbstractVector{Td}, F::Base.SparseArrays.CHOLMOD.Factor{Ta}) where{Ta<:Real, Td<:Real}
+    # update CHolesky factor
+    F = cholfact!(F, Symmetric(A*spdiagm(d)*A'))
+    return F
+end
+
 """
     solve!(y, F, b)
     Solves the system F*y = b and overwrites y.

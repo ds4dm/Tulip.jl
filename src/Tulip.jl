@@ -1,6 +1,6 @@
 module Tulip
 
-export AbstractCholeskyFactor
+export Model, PrimalDualPoint
 
 # Cholesky module
     include("Cholesky/Cholesky.jl")
