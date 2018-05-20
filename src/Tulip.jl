@@ -6,6 +6,7 @@ export Model, PrimalDualPoint
     include("Cholesky/Cholesky.jl")
 
 # package code goes here
+    include("model.jl")
     include("ipm.jl")
     include("readmps.jl")
 

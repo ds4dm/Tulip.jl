@@ -1,64 +1,6 @@
 # import Tulip.Cholesky:
 #     AbstractCholeskyFactor, SimpleDenseCholeskyFactor, SimpleSparseCholeskyFactor
 
-"""
-    TulipSolution contains a primal-dual point
-"""
-mutable struct PrimalDualPoint{Tx<:Real, Ty<:Real, Ts<:Real, Tw<:Real, Tz<:Real}
-
-    x::AbstractVector{Tx}  # primal variables
-    y::AbstractVector{Ty}  # dual variables
-    s::AbstractVector{Ts}  # dual variables wrt/ non-negativity of s
-
-    w::AbstractVector{Tw}  # primal slack wrt/ upper bounds
-    z::AbstractVector{Tz}  # dual variables wrt/ non-negativity of w
-end
-
-
-"""
-    Model
-    Data structure for a model
-"""
-mutable struct Model{T1<:Real, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
-
-    # Problem Data
-    nconstr::Integer  # number of constraints
-    nvars::Integer  # number of variables
-    
-    A::AbstractMatrix{T1}  # constraint matrix
-    b::AbstractVector{T2}  # right-hand side
-    c::AbstractVector{T3}  # objective
-    uind::AbstractVector{Ti}  # indices of variables with upper bounds
-    uval::AbstractVector{T4}  # values of upper bounds on primal variables
-
-    # current solution
-    sol::PrimalDualPoint
-    status::Symbol  # optimization status
-
-end
-
-function Model(
-    A::AbstractMatrix{T1},
-    b::AbstractVector{T2},
-    c::AbstractVector{T3},
-    uind::AbstractVector{Ti},
-    uval::AbstractVector{T4}
-    ) where{T1<:Real, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
-    
-    (m, n) = size(A)
-    p = size(uind, 1)
-    n == size(c, 1) || throw(DimensionMismatch("Expected c to have size $(n) but got $(size(c, 1))"))
-    m == size(b, 1) || throw(DimensionMismatch("Expected b to have size $(m) but got $(size(b, 1))"))
-    if p > 0
-        uind[end] <= n  || throw(DimensionMismatch("Model has $(n) vars but upper bound given for var $(uind[end])"))
-    end
-    s = PrimalDualPoint(ones(n), zeros(m), ones(n), uval / 2.0, ones(p))
-
-    model = Model(m, n, A, b, c, uind, uval, s, :Built)
-    return model
-
-end
-
 
 """
     solve(model, tol, verbose)
@@ -66,9 +8,9 @@ end
 Solve model m using an infeasible predictor-corrector Interior-Point algorithm.
 
 # Arguments
-- `model`: the optimization model
-- `tol`: numerical tolerance
-- `verbose`: 0 means no output, 1 displays log at each iteration
+- `model::Model`: the optimization model
+- `tol::Float64`: numerical tolerance
+- `verbose::Int`: 0 means no output, 1 displays log at each iteration
 """
 function solve!(
     model::Model;
@@ -76,8 +18,7 @@ function solve!(
     verbose::Int = 0
 )
 
-    println("tol=", tol)
-    N_ITER_MAX = 100  # maximum number of IP iterations
+    N_ITER_MAX = 25  # maximum number of IP iterations
     niter = 0  # number of IP iterations
 
     # TODO: pre-optimization stuff
@@ -90,10 +31,15 @@ function solve!(
     # TODO: check stopping criterion for possible early termination
 
     # IPM log
-    println(" Itn      Primal Obj        Dual Obj  Prim Inf  Dual Inf  UBnd Inf\n")
-
+    if verbose == 1
+        println(" Itn      Primal Obj        Dual Obj  Prim Inf  Dual Inf  UBnd Inf\n")
+    end
+        # t_fact_tot = 0.0
+        # t_tot = 0.0
+        # t0 = time()
     # main loop
     while niter < N_ITER_MAX
+        
         # println("Current iterate:")
         # println("\t", model.sol.x)
         # println("\t", model.sol.y)
@@ -102,6 +48,7 @@ function solve!(
         # println("\t", model.sol.z)
         # println()
         # I. Form and factor Newton System
+        # t1 = time()
         compute_newton!(
             model.A,
             model.sol.x,
@@ -112,6 +59,13 @@ function solve!(
             θ,
             F
         )
+            # t2 = time()
+            # t_fact_tot += t2 - t1
+            # t_tot = t2 - t0
+            # println("t_fact = ", @sprintf("%.6f", t_fact_tot),
+            #     "\tt_tot = ", @sprintf("%.6f", t_tot),
+            #     "\tratio = ", @sprintf("%.6f", t_fact_tot / t_tot)
+            # )
 
         # II. Compute and take step
         compute_next_iterate!(model, F)
@@ -163,8 +117,10 @@ function solve!(
 
         # check status
         if model.status == :Optimal
-            println()
-            println("Optimal solution found.")
+            if verbose == 1
+                println()
+                println("Optimal solution found.")
+            end
             return model.status
         end
 
@@ -182,29 +138,17 @@ end
     Compute a starting point
 """
 function compute_starting_point!(model::Model, F::Factorization)
-    warn("TODO: starting point implementation")
+    # warn("TODO: starting point implementation")
     return model.sol
 end
 
 function compute_next_iterate!(model::Model, F::Factorization)
-    # warn("Implement computation of next iterate!")
+
     (x, y, s, w, z) = (model.sol.x, model.sol.y, model.sol.s, model.sol.w, model.sol.z)
     (m, n, p) = model.nconstr, model.nvars, size(model.uind, 1)
 
-    d_aff = PrimalDualPoint(
-        zeros(n),
-        zeros(m),
-        zeros(n),
-        zeros(p),
-        zeros(p)
-    )
-    d_cc = PrimalDualPoint(
-        zeros(n),
-        zeros(m),
-        zeros(n),
-        zeros(p),
-        zeros(p)
-    )
+    d_aff = copy(model.sol)
+    d_cc = copy(model.sol)
 
     # compute residuals
     μ = (
@@ -268,13 +212,7 @@ function compute_next_iterate!(model::Model, F::Factorization)
     )
 
     # final step size
-    d = PrimalDualPoint(
-        d_aff.x + d_cc.x,
-        d_aff.y + d_cc.y,
-        d_aff.s + d_cc.s,
-        d_aff.w + d_cc.w,
-        d_aff.z + d_cc.z
-    )
+    d = d_aff + d_cc
     (α_p, α_d) = compute_stepsize(model.sol, d, damp=0.99995)
 
     # take step
@@ -405,41 +343,68 @@ function solve_newton!(
     return d
 end
 
-function compute_stepsize(t::PrimalDualPoint, d::PrimalDualPoint; damp=1.0)
-    
-    if minimum(d.x) >= 0.0
-        apx = 1.0
-    else
-        apx = clamp(minimum(-(t.x ./ d.x)[d.x .< 0.0]), 0.0, 1.0)
-    end
-    
 
-    if minimum(d.s) >= 0.0
-        ads = 1.0
-    else
-        ads = clamp(minimum(-(t.s ./ d.s)[d.s .< 0.0]), 0.0, 1.0)
-    end
-    
-    if size(d.w, 1) > 0
-        if minimum(d.w) >= 0.0
-            apw = 1.0
-        else
-            apw = clamp(minimum(-(t.w ./ d.w)[d.w .< 0.0]), 0.0, 1.0)
-        end
+function compute_stepsize(
+    tx::AbstractVector{T}, tw::AbstractVector{T}, ts::AbstractVector{T}, tz::AbstractVector{T},
+    dx::AbstractVector{T}, dw::AbstractVector{T}, ds::AbstractVector{T}, dz::AbstractVector{T};
+    damp=1.0
+) where T<:Real
 
-        if minimum(d.z) >= 0.0
-            adz = 1.0
-        else
-            adz = clamp(minimum(-(t.z ./ d.z)[d.z .< 0.0]), 0.0, 1.0)
+    n = size(tx, 1)
+    p = size(tw, 1)
+    n == size(ts, 1) || throw(DimensionMismatch("t.s is wrong size"))
+    p == size(tz, 1) || throw(DimensionMismatch("t.z is wrong size"))
+    
+    n == size(dx, 1) || throw(DimensionMismatch("d.x is wrong size"))
+    n == size(ds, 1) || throw(DimensionMismatch("d.s is wrong size"))
+    p == size(dw, 1) || throw(DimensionMismatch("d.w is wrong size"))
+    p == size(dz, 1) || throw(DimensionMismatch("d.z is wrong size"))
+    
+    ap, ad = -1.0, -1.0
+    
+    @inbounds for i in 1:n
+        if dx[i] < 0.0
+            if (tx[i] / dx[i]) > ap
+                ap = (tx[i] / dx[i])
+            end
         end
-    else
-        apw = 1.0
-        adz = 1.0
     end
     
-    ap = damp * min(apx, apw)
-    ad = damp * min(ads, adz)
+    @inbounds for i in 1:n
+        if ds[i] < 0.0
+            if (ts[i] / ds[i]) > ad
+                ad = (ts[i] / ds[i])
+            end
+        end
+    end
     
+    @inbounds for j in 1:p
+        if dw[j] < 0.0
+            if (tw[j] / dw[j]) > ap
+                ap = (tw[j] / dw[j])
+            end
+        end
+    end
+    
+    @inbounds for j in 1:p
+        if dz[j] < 0.0
+            if (tz[j] / dz[j]) > ad
+                ad = (tz[j] / dz[j])
+            end
+        end
+    end
+    
+    ap = - damp * ap
+    ad = - damp * ad
+
+    # println("\t(ap, ad) = ", (ap, ad))
+    
+    return (ap, ad)
+
+end
+
+function compute_stepsize(t::PrimalDualPoint{T}, d::PrimalDualPoint{T}; damp=1.0) where T<:Real
+    (ap, ad) = compute_stepsize(t.x, t.w, t.s, t.z, d.x, d.w, d.s, d.z, damp=damp)
     return (ap, ad)
 end
 
