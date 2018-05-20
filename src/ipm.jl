@@ -1,5 +1,5 @@
-# import Tulip.Cholesky:
-#     AbstractCholeskyFactor, SimpleDenseCholeskyFactor, SimpleSparseCholeskyFactor
+import Tulip:
+    Model, PrimalDualPoint
 
 
 """
@@ -18,7 +18,7 @@ function solve!(
     verbose::Int = 0
 )
 
-    N_ITER_MAX = 25  # maximum number of IP iterations
+    N_ITER_MAX = 100  # maximum number of IP iterations
     niter = 0  # number of IP iterations
 
     # TODO: pre-optimization stuff
@@ -34,21 +34,11 @@ function solve!(
     if verbose == 1
         println(" Itn      Primal Obj        Dual Obj  Prim Inf  Dual Inf  UBnd Inf\n")
     end
-        # t_fact_tot = 0.0
-        # t_tot = 0.0
-        # t0 = time()
+
     # main loop
     while niter < N_ITER_MAX
         
-        # println("Current iterate:")
-        # println("\t", model.sol.x)
-        # println("\t", model.sol.y)
-        # println("\t", model.sol.s)
-        # println("\t", model.sol.w)
-        # println("\t", model.sol.z)
-        # println()
         # I. Form and factor Newton System
-        # t1 = time()
         compute_newton!(
             model.A,
             model.sol.x,
@@ -59,13 +49,6 @@ function solve!(
             θ,
             F
         )
-            # t2 = time()
-            # t_fact_tot += t2 - t1
-            # t_tot = t2 - t0
-            # println("t_fact = ", @sprintf("%.6f", t_fact_tot),
-            #     "\tt_tot = ", @sprintf("%.6f", t_tot),
-            #     "\tratio = ", @sprintf("%.6f", t_fact_tot / t_tot)
-            # )
 
         # II. Compute and take step
         compute_next_iterate!(model, F)
@@ -82,11 +65,6 @@ function solve!(
 
         obj_primal = dot(model.sol.x, model.c)
         obj_dual = dot(model.b, model.sol.y) - dot(model.uval, model.sol.z)
-        # println("Current Residuals:")
-        # println("\t", rb)
-        # println("\t", rc)
-        # println("\t", ru)
-        # println()
 
         niter += 1
         if verbose == 1
@@ -108,12 +86,6 @@ function solve!(
         if (eps_p < tol) && (eps_u < tol) && (eps_d < tol) && (eps_g < tol)
             model.status = :Optimal
         end
-        # println(
-        #     @sprintf("%9.2e", eps_p),
-        #     @sprintf("%9.2e", eps_u),
-        #     @sprintf("%9.2e", eps_d),
-        #     @sprintf("%9.2e", eps_g)
-        # )
 
         # check status
         if model.status == :Optimal
@@ -221,36 +193,6 @@ function compute_next_iterate!(model::Model, F::Factorization)
     model.sol.s += α_d * d.s
     model.sol.w += α_p * d.w
     model.sol.z += α_d * d.z
-
-    # println("Predictor direction:")
-    # println("\td_aff.x = ", d_aff.x)
-    # println("\td_aff.y = ", d_aff.y)
-    # println("\td_aff.s = ", d_aff.s)
-    # println("\td_aff.w = ", d_aff.w)
-    # println("\td_aff.z = ", d_aff.z)
-    # println()
-    # println("Corrector direction:")
-    # println("\t d_cc.x = ", d_cc.x)
-    # println("\t d_cc.y = ", d_cc.y)
-    # println("\t d_cc.s = ", d_cc.s)
-    # println("\t d_cc.w = ", d_cc.w)
-    # println("\t d_cc.z = ", d_cc.z)
-    # println()
-    # println("Final direction:")
-    # println("\t    d.x = ", d.x)
-    # println("\t    d.y = ", d.y)
-    # println("\t    d.s = ", d.s)
-    # println("\t    d.w = ", d.w)
-    # println("\t    d.z = ", d.z)
-    # println()
-
-    # println("Steps:",
-    #     @sprintf("%9.6f", α_pa),
-    #     @sprintf("%9.6f", α_da),
-    #     @sprintf("%9.6f", α_p),
-    #     @sprintf("%9.6f", α_d)
-    # )
-    # println()
     
     return model.sol
 end
@@ -406,58 +348,4 @@ end
 function compute_stepsize(t::PrimalDualPoint{T}, d::PrimalDualPoint{T}; damp=1.0) where T<:Real
     (ap, ad) = compute_stepsize(t.x, t.w, t.s, t.z, d.x, d.w, d.s, d.z, damp=damp)
     return (ap, ad)
-end
-
-
-function solve_newton_bis!(
-    A::AbstractMatrix{Ta},
-    θ::AbstractVector{T1},
-    F::Factorization{Ta},
-    Λ::PrimalDualPoint,
-    d::PrimalDualPoint,
-    uind::AbstractVector{Ti},
-    ξ_b::AbstractVector{T2},
-    ξ_c::AbstractVector{T3},
-    ξ_u::AbstractVector{T4},
-    ξ_xs::AbstractVector{T5},
-    ξ_wz::AbstractVector{T6},
-) where {Ta<:Real, T1<:Real, T2<:Real, T3<:Real, T4<:Real, T5<:Real, T6<:Real, Ti<:Integer}
-    (m, n) = size(A)
-    p = size(uind, 1)
-    Φ = vcat(
-        hcat(A, spzeros(m, p), spzeros(m, m), spzeros(m, p), spzeros(m, n)),
-        hcat(speye(p), speye(p), spzeros(p, m), spzeros(p, p), spzeros(p, n)),
-        hcat(spzeros(n, n), spzeros(n, p), A', -spdiagm(sparsevec(uind, ones(p), n)), speye(n)),
-        hcat(spdiagm(Λ.s), spzeros(n, p), spzeros(n, m), spzeros(n, p), spdiagm(Λ.x)),
-        hcat(spzeros(p, n), spdiagm(Λ.z), spzeros(p, m), spdiagm(Λ.w), spzeros(p, n))
-    )
-
-    ξ = vcat(ξ_b, ξ_u, ξ_c, ξ_xs, ξ_wz...);
-    
-    d_ = Φ \ ξ;
-    
-    d.x = d_[1:n]
-    d.y = d_[(2n+1):(2n+m)]
-    d.s = d_[(2n+m+p+1):end]
-    d.w = d_[(n+1):(2n)]
-    d.z = d_[(2n+m+1):(2n+m+p)]
-
-
-    # check if system is solved correctly
-    rb = ξ_b - A*d.x
-    rc = ξ_c - (A'*d.y + d.s)
-    rc[uind] += d.z
-    ru = ξ_u - (d.x[uind] + d.w)
-    rxs = ξ_xs - (Λ.s .* d.x + Λ.x .* d.s)
-    rwz = ξ_wz - (Λ.z .* d.w + Λ.w .* d.z)
-
-    println("Residuals\t(naive)")
-    println("||rb||   \t", @sprintf("%.6e", maximum(abs.(rb))))
-    println("||rc||   \t", @sprintf("%.6e", maximum(abs.(rc))))
-    println("||ru||   \t", @sprintf("%.6e", maximum(abs.(ru))))
-    println("||rxs||  \t", @sprintf("%.6e", maximum(abs.(rxs))))
-    println("||rwz||  \t", @sprintf("%.6e", maximum(abs.(rwz))))
-    println()
-
-    return d
 end

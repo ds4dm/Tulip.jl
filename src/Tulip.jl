@@ -1,6 +1,6 @@
 module Tulip
 
-export Model, PrimalDualPoint
+export Model, PrimalDualPoint, readmps
 
 # Cholesky module
     include("Cholesky/Cholesky.jl")
@@ -9,7 +9,5 @@ export Model, PrimalDualPoint
     include("model.jl")
     include("ipm.jl")
     include("readmps.jl")
-
-
     
 end # module
