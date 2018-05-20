@@ -5,5 +5,19 @@ else
     using Test
 end
 
+include("../src/Tulip.jl")
+
 # write your own tests here
-@test 1 == 2
+const testdir = dirname(@__FILE__)
+
+const test_files = [
+    # include test file name here (without .jl extension)
+    "model",
+    "tst_basic",
+    
+]
+
+for f in test_files
+    tp = joinpath(testdir, "$(f).jl")
+    include(tp)
+end
