@@ -1,6 +1,6 @@
 module Cholesky
 
-# export AbstractCholeskyFactor, SimpleDenseCholeskyFactor, SimpleSparseCholeskyFactor
+export DenseBlockAngular, FactorBlockAngular
 
 """
     cholesky!(A, d, M)
@@ -34,6 +34,7 @@ end
 
 # include("denseCholesky.jl")
 # include("sparseCholesky.jl")
+include("denseBlockAngular.jl")
 
 
 end  # module
