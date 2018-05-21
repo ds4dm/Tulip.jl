@@ -1,4 +1,4 @@
-print("\tmodel.jl...")
+print("\tmodel.jl")
 
 m = 8
 n = 8
