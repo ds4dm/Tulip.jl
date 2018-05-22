@@ -1,3 +1,11 @@
+# Base Interface
+import Base:
+    size, getindex, *
+import Base.LinAlg:
+    A_mul_B!, A_ldiv_B!
+
+# TODO: make sure this implementation is stable
+
 """
     DenseBlockAngular{Tv<:Real, Ti<:Integer}
 
@@ -33,7 +41,7 @@ function DenseBlockAngular(col_list::Vector{Matrix{T}}) where T<:Real
     colptr = Vector{Int}(R+1)
     colptr[1] = 1
 
-    # check dimensions
+    # Dimension check
     for r in 1:R
         m == size(col_list[r], 1) || throw(DimensionMismatch("Block 1 has dimensions $(size(col_list[1])) but block $(r) has dimensions $(size(col_list[r]))"))
         colptr[r+1] = colptr[r] + size(col_list[r], 2)
@@ -44,11 +52,6 @@ function DenseBlockAngular(col_list::Vector{Matrix{T}}) where T<:Real
     return DenseBlockAngular(m, colptr[end]-1, R, colptr, cols)
 end
 
-# Base Interface
-import Base:
-    size, getindex, *
-import Base.LinAlg:
-    A_mul_B!
 
 size(M::DenseBlockAngular) = (M.m+M.R, M.n)
 function getindex(M::DenseBlockAngular{Tv, Ti}, i::Integer, j::Integer) where {Tv<:Real, Ti<:Integer}
@@ -137,6 +140,60 @@ mutable struct FactorBlockAngular{Tv<:Real, Ti<:Integer} <: Factorization{Tv}
     ) where{Tv<:Real, Ti<:Integer} = new{Tv, Ti}(m, n, R, colptr, d, η, Fc)
 end
 
+size(F::FactorBlockAngular) = (F.m+F.R, F.n)
+
+
+"""
+    A_ldiv_B!
+
+"""
+function A_ldiv_B!(F::FactorBlockAngular{Tv, Ti}, b::AbstractVector{Tv}) where{Tv<:Real, Ti<:Integer}
+    
+    # Dimension check
+    (F.m + F.R) == size(b, 1) || throw(DimensionMismatch("F has dimensions $(size(F)) but b has dimensions $(size(b))"))
+    
+    @views b[1:F.R] .*= F.d
+    
+    # right-hand side for global solve (b0)
+    @views Base.BLAS.gemv!('N', -1.0, F.η, b[1:F.R], 1.0, b[(F.R+1):end])
+    
+    # global solve
+    @views Base.LinAlg.A_ldiv_B!(F.Fc, b[(F.R+1):end])
+    
+    # local backward pass
+    @views b[1:F.R] ./= F.d
+    @views Base.BLAS.gemv!('T', -1.0, F.η, b[(F.R+1):end], 1.0, b[1:F.R])
+    @views b[1:F.R] .*= F.d
+    
+    return b
+end
+
+function A_ldiv_B!(y::AbstractVector{Tv}, F::FactorBlockAngular{Tv, Ti}, b::AbstractVector{Tv}) where{Tv<:Real, Ti<:Integer}
+    
+    # Dimension check
+    (F.m + F.R) == size(b, 1) || throw(DimensionMismatch("F has dimensions $(size(F)) but b has dimensions $(size(b))"))
+    (F.m + F.R) == size(y, 1) || throw(DimensionMismatch("F has dimensions $(size(F)) but y has dimensions $(size(y))"))
+    
+    # over-write y with b
+    copy!(y, b)
+    @views y[1:F.R] .*= F.d
+    
+    # right-hand side for global solve
+    @views Base.BLAS.gemv!('N', -1.0, F.η, y[1:F.R], 0.0, y[(F.R+1):end])
+    @views Base.BLAS.axpy!(1.0, b[(F.R+1):end], y[(F.R+1):end])
+    
+    # global solve
+    @views Base.LinAlg.A_ldiv_B!(F.Fc, y[(F.R+1):end])
+    
+    # local backward pass
+    @views Base.BLAS.gemv!('T', -1.0, F.η, y[(F.R+1):end], 0.0, y[1:F.R])
+    @views Base.BLAS.axpy!(1.0, b[1:F.R], y[1:F.R])
+    @views y[1:F.R] .*= F.d
+    
+    return y
+end
+
+
 
 """
     CpBDBt!(C, B, d)
@@ -153,12 +210,14 @@ only its upper-triangular part is modified.
 -`B::Matrix{T}`: An `m`-by-`k` dense matrix
 -`d::Vector{T}`: A vector of length `k`
 """
-function CpBDBt!(C::Matrix{T}, B::Matrix{T}, d::Vector{T}) where {T<:Real}
+function CpBDBt!(C::Matrix{T}, B::AbstractMatrix{T}, d::AbstractVector{T}) where {T<:Real}
+    # TODO: allow user to specify which triangular part should be update
+    # TODO: add parameter for computing C = α C + B*D*B'
     
     # Dimension checks
     (m, k) = size(B)
     (m, m) == size(C) || throw(DimensionMismatch("C has dimensions $(size(C)) but B has dimensions $(size(B))"))
-    k = size(d, 1) || throw(DimensionMismatch("d has dimensions $(size(d)) but B has dimensions $(size(B))"))
+    k == size(d, 1) || throw(DimensionMismatch("d has dimensions $(size(d)) but B has dimensions $(size(B))"))
     
     # compute symmetric rank-k update
     # only the upper-triangular part of C is modified
@@ -178,6 +237,9 @@ function CpBDBt!(C::Matrix{T}, B::Matrix{T}, d::Vector{T}) where {T<:Real}
     
     return C
 end
+
+# TODO: blocked version
+# Compare to BLAS `syrk!`, there is a performance factor of ~2-3 to be gained 
 
 
 function cholesky!(
@@ -203,7 +265,7 @@ function cholesky!(
         @views Base.BLAS.syr!('U', -F.d[r], F.η[:, r], C)
     end
     
-    # compute Cholesky factor of C
+    # Compute Cholesky factor of C
     F.Fc = cholfact(Symmetric(C))
         
     return F
