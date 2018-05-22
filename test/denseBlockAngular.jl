@@ -1,9 +1,9 @@
 print("\tdenseBlockAngular.jl")
 
 srand(0)
-m = 4
-n = 2
-R = 8
+m = 24
+n = 32
+R = 16
 u = [rand(m, n) for _ in 1:R]
 
 # Constructor test
@@ -23,6 +23,7 @@ end
 @test A[end, end] == u[end][end, end]
 @test A[R+1, 1] == u[1][1, 1]
 
+
 # Matrix-Vector multiplication tests
 x = rand(A.n)
 # these two should not throw any error
@@ -30,6 +31,34 @@ y = A * x
 Base.LinAlg.A_mul_B!(y, A, x)
 y_ = hcat(u...) * x
 @test y[(R+1):end] == y_
+
+
+# factorization tests
+F = Tulip.Cholesky.cholesky(A, ones(A.n))
+@test m == F.m
+@test R == F.R
+@test n*R == F.n
+@test F.colptr[end] == (F.n+1)
+# factor update
+θ = rand(A.n)
+Tulip.Cholesky.cholesky!(A, θ, F)
+
+# Left division tests
+A_ = sparse(A)  # sparse representation of A
+b = rand(m+R)
+
+y = F \ b
+err = maximum(abs.(A_ * (θ .* (A_' * y)) - b))
+@test err < 10.0^-10
+
+Base.LinAlg.A_ldiv_B!(y, F, b)
+err = maximum(abs.(A_ * (θ .* (A_' * y)) - b))
+@test err < 10.0^-10
+
+y = copy(b)
+Base.LinAlg.A_ldiv_B!(F, y)
+err = maximum(abs.(A_ * (θ .* (A_' * y)) - b))
+@test err < 10.0^-10
 
 
 println("\tPassed.")
