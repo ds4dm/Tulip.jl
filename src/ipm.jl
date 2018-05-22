@@ -267,13 +267,13 @@ function solve_newton!(
     d.s = (ξ_xs - Λ.s .* d.x) ./ Λ.x
     d.w = (ξ_wz - Λ.w .* d.z) ./ Λ.z
 
-    # check if system is solved correctly
-    rb = ξ_b - A*d.x
-    rc = ξ_c - (A'*d.y + d.s)
-    rc[uind] += d.z
-    ru = ξ_u - (d.x[uind] + d.w)
-    rxs = ξ_xs - (Λ.s .* d.x + Λ.x .* d.s)
-    rwz = ξ_wz - (Λ.z .* d.w + Λ.w .* d.z)
+    # # check if system is solved correctly
+    # rb = ξ_b - A*d.x
+    # rc = ξ_c - (A'*d.y + d.s)
+    # rc[uind] += d.z
+    # ru = ξ_u - (d.x[uind] + d.w)
+    # rxs = ξ_xs - (Λ.s .* d.x + Λ.x .* d.s)
+    # rwz = ξ_wz - (Λ.z .* d.w + Λ.w .* d.z)
 
     # println("Residuals\t(normal eqs)")
     # println("||rb||   \t", @sprintf("%.6e", maximum(abs.(rb))))
