@@ -1,3 +1,6 @@
+import Base.LinAlg:
+    A_mul_B!, At_mul_B, A_ldiv_B!
+
 import Tulip:
     Model, PrimalDualPoint
 
@@ -18,6 +21,8 @@ function solve!(
     verbose::Int = 0
 )
 
+    model.status = :Built
+
     N_ITER_MAX = 100  # maximum number of IP iterations
     niter = 0  # number of IP iterations
 
@@ -25,14 +30,15 @@ function solve!(
     F = symbolic_cholesky(model.A)  # Symbolic factorization
     θ = zeros(model.sol.x)
 
-    # compute starting point
-    compute_starting_point!(model, F)
-
     # TODO: check stopping criterion for possible early termination
+
+    # compute starting point
+    # TODO: decide which starting point
+    compute_starting_point!(model, F)
 
     # IPM log
     if verbose == 1
-        println(" Itn      Primal Obj        Dual Obj  Prim Inf  Dual Inf  UBnd Inf\n")
+        println(" Itn      Primal Obj        Dual Obj    Prim Inf Dual Inf UBnd Inf\n")
     end
 
     # main loop
@@ -56,8 +62,8 @@ function solve!(
         # III. Book-keeping + display log
         # compute residuals
         rb = model.A * model.sol.x - model.b
-        rc = Base.LinAlg.At_mul_B(model.A, model.sol.y) + model.sol.s - model.c
-        update_rc!(rc, model.sol.z, model.uind)
+        rc = At_mul_B(model.A, model.sol.y) + model.sol.s - model.c
+        spxpay!(-1.0, rc, model.uind, model.sol.z)
     
         ru = model.sol.x[model.uind] + model.sol.w - model.uval
 
@@ -80,6 +86,17 @@ function solve!(
         eps_d = (norm(rc)) / (1.0 + norm(model.c))
         eps_u = (norm(ru)) / (1.0 + norm(model.uval))
         eps_g = abs(obj_primal - obj_dual) / (1.0 + abs(obj_primal))
+        # if verbose == 1
+        #     print("\teps_p=")
+        #     print(@sprintf("%9.2e", eps_p))
+        #     print("\teps_d=")
+        #     print(@sprintf("%9.2e", eps_d))
+        #     print("\teps_u=")
+        #     print(@sprintf("%9.2e", eps_u))
+        #     print("\teps_g=")
+        #     print(@sprintf("%9.2e", eps_g))
+        #     println("\n")
+        # end
 
         if (eps_p < tol) && (eps_u < tol) && (eps_d < tol) && (eps_g < tol)
             model.status = :Optimal
@@ -105,9 +122,128 @@ end
 """
     compute_starting_point!
     Compute a starting point
+# Arguments
+-`model::Model`
+-`F::Factorization`: Cholesky factor of A*A', where A is the constraint matrix
+    of the optimization problem.
 """
 function compute_starting_point!(model::Model, F::Factorization)
     # warn("TODO: starting point implementation")
+
+    rhs = - 2 * model.b
+    # TODO: update rhs with upper bounds
+
+    #==============================#
+    #
+    #   I. Solve two QPs
+    #
+    #==============================#
+
+    # Compute x0
+    v = F \ rhs
+    copy!(model.sol.x, -0.5 * At_mul_B(model.A, v))
+    spxpay!(0.5, model.sol.x, model.uind, model.uval)
+    
+    # Compute w0
+    @inbounds for i in 1:size(model.uind, 1)
+        j = model.uind[i]
+        model.sol.w[i] = model.uval[i] - model.sol.x[j]
+    end
+
+    # Compute y0
+    copy!(model.sol.y, F \ (model.A*model.c))
+    
+    # Compute s0
+    copy!(model.sol.s, 0.5 * (At_mul_B(model.A, model.sol.y) - model.c))
+
+    # Compute z0
+    @inbounds for i in size(model.uind, 1)
+        j = model.uind[i]
+        model.sol.z[i] = - model.sol.s[j]
+    end
+
+    #==============================#
+    #
+    #   II. Compute correction
+    #
+    #==============================#
+
+    dp = 0.0
+    dd = 0.0
+    
+    @inbounds for i in 1:model.nvars
+        tmp = -1.5 * model.sol.x[i]
+        if tmp > dp
+            dp = tmp
+        end
+    end
+
+    @inbounds for i in 1:size(model.uind, 1)
+        tmp = -1.5 * model.sol.w[i]
+        if tmp > dp
+            dp = tmp
+        end
+    end
+
+    
+    @inbounds for i in 1:model.nvars
+        tmp = -1.5 * model.sol.s[i]
+        if tmp > dd
+            dd = tmp
+        end
+    end
+
+    @inbounds for i in 1:size(model.uind, 1)
+        tmp = -1.5 * model.sol.z[i]
+        if tmp > dd
+            dd = tmp
+        end
+    end
+
+    @inbounds for i in 1:model.nvars
+        model.sol.x[i] += dp    
+    end
+
+    @inbounds for i in 1:model.nvars
+        model.sol.s[i] += dp    
+    end
+
+    @inbounds for i in 1:size(model.uind, 1)
+        model.sol.w[i] += dp    
+    end
+
+    @inbounds for i in 1:size(model.uind, 1)
+        model.sol.z[i] += dd    
+    end
+
+    tmp = dot(model.sol.x, model.sol.s) + dot(model.sol.w, model.sol.z)
+
+    dp = 0.5 * tmp / (sum(model.sol.x) + sum(model.sol.w))
+    dd = 0.5 * tmp / (sum(model.sol.s) + sum(model.sol.z))
+
+    #==============================#
+    #
+    #   III. Apply correction
+    #
+    #==============================#
+
+    @inbounds for i in 1:model.nvars
+        model.sol.x[i] += dp    
+    end
+
+    @inbounds for i in 1:model.nvars
+        model.sol.s[i] += dp    
+    end
+
+    @inbounds for i in 1:size(model.uind, 1)
+        model.sol.w[i] += dp    
+    end
+
+    @inbounds for i in 1:size(model.uind, 1)
+        model.sol.z[i] += dd    
+    end
+
+    # Done
     return model.sol
 end
 
@@ -125,8 +261,8 @@ function compute_next_iterate!(model::Model, F::Factorization)
     )
 
     rb = (model.A * x) - model.b
-    rc = Base.LinAlg.At_mul_B(model.A, y) + s - model.c
-    update_rc!(rc, z, model.uind)
+    rc = At_mul_B(model.A, y) + s - model.c
+    spxpay!(-1.0, rc, model.uind, model.sol.z)
 
     ru = x[model.uind] + w - model.uval
     rxs = x .* s
@@ -264,7 +400,7 @@ function solve_newton!(
 
     d.y = F \ (ξ_b + A * (θ .* ξ_tmp))
 
-    d.x = θ .* (Base.LinAlg.At_mul_B(A, d.y) - ξ_tmp)
+    d.x = θ .* (At_mul_B(A, d.y) - ξ_tmp)
 
     d.z = (Λ.z .* (-ξ_u + d.x[uind]) + ξ_wz) ./ Λ.w
     d.s = (ξ_xs - Λ.s .* d.x) ./ Λ.x
@@ -363,17 +499,16 @@ function update_theta!(θ, x, s, z, w, colind)
 end
 
 """
-    update_rc!
+    spxpay!(α, x, y_ind, y_val)
+
+In-place computation of x += α * y, where y = sparse(y_ind, y_val)
 
 # Arguments
--`rc::StridedVector{Tv}`
--`z::StridedVector{Tv}`: 
--`colind::StridedVector{Ti}`
 """
-function update_rc!(rc, z, colind)
-    for i in 1:size(colind, 1)
-        j = colind[i]
-        rc[j] = rc[j] - z[i]
+function spxpay!(α::Tv, x::AbstractVector{Tv}, y_ind::AbstractVector{Ti}, y_val::AbstractVector{Tv}) where{Ti<:Integer, Tv<:Real}
+    for i in 1:size(y_ind, 1)
+        j = y_ind[i]
+        x[j] = x[j] + α * y_val[i]
     end
     return nothing
 end
