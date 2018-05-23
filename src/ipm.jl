@@ -56,10 +56,8 @@ function solve!(
         # III. Book-keeping + display log
         # compute residuals
         rb = model.A * model.sol.x - model.b
-        rc = model.A' * model.sol.y + model.sol.s - model.c
-        for (i,j) in enumerate(model.uind)
-            rc[j] -= model.sol.z[i]
-        end
+        rc = Base.LinAlg.At_mul_B(model.A, model.sol.y) + model.sol.s - model.c
+        update_rc!(rc, model.sol.z, model.uind)
     
         ru = model.sol.x[model.uind] + model.sol.w - model.uval
 
@@ -99,7 +97,6 @@ function solve!(
     end
 
     # 
-
     return model.status
     
 end
@@ -115,32 +112,28 @@ function compute_starting_point!(model::Model, F::Factorization)
 end
 
 function compute_next_iterate!(model::Model, F::Factorization)
-
     (x, y, s, w, z) = (model.sol.x, model.sol.y, model.sol.s, model.sol.w, model.sol.z)
     (m, n, p) = model.nconstr, model.nvars, size(model.uind, 1)
 
     d_aff = copy(model.sol)
     d_cc = copy(model.sol)
-
+    
     # compute residuals
     μ = (
         (dot(x, s) + dot(w, z))
         / (n + p)
     )
-    rb = model.A * x - model.b
-    rc = model.A' * y + s - model.c
-    for (i,j) in enumerate(model.uind)
-        rc[j] -= z[i]
-    end
+
+    rb = (model.A * x) - model.b
+    rc = Base.LinAlg.At_mul_B(model.A, y) + s - model.c
+    update_rc!(rc, z, model.uind)
 
     ru = x[model.uind] + w - model.uval
     rxs = x .* s
     rwz = w .* z
 
     θ = x ./ s
-    for (i, j) in enumerate(model.uind)
-        θ[j] = 1.0 / (s[j] / x[j] + z[i] / w[i])
-    end
+    update_theta!(θ, x, s, z, w, model.uind)
 
     # compute predictor
     solve_newton!(
@@ -159,6 +152,7 @@ function compute_next_iterate!(model::Model, F::Factorization)
 
     # compute step length
     (α_pa, α_da) = compute_stepsize(model.sol, d_aff)
+
     # update centrality parameter
     μ_aff = (
         (
@@ -193,7 +187,7 @@ function compute_next_iterate!(model::Model, F::Factorization)
     model.sol.s += α_d * d.s
     model.sol.w += α_p * d.w
     model.sol.z += α_d * d.z
-    
+
     return model.sol
 end
 
@@ -204,6 +198,14 @@ end
 function symbolic_cholesky(A::AbstractMatrix{T}) where {T<:Real}
 
     F = cholfact(Symmetric(A*A'))
+    return F
+
+end
+
+function symbolic_cholesky(A::Cholesky.DenseBlockAngular{Tv, Ti}) where {Tv<:Real, Ti<:Integer}
+
+    F = Cholesky.cholesky(A, ones(A.n))
+
     return F
 
 end
@@ -226,7 +228,8 @@ function compute_newton!(
 
     # Compute Θ = (X^{-1} S + W^{-1} Z)^{-1}
     θ = x ./ s
-    for (i, j) in enumerate(uind)
+    for i in 1:size(uind, 1)
+        j = uind[i]
         θ[j] = 1.0 / (s[j] / x[j] + z[i] / w[i])
     end
 
@@ -261,7 +264,7 @@ function solve_newton!(
 
     d.y = F \ (ξ_b + A * (θ .* ξ_tmp))
 
-    d.x = θ .* (A' * d.y - ξ_tmp)
+    d.x = θ .* (Base.LinAlg.At_mul_B(A, d.y) - ξ_tmp)
 
     d.z = (Λ.z .* (-ξ_u + d.x[uind]) + ξ_wz) ./ Λ.w
     d.s = (ξ_xs - Λ.s .* d.x) ./ Λ.x
@@ -348,4 +351,29 @@ end
 function compute_stepsize(t::PrimalDualPoint{T}, d::PrimalDualPoint{T}; damp=1.0) where T<:Real
     (ap, ad) = compute_stepsize(t.x, t.w, t.s, t.z, d.x, d.w, d.s, d.z, damp=damp)
     return (ap, ad)
+end
+
+function update_theta!(θ, x, s, z, w, colind)
+    # only called from within the optimization, so bounds were checked before
+    for i in 1:size(colind, 1)
+        j = colind[i]
+        θ[j] = 1.0 / (s[j] / x[j] + z[i] / w[i])
+    end
+    return nothing
+end
+
+"""
+    update_rc!
+
+# Arguments
+-`rc::StridedVector{Tv}`
+-`z::StridedVector{Tv}`: 
+-`colind::StridedVector{Ti}`
+"""
+function update_rc!(rc, z, colind)
+    for i in 1:size(colind, 1)
+        j = colind[i]
+        rc[j] = rc[j] - z[i]
+    end
+    return nothing
 end

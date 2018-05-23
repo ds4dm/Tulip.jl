@@ -2,7 +2,7 @@
 import Base:
     size, getindex, *
 import Base.LinAlg:
-    A_mul_B!, A_ldiv_B!
+    A_mul_B!, At_mul_B, A_ldiv_B!
 
 # TODO: make sure this implementation is stable
 
@@ -88,7 +88,6 @@ function *(A::DenseBlockAngular{Tv, Ti}, x::AbstractVector{Tv}) where{Tv<:Real, 
     return y
 end
 
-# In-place Matrix-Vector multiplication
 function A_mul_B!(y::AbstractVector{Tv}, A::DenseBlockAngular{Tv, Ti}, x::AbstractVector{Tv}) where{Tv<:Real, Ti<:Integer}
     
     m, n = size(A)
@@ -102,6 +101,22 @@ function A_mul_B!(y::AbstractVector{Tv}, A::DenseBlockAngular{Tv, Ti}, x::Abstra
     Base.BLAS.gemv!('N', 1.0, A.cols, x, 0.0, view(y, (A.R+1):size(A, 1)))
     
     return y
+end
+
+function At_mul_B(A::DenseBlockAngular{Tv, Ti}, y::AbstractVector{Tv}) where{Tv<:Real, Ti<:Integer}
+    
+    m, n = size(A)
+    m == size(y, 1) || throw(DimensionMismatch("A has dimension $(size(A)) but y has dimension $(size(y))"))
+    
+    x = ones(n)
+    @inbounds for r in 1:A.R
+        for i in A.colptr[r]:(A.colptr[r+1]-1)
+            x[i] = y[r]
+        end
+    end
+    @views Base.BLAS.gemv!('T', 1.0, A.cols, y[(A.R+1):end], 1.0, x)
+    
+    return x
 end
 
 
@@ -206,11 +221,11 @@ C is modified in-place (no memory allocated),
 only its upper-triangular part is modified.
 
 # Arguments
--`C::Matrix{T}`: An `m`-by-`m` dense matrix, modified in place
--`B::Matrix{T}`: An `m`-by-`k` dense matrix
--`d::Vector{T}`: A vector of length `k`
+-`C::StridedMatrix{T}`: An `m`-by-`m` dense matrix, modified in place
+-`B::StridedMatrix{T}`: An `m`-by-`k` dense matrix
+-`d::StridedVector{T}`: A vector of length `k`
 """
-function CpBDBt!(C::Matrix{T}, B::AbstractMatrix{T}, d::AbstractVector{T}) where {T<:Real}
+function CpBDBt!(C::StridedMatrix{T}, B::StridedMatrix{T}, d::StridedVector{T}) where {T<:Real}
     # TODO: allow user to specify which triangular part should be update
     # TODO: add parameter for computing C = α C + B*D*B'
     
@@ -253,21 +268,22 @@ function cholesky!(
     
     for r in 1:A.R
         θ_ = view(θ, A.colptr[r]:(A.colptr[r+1]-1))
+        A_ = view(A.cols, :, A.colptr[r]:(A.colptr[r+1]-1))
+        η_ = view(F.η, :, r)
         
         # diagonal elements
         F.d[r] = oneunit(Tv) / sum(θ_)
         
         # lower factors
-        @views Base.BLAS.gemv!('N', 1.0, A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)], θ_, 0.0, F.η[:, r])
-        
+        Base.BLAS.gemv!('N', 1.0, A_, θ_, 0.0, η_)
+
         # Schur complement
-        @views CpBDBt!(C, A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)], θ_)
-        @views Base.BLAS.syr!('U', -F.d[r], F.η[:, r], C)
+        CpBDBt!(C, A_, θ_)
+        Base.BLAS.syr!('U', -F.d[r], η_, C)
     end
-    
-    # Compute Cholesky factor of C
+
     F.Fc = cholfact(Symmetric(C))
-        
+    
     return F
 end
 
@@ -283,16 +299,18 @@ function cholesky(
     
     for r in 1:A.R
         θ_ = view(θ, A.colptr[r]:(A.colptr[r+1]-1))
+        A_ = view(A.cols, :, A.colptr[r]:(A.colptr[r+1]-1))
+        η_ = view(η, :, r)
         
         # diagonal elements
         d[r] = oneunit(Tv) / sum(θ_)
         
         # lower factors
-        @views Base.BLAS.gemv!('N', 1.0, A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)], θ_, 0.0, η[:, r])
+        Base.BLAS.gemv!('N', 1.0, A_, θ_, 0.0, η_)
         
         # Schur complement
-        @views CpBDBt!(C, A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)], θ_)
-        @views Base.BLAS.syr!('U', -d[r], η[:, r], C)
+        CpBDBt!(C, A_, θ_)
+        Base.BLAS.syr!('U', -d[r], η_, C)
     end
     
     # compute Cholesky factor of C
@@ -301,5 +319,4 @@ function cholesky(
     F = FactorBlockAngular(A.m, A.n, A.R, A.colptr, d,η, Fc)
     
     return F
-
 end
