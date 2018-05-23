@@ -62,37 +62,22 @@ err = maximum(abs.(A_ * (θ .* (A_' * y)) - b))
 @test err < 10.0^-10
 
 # Tulip tests
-# create and solve model 
-m, n, R = 8, 16, 32
-u = [1.0 - 2.0 * rand(m, n) for _ in 1:R]
+# create and solve model
+m, n, R = 2, 2, 4
+u = 1.0 - 2.0 * rand(m, n*R)
 for r in 1:R
-    u[r][:, 1] = 0.0
+    u[:, 1+n*(r-1)] = 0.0
 end
-A = Tulip.Cholesky.DenseBlockAngular(u)
-A_ = sparse(A)
+colptr = [1+n*(r-1) for r in 1:(R+1)]
+A = Tulip.Cholesky.DenseBlockAngular(m, n*R, R, colptr, u)
 b = vcat(ones(R), zeros(m))
 c = rand(n*R)
 colub_ind = collect(1:(n*R))
 colub_val = 10.0 * ones(n*R)
-# solve model
 
+# solve model
 model = Tulip.Model(A, b, c, colub_ind, colub_val)
 Tulip.solve!(model, verbose=0, tol=10.0^-8)
-
-# println("Optimal value: ", dot(model.sol.x, model.c))
-
-
-# import MathProgBase
-# import Gurobi:GurobiSolver
-# solver_grb = GurobiSolver(OutputFlag=0, Method=2, Presolve=0, Threads=1, Crossover=0)
-# println()
-# println("\n********* RUNNING GUROBI  ***********\n")
-# senses = ['=' for i=1:(m+R)]
-# u_ = colub_val
-# model_ = MathProgBase.LinearQuadraticModel(solver_grb)
-# MathProgBase.loadproblem!(model_, A_, zeros(n*R), u_, c, b, b, :Min)
-# @time MathProgBase.optimize!(model_)
-
 
 
 println("\tPassed.")
