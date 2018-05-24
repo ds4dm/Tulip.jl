@@ -30,7 +30,7 @@ function solve!(
     F = symbolic_cholesky(model.A)  # Symbolic factorization
     θ = zeros(model.sol.x)
 
-    X = Array{PrimalDualPoint, 1}()
+    # X = Array{PrimalDualPoint, 1}()
     # TODO: check stopping criterion for possible early termination
 
     # compute starting point
@@ -48,7 +48,7 @@ function solve!(
     end
 
     # main loop
-    push!(X, copy(model.sol))
+    # push!(X, copy(model.sol))
 
     while niter < N_ITER_MAX
         
@@ -112,7 +112,7 @@ function solve!(
             model.status = :Optimal
         end
 
-        push!(X, copy(model.sol))
+        # push!(X, copy(model.sol))
 
         # check status
         if model.status == :Optimal
@@ -120,13 +120,13 @@ function solve!(
                 println()
                 println("Optimal solution found.")
             end
-            return model.status, X
+            return model.status
         end
 
     end
 
     # 
-    return model.status, X
+    return model.status
     
 end
 
