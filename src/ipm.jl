@@ -30,11 +30,17 @@ function solve!(
     F = symbolic_cholesky(model.A)  # Symbolic factorization
     θ = zeros(model.sol.x)
 
+    X = Array{PrimalDualPoint, 1}()
     # TODO: check stopping criterion for possible early termination
 
     # compute starting point
     # TODO: decide which starting point
-    compute_starting_point!(model, F)
+    compute_starting_point!(
+        model.A,
+        F,
+        model.sol,
+        model.b, model.c, model.uind, model.uval
+    )
 
     # IPM log
     if verbose == 1
@@ -42,6 +48,8 @@ function solve!(
     end
 
     # main loop
+    push!(X, copy(model.sol))
+
     while niter < N_ITER_MAX
         
         # I. Form and factor Newton System
@@ -71,15 +79,7 @@ function solve!(
         obj_dual = dot(model.b, model.sol.y) - dot(model.uval, model.sol.z)
 
         niter += 1
-        if verbose == 1
-            print(@sprintf("%4d", niter))  # iteration count
-            print(@sprintf("%+18.7e", obj_primal))  # primal objective
-            print(@sprintf("%+16.7e", obj_dual))  # dual objective
-            print(@sprintf("%10.2e", maximum(abs.(rb))))  # primal infeas
-            print(@sprintf("%9.2e", maximum(abs.(rc))))  # dual infeas
-            print(@sprintf("%9.2e", maximum(abs.(ru))))  # upper bound infeas
-            print("\n")
-        end
+
 
         # check stopping criterion
         eps_p = (norm(rb)) / (1.0 + norm(model.b))
@@ -97,10 +97,22 @@ function solve!(
         #     print(@sprintf("%9.2e", eps_g))
         #     println("\n")
         # end
+        if verbose == 1
+            print(@sprintf("%4d", niter))  # iteration count
+            print(@sprintf("%+18.7e", obj_primal))  # primal objective
+            print(@sprintf("%+16.7e", obj_dual))  # dual objective
+            print(@sprintf("%10.2e", norm(rb, Inf)))  # primal infeas
+            print(@sprintf("%9.2e", norm(rc, Inf)))  # dual infeas
+            print(@sprintf("%9.2e", norm(ru, Inf)))  # upper bound infeas
+            print(@sprintf("%9.2e", abs(obj_primal - obj_dual) / (model.nvars + size(model.uind, 1))))
+            print("\n")
+        end
 
         if (eps_p < tol) && (eps_u < tol) && (eps_d < tol) && (eps_g < tol)
             model.status = :Optimal
         end
+
+        push!(X, copy(model.sol))
 
         # check status
         if model.status == :Optimal
@@ -108,13 +120,13 @@ function solve!(
                 println()
                 println("Optimal solution found.")
             end
-            return model.status
+            return model.status, X
         end
 
     end
 
     # 
-    return model.status
+    return model.status, X
     
 end
 
@@ -122,16 +134,29 @@ end
 """
     compute_starting_point!
     Compute a starting point
+
 # Arguments
 -`model::Model`
 -`F::Factorization`: Cholesky factor of A*A', where A is the constraint matrix
     of the optimization problem.
 """
-function compute_starting_point!(model::Model, F::Factorization)
-    # warn("TODO: starting point implementation")
+function compute_starting_point!(
+    A::AbstractMatrix{Tv},
+    F::Factorization{Tv},
+    Λ::Tulip.PrimalDualPoint{Tv},
+    b::StridedVector{Tv},
+    c::StridedVector{Tv},
+    uind::StridedVector{Ti},
+    uval::StridedVector{Tv}
+    ) where{Tv<:Real, Ti<:Integer}
 
-    rhs = - 2 * model.b
-    # TODO: update rhs with upper bounds
+    (m, n) = size(A)
+    p = size(uind, 1)
+
+    rhs = - 2 * b
+    u_ = zeros(n)
+    spxpay!(1.0, u_, uind, uval)
+    rhs += A* u_
 
     #==============================#
     #
@@ -141,26 +166,28 @@ function compute_starting_point!(model::Model, F::Factorization)
 
     # Compute x0
     v = F \ rhs
-    copy!(model.sol.x, -0.5 * At_mul_B(model.A, v))
-    spxpay!(0.5, model.sol.x, model.uind, model.uval)
-    
+
+    copy!(Λ.x, -0.5 * At_mul_B(A, v))
+    spxpay!(0.5, Λ.x, uind, uval)
+
     # Compute w0
-    @inbounds for i in 1:size(model.uind, 1)
-        j = model.uind[i]
-        model.sol.w[i] = model.uval[i] - model.sol.x[j]
+    @inbounds for i in 1:p
+        j = uind[i]
+        Λ.w[i] = uval[i] - Λ.x[j]
     end
 
     # Compute y0
-    copy!(model.sol.y, F \ (model.A*model.c))
-    
+    copy!(Λ.y, F \ (A*c))
+
     # Compute s0
-    copy!(model.sol.s, 0.5 * (At_mul_B(model.A, model.sol.y) - model.c))
+    copy!(Λ.s, 0.5 * (At_mul_B(A, Λ.y) - c))
 
     # Compute z0
-    @inbounds for i in size(model.uind, 1)
-        j = model.uind[i]
-        model.sol.z[i] = - model.sol.s[j]
+    @inbounds for i in 1:p
+        j = uind[i]
+        Λ.z[i] = - Λ.s[j]
     end
+
 
     #==============================#
     #
@@ -168,58 +195,42 @@ function compute_starting_point!(model::Model, F::Factorization)
     #
     #==============================#
 
-    dp = 0.0
-    dd = 0.0
-    
-    @inbounds for i in 1:model.nvars
-        tmp = -1.5 * model.sol.x[i]
+    dp = zero(Tv)
+    dd = zero(Tv)
+
+    @inbounds for i in 1:n
+        tmp = -1.5 * Λ.x[i]
         if tmp > dp
             dp = tmp
         end
     end
 
-    @inbounds for i in 1:size(model.uind, 1)
-        tmp = -1.5 * model.sol.w[i]
+    @inbounds for i in 1:p
+        tmp = -1.5 * Λ.w[i]
         if tmp > dp
             dp = tmp
         end
     end
 
-    
-    @inbounds for i in 1:model.nvars
-        tmp = -1.5 * model.sol.s[i]
+
+    @inbounds for i in 1:n
+        tmp = -1.5 * Λ.s[i]
         if tmp > dd
             dd = tmp
         end
     end
 
-    @inbounds for i in 1:size(model.uind, 1)
-        tmp = -1.5 * model.sol.z[i]
+    @inbounds for i in 1:p
+        tmp = -1.5 * Λ.z[i]
         if tmp > dd
             dd = tmp
         end
     end
 
-    @inbounds for i in 1:model.nvars
-        model.sol.x[i] += dp    
-    end
+    tmp = dot(Λ.x + dp, Λ.s + dd) + dot(Λ.w + dp, Λ.z + dd)
 
-    @inbounds for i in 1:model.nvars
-        model.sol.s[i] += dp    
-    end
-
-    @inbounds for i in 1:size(model.uind, 1)
-        model.sol.w[i] += dp    
-    end
-
-    @inbounds for i in 1:size(model.uind, 1)
-        model.sol.z[i] += dd    
-    end
-
-    tmp = dot(model.sol.x, model.sol.s) + dot(model.sol.w, model.sol.z)
-
-    dp = 0.5 * tmp / (sum(model.sol.x) + sum(model.sol.w))
-    dd = 0.5 * tmp / (sum(model.sol.s) + sum(model.sol.z))
+    dp += 0.5 * tmp / (sum(Λ.s + dd) + sum(Λ.z + dd))
+    dd += 0.5 * tmp / (sum(Λ.x + dp) + sum(Λ.w + dp))
 
     #==============================#
     #
@@ -227,24 +238,24 @@ function compute_starting_point!(model::Model, F::Factorization)
     #
     #==============================#
 
-    @inbounds for i in 1:model.nvars
-        model.sol.x[i] += dp    
+    @inbounds for i in 1:n
+        Λ.x[i] += dp    
     end
 
-    @inbounds for i in 1:model.nvars
-        model.sol.s[i] += dp    
+    @inbounds for i in 1:n
+        Λ.s[i] += dd    
     end
 
-    @inbounds for i in 1:size(model.uind, 1)
-        model.sol.w[i] += dp    
+    @inbounds for i in 1:p
+        Λ.w[i] += dp    
     end
 
-    @inbounds for i in 1:size(model.uind, 1)
-        model.sol.z[i] += dd    
+    @inbounds for i in 1:p
+        Λ.z[i] += dd    
     end
 
     # Done
-    return model.sol
+    return Λ
 end
 
 function compute_next_iterate!(model::Model, F::Factorization)
