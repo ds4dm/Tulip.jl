@@ -344,15 +344,7 @@ end
 """
 function symbolic_cholesky(A::AbstractMatrix{T}) where {T<:Real}
 
-    F = cholfact(Symmetric(A*A'))
-    return F
-
-end
-
-function symbolic_cholesky(A::Cholesky.DenseBlockAngular{Tv, Ti}) where {Tv<:Real, Ti<:Integer}
-
     F = Cholesky.cholesky(A, ones(A.n))
-
     return F
 
 end
