@@ -1,9 +1,31 @@
 module Cholesky
 
-# export AbstractCholeskyFactor, SimpleDenseCholeskyFactor, SimpleSparseCholeskyFactor
+export DenseBlockAngular, FactorBlockAngular
 
 """
-    cholesky!(A, d, M)
+    cholesky(A, d)
+    Form the matrix S = A*Diag(d)*A' and computes its Cholesky factorization.
+    The factorization overwrites F.
+"""
+function cholesky(A::AbstractMatrix{Tv}, d::AbstractVector{Td}) where{Tv<:Real, Td<:Real}
+    warn("cholesky! must be implemented for $(typeof(A))")
+    F = cholfact(Symmetric(A*spdiagm(d)*A'))
+    return F
+end
+
+function cholesky(A::Matrix{Ta}, d::AbstractVector{Td}) where{Ta<:Real, Td<:Real}
+    F = cholfact(Symmetric(A*Diagonal(d)*A'))
+    return F
+end
+
+function cholesky(A::SparseMatrixCSC{Ta, Int64}, d::AbstractVector{Td}) where{Ta<:Real, Td<:Real}
+    F = cholfact(Symmetric(A*spdiagm(d)*A'))
+    return F
+end
+
+
+"""
+    cholesky!(A, d, F)
     Form the matrix S = A*Diag(d)*A' and computes its Cholesky factorization.
     The factorization overwrites F.
 """
@@ -34,6 +56,7 @@ end
 
 # include("denseCholesky.jl")
 # include("sparseCholesky.jl")
+include("denseBlockAngular.jl")
 
 
 end  # module

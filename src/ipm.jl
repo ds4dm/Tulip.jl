@@ -1,3 +1,6 @@
+import Base.LinAlg:
+    A_mul_B!, At_mul_B, A_ldiv_B!
+
 import Tulip:
     Model, PrimalDualPoint
 
@@ -18,6 +21,8 @@ function solve!(
     verbose::Int = 0
 )
 
+    model.status = :Built
+
     N_ITER_MAX = 100  # maximum number of IP iterations
     niter = 0  # number of IP iterations
 
@@ -25,17 +30,26 @@ function solve!(
     F = symbolic_cholesky(model.A)  # Symbolic factorization
     θ = zeros(model.sol.x)
 
-    # compute starting point
-    compute_starting_point!(model, F)
-
+    # X = Array{PrimalDualPoint, 1}()
     # TODO: check stopping criterion for possible early termination
+
+    # compute starting point
+    # TODO: decide which starting point
+    compute_starting_point!(
+        model.A,
+        F,
+        model.sol,
+        model.b, model.c, model.uind, model.uval
+    )
 
     # IPM log
     if verbose == 1
-        println(" Itn      Primal Obj        Dual Obj  Prim Inf  Dual Inf  UBnd Inf\n")
+        println(" Itn      Primal Obj        Dual Obj    Prim Inf Dual Inf UBnd Inf\n")
     end
 
     # main loop
+    # push!(X, copy(model.sol))
+
     while niter < N_ITER_MAX
         
         # I. Form and factor Newton System
@@ -56,10 +70,8 @@ function solve!(
         # III. Book-keeping + display log
         # compute residuals
         rb = model.A * model.sol.x - model.b
-        rc = model.A' * model.sol.y + model.sol.s - model.c
-        for (i,j) in enumerate(model.uind)
-            rc[j] -= model.sol.z[i]
-        end
+        rc = At_mul_B(model.A, model.sol.y) + model.sol.s - model.c
+        spxpay!(-1.0, rc, model.uind, model.sol.z)
     
         ru = model.sol.x[model.uind] + model.sol.w - model.uval
 
@@ -67,25 +79,40 @@ function solve!(
         obj_dual = dot(model.b, model.sol.y) - dot(model.uval, model.sol.z)
 
         niter += 1
-        if verbose == 1
-            print(@sprintf("%4d", niter))  # iteration count
-            print(@sprintf("%+18.7e", obj_primal))  # primal objective
-            print(@sprintf("%+16.7e", obj_dual))  # dual objective
-            print(@sprintf("%10.2e", maximum(abs.(rb))))  # primal infeas
-            print(@sprintf("%9.2e", maximum(abs.(rc))))  # dual infeas
-            print(@sprintf("%9.2e", maximum(abs.(ru))))  # upper bound infeas
-            print("\n")
-        end
+
 
         # check stopping criterion
         eps_p = (norm(rb)) / (1.0 + norm(model.b))
         eps_d = (norm(rc)) / (1.0 + norm(model.c))
         eps_u = (norm(ru)) / (1.0 + norm(model.uval))
         eps_g = abs(obj_primal - obj_dual) / (1.0 + abs(obj_primal))
+        # if verbose == 1
+        #     print("\teps_p=")
+        #     print(@sprintf("%9.2e", eps_p))
+        #     print("\teps_d=")
+        #     print(@sprintf("%9.2e", eps_d))
+        #     print("\teps_u=")
+        #     print(@sprintf("%9.2e", eps_u))
+        #     print("\teps_g=")
+        #     print(@sprintf("%9.2e", eps_g))
+        #     println("\n")
+        # end
+        if verbose == 1
+            print(@sprintf("%4d", niter))  # iteration count
+            print(@sprintf("%+18.7e", obj_primal))  # primal objective
+            print(@sprintf("%+16.7e", obj_dual))  # dual objective
+            print(@sprintf("%10.2e", norm(rb, Inf)))  # primal infeas
+            print(@sprintf("%9.2e", norm(rc, Inf)))  # dual infeas
+            print(@sprintf("%9.2e", norm(ru, Inf)))  # upper bound infeas
+            print(@sprintf("%9.2e", abs(obj_primal - obj_dual) / (model.nvars + size(model.uind, 1))))
+            print("\n")
+        end
 
         if (eps_p < tol) && (eps_u < tol) && (eps_d < tol) && (eps_g < tol)
             model.status = :Optimal
         end
+
+        # push!(X, copy(model.sol))
 
         # check status
         if model.status == :Optimal
@@ -99,7 +126,6 @@ function solve!(
     end
 
     # 
-
     return model.status
     
 end
@@ -108,39 +134,153 @@ end
 """
     compute_starting_point!
     Compute a starting point
+
+# Arguments
+-`model::Model`
+-`F::Factorization`: Cholesky factor of A*A', where A is the constraint matrix
+    of the optimization problem.
 """
-function compute_starting_point!(model::Model, F::Factorization)
-    # warn("TODO: starting point implementation")
-    return model.sol
+function compute_starting_point!(
+    A::AbstractMatrix{Tv},
+    F::Factorization{Tv},
+    Λ::Tulip.PrimalDualPoint{Tv},
+    b::StridedVector{Tv},
+    c::StridedVector{Tv},
+    uind::StridedVector{Ti},
+    uval::StridedVector{Tv}
+    ) where{Tv<:Real, Ti<:Integer}
+
+    (m, n) = size(A)
+    p = size(uind, 1)
+
+    rhs = - 2 * b
+    u_ = zeros(n)
+    spxpay!(1.0, u_, uind, uval)
+    rhs += A* u_
+
+    #==============================#
+    #
+    #   I. Solve two QPs
+    #
+    #==============================#
+
+    # Compute x0
+    v = F \ rhs
+
+    copy!(Λ.x, -0.5 * At_mul_B(A, v))
+    spxpay!(0.5, Λ.x, uind, uval)
+
+    # Compute w0
+    @inbounds for i in 1:p
+        j = uind[i]
+        Λ.w[i] = uval[i] - Λ.x[j]
+    end
+
+    # Compute y0
+    copy!(Λ.y, F \ (A*c))
+
+    # Compute s0
+    copy!(Λ.s, 0.5 * (At_mul_B(A, Λ.y) - c))
+
+    # Compute z0
+    @inbounds for i in 1:p
+        j = uind[i]
+        Λ.z[i] = - Λ.s[j]
+    end
+
+
+    #==============================#
+    #
+    #   II. Compute correction
+    #
+    #==============================#
+
+    dp = zero(Tv)
+    dd = zero(Tv)
+
+    @inbounds for i in 1:n
+        tmp = -1.5 * Λ.x[i]
+        if tmp > dp
+            dp = tmp
+        end
+    end
+
+    @inbounds for i in 1:p
+        tmp = -1.5 * Λ.w[i]
+        if tmp > dp
+            dp = tmp
+        end
+    end
+
+
+    @inbounds for i in 1:n
+        tmp = -1.5 * Λ.s[i]
+        if tmp > dd
+            dd = tmp
+        end
+    end
+
+    @inbounds for i in 1:p
+        tmp = -1.5 * Λ.z[i]
+        if tmp > dd
+            dd = tmp
+        end
+    end
+
+    tmp = dot(Λ.x + dp, Λ.s + dd) + dot(Λ.w + dp, Λ.z + dd)
+
+    dp += 0.5 * tmp / (sum(Λ.s + dd) + sum(Λ.z + dd))
+    dd += 0.5 * tmp / (sum(Λ.x + dp) + sum(Λ.w + dp))
+
+    #==============================#
+    #
+    #   III. Apply correction
+    #
+    #==============================#
+
+    @inbounds for i in 1:n
+        Λ.x[i] += dp    
+    end
+
+    @inbounds for i in 1:n
+        Λ.s[i] += dd    
+    end
+
+    @inbounds for i in 1:p
+        Λ.w[i] += dp    
+    end
+
+    @inbounds for i in 1:p
+        Λ.z[i] += dd    
+    end
+
+    # Done
+    return Λ
 end
 
 function compute_next_iterate!(model::Model, F::Factorization)
-
     (x, y, s, w, z) = (model.sol.x, model.sol.y, model.sol.s, model.sol.w, model.sol.z)
     (m, n, p) = model.nconstr, model.nvars, size(model.uind, 1)
 
     d_aff = copy(model.sol)
     d_cc = copy(model.sol)
-
+    
     # compute residuals
     μ = (
         (dot(x, s) + dot(w, z))
         / (n + p)
     )
-    rb = model.A * x - model.b
-    rc = model.A' * y + s - model.c
-    for (i,j) in enumerate(model.uind)
-        rc[j] -= z[i]
-    end
+
+    rb = (model.A * x) - model.b
+    rc = At_mul_B(model.A, y) + s - model.c
+    spxpay!(-1.0, rc, model.uind, model.sol.z)
 
     ru = x[model.uind] + w - model.uval
     rxs = x .* s
     rwz = w .* z
 
     θ = x ./ s
-    for (i, j) in enumerate(model.uind)
-        θ[j] = 1.0 / (s[j] / x[j] + z[i] / w[i])
-    end
+    update_theta!(θ, x, s, z, w, model.uind)
 
     # compute predictor
     solve_newton!(
@@ -159,6 +299,7 @@ function compute_next_iterate!(model::Model, F::Factorization)
 
     # compute step length
     (α_pa, α_da) = compute_stepsize(model.sol, d_aff)
+
     # update centrality parameter
     μ_aff = (
         (
@@ -193,7 +334,7 @@ function compute_next_iterate!(model::Model, F::Factorization)
     model.sol.s += α_d * d.s
     model.sol.w += α_p * d.w
     model.sol.z += α_d * d.z
-    
+
     return model.sol
 end
 
@@ -203,7 +344,7 @@ end
 """
 function symbolic_cholesky(A::AbstractMatrix{T}) where {T<:Real}
 
-    F = cholfact(Symmetric(A*A'))
+    F = Cholesky.cholesky(A, ones(A.n))
     return F
 
 end
@@ -226,7 +367,8 @@ function compute_newton!(
 
     # Compute Θ = (X^{-1} S + W^{-1} Z)^{-1}
     θ = x ./ s
-    for (i, j) in enumerate(uind)
+    for i in 1:size(uind, 1)
+        j = uind[i]
         θ[j] = 1.0 / (s[j] / x[j] + z[i] / w[i])
     end
 
@@ -261,19 +403,19 @@ function solve_newton!(
 
     d.y = F \ (ξ_b + A * (θ .* ξ_tmp))
 
-    d.x = θ .* (A' * d.y - ξ_tmp)
+    d.x = θ .* (At_mul_B(A, d.y) - ξ_tmp)
 
     d.z = (Λ.z .* (-ξ_u + d.x[uind]) + ξ_wz) ./ Λ.w
     d.s = (ξ_xs - Λ.s .* d.x) ./ Λ.x
     d.w = (ξ_wz - Λ.w .* d.z) ./ Λ.z
 
-    # check if system is solved correctly
-    rb = ξ_b - A*d.x
-    rc = ξ_c - (A'*d.y + d.s)
-    rc[uind] += d.z
-    ru = ξ_u - (d.x[uind] + d.w)
-    rxs = ξ_xs - (Λ.s .* d.x + Λ.x .* d.s)
-    rwz = ξ_wz - (Λ.z .* d.w + Λ.w .* d.z)
+    # # check if system is solved correctly
+    # rb = ξ_b - A*d.x
+    # rc = ξ_c - (A'*d.y + d.s)
+    # rc[uind] += d.z
+    # ru = ξ_u - (d.x[uind] + d.w)
+    # rxs = ξ_xs - (Λ.s .* d.x + Λ.x .* d.s)
+    # rwz = ξ_wz - (Λ.z .* d.w + Λ.w .* d.z)
 
     # println("Residuals\t(normal eqs)")
     # println("||rb||   \t", @sprintf("%.6e", maximum(abs.(rb))))
@@ -348,4 +490,28 @@ end
 function compute_stepsize(t::PrimalDualPoint{T}, d::PrimalDualPoint{T}; damp=1.0) where T<:Real
     (ap, ad) = compute_stepsize(t.x, t.w, t.s, t.z, d.x, d.w, d.s, d.z, damp=damp)
     return (ap, ad)
+end
+
+function update_theta!(θ, x, s, z, w, colind)
+    # only called from within the optimization, so bounds were checked before
+    for i in 1:size(colind, 1)
+        j = colind[i]
+        θ[j] = 1.0 / (s[j] / x[j] + z[i] / w[i])
+    end
+    return nothing
+end
+
+"""
+    spxpay!(α, x, y_ind, y_val)
+
+In-place computation of x += α * y, where y = sparse(y_ind, y_val)
+
+# Arguments
+"""
+function spxpay!(α::Tv, x::AbstractVector{Tv}, y_ind::AbstractVector{Ti}, y_val::AbstractVector{Tv}) where{Ti<:Integer, Tv<:Real}
+    for i in 1:size(y_ind, 1)
+        j = y_ind[i]
+        x[j] = x[j] + α * y_val[i]
+    end
+    return nothing
 end

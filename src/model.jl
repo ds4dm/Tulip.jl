@@ -1,4 +1,3 @@
-import Base: copy, +
 """
     PrimalDualPoint
 
@@ -10,16 +9,18 @@ import Base: copy, +
 - `z::AbstractVector{T}`: vector of dual variables (reduced costs of `w`)
 """
 mutable struct PrimalDualPoint{T<:Real}
+    x::AbstractVector{T}
+    w::AbstractVector{T}
 
-    x::AbstractVector{T}  # primal variables
-    w::AbstractVector{T}  # primal slack wrt/ upper bounds
-
-    y::AbstractVector{T}  # dual variables
-    s::AbstractVector{T}  # dual variables wrt/ non-negativity of s
-    z::AbstractVector{T}  # dual variables wrt/ non-negativity of w
+    y::AbstractVector{T}
+    s::AbstractVector{T} 
+    z::AbstractVector{T}
 end
 
 # extend Base operation on primal-dual points
+import Base:
+    copy, +
+
 copy(p::PrimalDualPoint) = PrimalDualPoint(copy(p.x), copy(p.w), copy(p.y), copy(p.s), copy(p.z))
 +(p1::PrimalDualPoint, p2::PrimalDualPoint) = PrimalDualPoint(
     p1.x + p2.x,
@@ -32,22 +33,33 @@ copy(p::PrimalDualPoint) = PrimalDualPoint(copy(p.x), copy(p.w), copy(p.y), copy
 """
     Model
     Data structure for a model
+
+# Attributes
+-`nconstr::Integer`: Number of constraints
+-`nvars::Integer`: Number of variables
+-`A::AbstractMatrix{T1<:Real}`: Constraint matrix
+-`b::AbstractVector{T2<:Real}`: Right-hand side of the equality constraints
+-`c::AbstractVector{T3<:Real}`: Objective coefficient
+-`uind::AbstractVector{Ti<:Integer}`: Indices of upper-bounded variables
+-`uval::AbstractVector{T4<:Real}`: Upper bounds on the variables. Only finite
+    upper bounds are stored.
+-`sol::PrimalDualPoint`: Current solution to the problem (may be infeasible at
+    the beginning of the optimization)
+-`status::Symbol`: Optimization status
 """
 mutable struct Model{T1<:Real, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
 
-    # Problem Data
-    nconstr::Integer  # number of constraints
-    nvars::Integer  # number of variables
+    nconstr::Integer
+    nvars::Integer
     
-    A::AbstractMatrix{T1}  # constraint matrix
-    b::AbstractVector{T2}  # right-hand side
-    c::AbstractVector{T3}  # objective
-    uind::AbstractVector{Ti}  # indices of variables with upper bounds
-    uval::AbstractVector{T4}  # values of upper bounds on primal variables
+    A::AbstractMatrix{T1}
+    b::AbstractVector{T2}
+    c::AbstractVector{T3}
+    uind::AbstractVector{Ti}
+    uval::AbstractVector{T4}
 
-    # current solution
     sol::PrimalDualPoint
-    status::Symbol  # optimization status
+    status::Symbol
 
 end
 
