@@ -1,10 +1,6 @@
 import Base.LinAlg:
     A_mul_B!, At_mul_B, A_ldiv_B!
 
-import Tulip:
-    Model, PrimalDualPoint
-
-
 """
     solve(model, tol, verbose)
 
@@ -86,17 +82,6 @@ function solve!(
         eps_d = (norm(rc)) / (1.0 + norm(model.c))
         eps_u = (norm(ru)) / (1.0 + norm(model.uval))
         eps_g = abs(obj_primal - obj_dual) / (1.0 + abs(obj_primal))
-        # if verbose == 1
-        #     print("\teps_p=")
-        #     print(@sprintf("%9.2e", eps_p))
-        #     print("\teps_d=")
-        #     print(@sprintf("%9.2e", eps_d))
-        #     print("\teps_u=")
-        #     print(@sprintf("%9.2e", eps_u))
-        #     print("\teps_g=")
-        #     print(@sprintf("%9.2e", eps_g))
-        #     println("\n")
-        # end
         if verbose == 1
             print(@sprintf("%4d", niter))  # iteration count
             print(@sprintf("%+18.7e", obj_primal))  # primal objective
@@ -112,8 +97,6 @@ function solve!(
             model.status = :Optimal
         end
 
-        # push!(X, copy(model.sol))
-
         # check status
         if model.status == :Optimal
             if verbose == 1
@@ -125,7 +108,6 @@ function solve!(
 
     end
 
-    # 
     return model.status
     
 end
@@ -141,14 +123,14 @@ end
     of the optimization problem.
 """
 function compute_starting_point!(
-    A::AbstractMatrix{Tv},
-    F::Factorization{Tv},
-    Λ::Tulip.PrimalDualPoint{Tv},
-    b::StridedVector{Tv},
-    c::StridedVector{Tv},
-    uind::StridedVector{Ti},
-    uval::StridedVector{Tv}
-    ) where{Tv<:Real, Ti<:Integer}
+        A::AbstractMatrix{Tv},
+        F::Factorization{Tv},
+        Λ::Tulip.PrimalDualPoint{Tv},
+        b::StridedVector{Tv},
+        c::StridedVector{Tv},
+        uind::StridedVector{Ti},
+        uval::StridedVector{Tv}
+    ) where {Tv<:Real, Ti<:Integer}
 
     (m, n) = size(A)
     p = size(uind, 1)
@@ -159,9 +141,7 @@ function compute_starting_point!(
     rhs += A* u_
 
     #==============================#
-    #
     #   I. Solve two QPs
-    #
     #==============================#
 
     # Compute x0
@@ -190,9 +170,7 @@ function compute_starting_point!(
 
 
     #==============================#
-    #
     #   II. Compute correction
-    #
     #==============================#
 
     dp = zero(Tv)
@@ -233,9 +211,7 @@ function compute_starting_point!(
     dd += 0.5 * tmp / (sum(Λ.x + dp) + sum(Λ.w + dp))
 
     #==============================#
-    #
     #   III. Apply correction
-    #
     #==============================#
 
     @inbounds for i in 1:n
@@ -259,19 +235,16 @@ function compute_starting_point!(
 end
 
 function compute_next_iterate!(model::Model, F::Factorization)
-    (x, y, s, w, z) = (model.sol.x, model.sol.y, model.sol.s, model.sol.w, model.sol.z)
+    (x, y, s, w, z) = model.sol.x, model.sol.y, model.sol.s, model.sol.w, model.sol.z
     (m, n, p) = model.nconstr, model.nvars, size(model.uind, 1)
 
     d_aff = copy(model.sol)
     d_cc = copy(model.sol)
     
     # compute residuals
-    μ = (
-        (dot(x, s) + dot(w, z))
-        / (n + p)
-    )
+    μ = (dot(x, s) + dot(w, z)) / (n + p)
 
-    rb = (model.A * x) - model.b
+    rb = model.A * x - model.b
     rc = At_mul_B(model.A, y) + s - model.c
     spxpay!(-1.0, rc, model.uind, model.sol.z)
 
@@ -301,12 +274,8 @@ function compute_next_iterate!(model::Model, F::Factorization)
     (α_pa, α_da) = compute_stepsize(model.sol, d_aff)
 
     # update centrality parameter
-    μ_aff = (
-        (
-            dot(x + α_pa * d_aff.x, s + α_da * d_aff.s)
-            + dot(w + α_pa * d_aff.w, z + α_da * d_aff.z)
-        ) / (n + p)
-    ) 
+    μ_aff = (dot(x + α_pa * d_aff.x, s + α_da * d_aff.s)
+            +dot(w + α_pa * d_aff.w, z + α_da * d_aff.z)) / (n + p)
 
     σ = clamp((μ_aff / μ)^3, 10.0^-12, 1.0 - 10.0^-12)  # clamped for numerical stability
     # compute corrector
@@ -355,14 +324,14 @@ end
     Form and factorize the Newton system, using the normal equations.
 """
 function compute_newton!(
-    A::AbstractMatrix{Ta},
-    x::AbstractVector{Tx},
-    s::AbstractVector{Ts},
-    w::AbstractVector{Tw},
-    z::AbstractVector{Tz},
-    uind::AbstractVector{Ti},
-    θ::AbstractVector{T},
-    F::Factorization{Ta}
+        A::AbstractMatrix{Ta},
+        x::AbstractVector{Tx},
+        s::AbstractVector{Ts},
+        w::AbstractVector{Tw},
+        z::AbstractVector{Tz},
+        uind::AbstractVector{Ti},
+        θ::AbstractVector{T},
+        F::Factorization{Ta}
     ) where {Ta<:Real, Tx<:Real, Ts<:Real, Tw<:Real, Tz<:Real, Ti<:Integer, T<:Real}
 
     # Compute Θ = (X^{-1} S + W^{-1} Z)^{-1}
@@ -417,13 +386,6 @@ function solve_newton!(
     # rxs = ξ_xs - (Λ.s .* d.x + Λ.x .* d.s)
     # rwz = ξ_wz - (Λ.z .* d.w + Λ.w .* d.z)
 
-    # println("Residuals\t(normal eqs)")
-    # println("||rb||   \t", @sprintf("%.6e", maximum(abs.(rb))))
-    # println("||rc||   \t", @sprintf("%.6e", maximum(abs.(rc))))
-    # println("||ru||   \t", @sprintf("%.6e", maximum(abs.(ru))))
-    # println("||rxs||  \t", @sprintf("%.6e", maximum(abs.(rxs))))
-    # println("||rwz||  \t", @sprintf("%.6e", maximum(abs.(rwz))))
-    # println()
     return d
 end
 
@@ -444,7 +406,7 @@ function compute_stepsize(
     p == size(dw, 1) || throw(DimensionMismatch("d.w is wrong size"))
     p == size(dz, 1) || throw(DimensionMismatch("d.z is wrong size"))
     
-    ap, ad = -1.0, -1.0
+    ap = ad = -1.0
     
     @inbounds for i in 1:n
         if dx[i] < 0.0
@@ -498,7 +460,6 @@ function update_theta!(θ, x, s, z, w, colind)
         j = colind[i]
         θ[j] = 1.0 / (s[j] / x[j] + z[i] / w[i])
     end
-    return nothing
 end
 
 """
@@ -513,5 +474,4 @@ function spxpay!(α::Tv, x::AbstractVector{Tv}, y_ind::AbstractVector{Ti}, y_val
         j = y_ind[i]
         x[j] = x[j] + α * y_val[i]
     end
-    return nothing
 end

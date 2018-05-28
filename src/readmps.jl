@@ -4,9 +4,8 @@
     Parse an MPS file, and return a linear program in standard form.
 """
 function readmps(file_name)
-    # parse an MPS file
     section = ""
-    d = Dict()
+    d = Dict{String,Any}()
 
     row2idx = Dict()  # name <-> index correspondence for rows
     col2idx = Dict()  # name <-> index correspondence for columns
@@ -112,12 +111,12 @@ end
 
 
 function convert_to_standard_form(
-    d, 
-    obj_col, obj_val,  # objective
-    rhs_row, rhs_val, senses,  # right-hand side and senses
-    coeffs_row, coeffs_col, coeffs_val,  # coefficients
-    lb_col, lb_val, ub_col, ub_val,  # lower and uper bounds
-    ranges_row, ranges_val
+        d,
+        obj_col, obj_val,  # objective
+        rhs_row, rhs_val, senses,  # right-hand side and senses
+        coeffs_row, coeffs_col, coeffs_val,  # coefficients
+        lb_col, lb_val, ub_col, ub_val,  # lower and uper bounds
+        ranges_row, ranges_val
     )
     
     m = d["nrows"]  # number of constraints in original formulation
@@ -195,20 +194,9 @@ function parseline(ln)
     for f in fields[end:-1:1]
         # remove left-trailing and right-trailing spaces
         f_ = strip(f)  # f_ may be empty
-        
-        if length(f_) == 0 && length(s) == 0
-            # f_ is empty field at the right-end
-            # do nothing
-            continue
-        # elseif contains(f_, "\$")
-        #     # f contains the $ sign: remove everything after $
-        #     s = [split(f_, '$')[1]]
-        #     # rest of line is treated as comment
-        #     continue
-        else
-            # f_ is empty but there is a non-empty field later
+
+        if length(f_) > 0 || length(s) > 0
             unshift!(s, f_)
-            continue
         end
     end
 
@@ -237,20 +225,16 @@ function parsemps_rows!(ln, fields, d, row2idx, senses)
     if fields[1] == "N"
         # objective
         row2idx[fields[2]] = 0
-
     elseif fields[1] == "E" || fields[1] == "L" || fields[1] == "G"
         # constraint
         d["nrows"] += 1
         row2idx[fields[2]] = d["nrows"]  # name
         push!(senses, fields[1])  # sense (i.e., E, L, or G)
-
     else
         # input error, current line is ignored
         warn("INPUT ERROR:\t$(ln)")
         return nothing
     end
-
-    return nothing
 end
 
 
@@ -377,8 +361,6 @@ function parsemps_rhs!(ln, fields, d, row2idx, rhs_row, rhs_val)
             push!(rhs_val, rval)
         end
     end
-
-    return nothing
 end
 
 
@@ -419,8 +401,6 @@ function parsemps_ranges!(ln, fields, d, row2idx, ranges_row, ranges_val)
         push!(ranges_row, row2idx[rname])
         push!(ranges_val, rngval)
     end
-
-    return nothing
 end
 
 
@@ -470,6 +450,4 @@ function parsemps_bounds!(ln, fields, d, col2idx, lb_col, lb_val, ub_col, ub_val
         # error in bound type
         warn("BND ERROR WRONG BOUND TYPE $(btype)")
     end
-
-    return nothing
 end
