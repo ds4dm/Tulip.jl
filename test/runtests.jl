@@ -5,8 +5,6 @@ else
     using Test
 end
 
-include("../src/Tulip.jl")
-
 # write your own tests here
 const testdir = dirname(@__FILE__)
 

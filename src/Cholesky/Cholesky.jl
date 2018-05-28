@@ -40,7 +40,7 @@ function cholesky!(A::Matrix{Ta}, d::AbstractVector{Td}, F::Base.LinAlg.Cholesky
 end
 
 function cholesky!(A::SparseMatrixCSC{Ta, Int64}, d::AbstractVector{Td}, F::Base.SparseArrays.CHOLMOD.Factor{Ta}) where{Ta<:Real, Td<:Real}
-    # update CHolesky factor
+    # update Cholesky factor
     F = cholfact!(F, Symmetric(A*spdiagm(d)*A'))
     return F
 end
