@@ -47,20 +47,103 @@ copy(p::PrimalDualPoint) = PrimalDualPoint(copy(p.x), copy(p.w), copy(p.y), copy
     the beginning of the optimization)
 -`status::Symbol`: Optimization status
 """
-mutable struct Model{T1<:Real, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
+mutable struct Model
 
-    nconstr::Integer
-    nvars::Integer
+    #=======================================================
+        Optimization-related parameters
+    =======================================================#
     
-    A::AbstractMatrix{T1}
-    b::AbstractVector{T2}
-    c::AbstractVector{T3}
-    uind::AbstractVector{Ti}
-    uval::AbstractVector{T4}
+    # I/O behaviour
+    output_level::Int       # 0 means no output, 1 means normal
 
-    sol::PrimalDualPoint
-    status::Symbol
+    # Termination criteria
+    n_iter_max::Int         # Maximum number of barrier iterations
+    time_limit::Real        # Time limit (in seconds)
+    ϵ_p::Real               # Numerical tolerance for primal feasibility
+    ϵ_d::Real               # Numerical tolerance for dual feasibility
+    ϵ_g::Real               # Numerical tolerance for optimality gap
 
+
+    #=======================================================
+        Problem data
+    =======================================================#
+
+    # Problem dimension
+    n_var::Integer          # Number of variables (total)
+    n_var_ub::Integer       # Number of upper-bounded variables
+    n_con::Integer          # Number of constraints
+
+    # Actual data
+    A::AbstractMatrix       # Constraints matrix
+    b::AbstractVector       # Right-hand side of equality constraints
+    c::AbstractVector       # Objective vector
+    uind::AbstractVector{Int}  # Indices of upper-bounded variables
+    uval::AbstractVector    # Values of upper bounds
+
+    
+    #=======================================================
+        Book-keeping
+    =======================================================#
+
+    sol::PrimalDualPoint    # Current primal-dual iterate
+    status::Symbol          # Optimization status
+
+
+    #=======================================================
+        Model constructor
+    =======================================================#  
+    
+    function Model(
+        # Optimization parameters
+        output_level, n_iter_max, time_limit, ϵ_p, ϵ_d, ϵ_g,
+        # Problem data
+        A, b, c, uind, uval, sol
+    )
+        m = new()
+
+        m.output_level = output_level
+        m.n_iter_max = n_iter_max
+        m.time_limit = time_limit
+        m.ϵ_p = ϵ_p
+        m.ϵ_d = ϵ_d
+        m.ϵ_g = ϵ_g
+
+        # Dimension check
+        n_con = size(A, 1)
+        n_var = size(A, 2)
+        n_con == size(b, 1) || throw(DimensionMismatch(
+            "A has size $(size(A)) but b has size $(size(b))"
+        ))
+        n_var == size(c, 1) || throw(DimensionMismatch(
+            "A has size $(size(A)) but c has size $(size(b))"
+        ))
+        n_var_ub = size(uind, 1)
+        n_var_ub == size(uval, 1) || throw(DimensionMismatch(
+            "uind has size $(size(uval)) but uval has size $(size(uval))"
+        ))
+        n_var_ub <= n_var || throw(DimensionMismatch(
+            "Too many upper bounds were specified"
+        ))
+        if n_var_ub > 0
+            uind[end] <= n_var || throw(DimensionMismatch(
+                "Got upper bound for var $(uind[end])>$(n_var)"
+            ))
+        end
+
+        m.n_var = n_var
+        m.n_var_ub = n_var_ub
+        m.n_con = n_con
+        m.A = A
+        m.b = b
+        m.c = c
+        m.uind = uind
+        m.uval = uval
+
+        m.sol = sol
+        m.status = :Built
+
+        return m
+    end
 end
 
 function Model(
@@ -68,19 +151,24 @@ function Model(
     b::AbstractVector{T2},
     c::AbstractVector{T3},
     uind::AbstractVector{Ti},
-    uval::AbstractVector{T4}
+    uval::AbstractVector{T4};
+    output_level=1,
+    n_iter_max=100,
+    time_limit=86400,
+    ϵ_p=10.0^-8,
+    ϵ_d=10.0^-8,
+    ϵ_g=10.0^-8
     ) where{T1<:Real, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
     
     (m, n) = size(A)
     p = size(uind, 1)
-    n == size(c, 1) || throw(DimensionMismatch("Expected c to have size $(n) but got $(size(c, 1))"))
-    m == size(b, 1) || throw(DimensionMismatch("Expected b to have size $(m) but got $(size(b, 1))"))
-    if p > 0
-        uind[end] <= n  || throw(DimensionMismatch("Model has $(n) vars but upper bound given for var $(uind[end])"))
-    end
-    s = PrimalDualPoint(ones(n), ones(p), zeros(m), ones(n), ones(p))
 
-    model = Model(m, n, A, b, c, uind, uval, s, :Built)
+    sol0 = PrimalDualPoint(ones(n), ones(p), zeros(m), ones(n), ones(p))
+
+    model = Model(
+        output_level, n_iter_max, time_limit, ϵ_p, ϵ_d, ϵ_g,
+        A, b, c, uind, uval, sol0
+    )
     return model
 
 end

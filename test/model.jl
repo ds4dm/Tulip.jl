@@ -28,8 +28,8 @@ v3 = v1 + v2
 # Create random instance and run checks
 model = Tulip.Model(A, b, c, u.nzind, u.nzval)
 
-@test m == model.nconstr
-@test n == model.nvars
+@test m == model.n_con
+@test n == model.n_var
 @test model.status == :Built
 
 sol = model.sol
