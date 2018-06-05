@@ -16,7 +16,6 @@ const test_files = [
     "tst_basic",
     "denseBlockAngular",
     "linear_algebra"
-    
 ]
 
 for f in test_files

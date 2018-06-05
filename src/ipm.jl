@@ -6,24 +6,15 @@ import Tulip:
 
 
 """
-    solve(model, tol, verbose)
+    optimize(model, tol, verbose)
 
 Solve model m using an infeasible predictor-corrector Interior-Point algorithm.
 
 # Arguments
 - `model::Model`: the optimization model
-- `tol::Float64`: numerical tolerance
-- `verbose::Int`: 0 means no output, 1 displays log at each iteration
 """
-function solve!(
-    model::Model;
-    tol::Float64 = 10.0^-8,
-    verbose::Int = 0
-)
+function optimize!(model::Model)
 
-    model.status = :Built
-
-    N_ITER_MAX = 100  # maximum number of IP iterations
     niter = 0  # number of IP iterations
 
     # TODO: pre-optimization stuff
@@ -43,14 +34,14 @@ function solve!(
     )
 
     # IPM log
-    if verbose == 1
+    if model.output_level == 1
         println(" Itn      Primal Obj        Dual Obj    Prim Inf Dual Inf UBnd Inf\n")
     end
 
     # main loop
     # push!(X, copy(model.sol))
 
-    while niter < N_ITER_MAX
+    while niter < model.n_iter_max
         
         # I. Form and factor Newton System
         compute_newton!(
@@ -80,43 +71,34 @@ function solve!(
 
         niter += 1
 
-
-        # check stopping criterion
         eps_p = (norm(rb)) / (1.0 + norm(model.b))
         eps_d = (norm(rc)) / (1.0 + norm(model.c))
         eps_u = (norm(ru)) / (1.0 + norm(model.uval))
         eps_g = abs(obj_primal - obj_dual) / (1.0 + abs(obj_primal))
-        # if verbose == 1
-        #     print("\teps_p=")
-        #     print(@sprintf("%9.2e", eps_p))
-        #     print("\teps_d=")
-        #     print(@sprintf("%9.2e", eps_d))
-        #     print("\teps_u=")
-        #     print(@sprintf("%9.2e", eps_u))
-        #     print("\teps_g=")
-        #     print(@sprintf("%9.2e", eps_g))
-        #     println("\n")
-        # end
-        if verbose == 1
+        if model.output_level == 1
             print(@sprintf("%4d", niter))  # iteration count
             print(@sprintf("%+18.7e", obj_primal))  # primal objective
             print(@sprintf("%+16.7e", obj_dual))  # dual objective
             print(@sprintf("%10.2e", norm(rb, Inf)))  # primal infeas
             print(@sprintf("%9.2e", norm(rc, Inf)))  # dual infeas
             print(@sprintf("%9.2e", norm(ru, Inf)))  # upper bound infeas
-            print(@sprintf("%9.2e", abs(obj_primal - obj_dual) / (model.nvars + size(model.uind, 1))))
+            print(@sprintf("%9.2e", abs(obj_primal - obj_dual) / (model.n_var + model.n_var_ub)))
             print("\n")
         end
 
-        if (eps_p < tol) && (eps_u < tol) && (eps_d < tol) && (eps_g < tol)
+        # check stopping criterion
+        if (
+            (eps_p < model.ϵ_tol_p)
+            && (eps_u < model.ϵ_tol_p)
+            && (eps_d < model.ϵ_tol_d)
+            && (eps_g < model.ϵ_tol_g)
+        )
             model.status = :Optimal
         end
 
-        # push!(X, copy(model.sol))
-
         # check status
         if model.status == :Optimal
-            if verbose == 1
+            if model.output_level == 1
                 println()
                 println("Optimal solution found.")
             end
@@ -125,7 +107,7 @@ function solve!(
 
     end
 
-    # 
+    # END
     return model.status
     
 end
@@ -133,7 +115,8 @@ end
 
 """
     compute_starting_point!
-    Compute a starting point
+
+Compute a starting point
 
 # Arguments
 -`model::Model`
@@ -158,11 +141,10 @@ function compute_starting_point!(
     spxpay!(1.0, u_, uind, uval)
     rhs += A* u_
 
-    #==============================#
-    #
-    #   I. Solve two QPs
-    #
-    #==============================#
+
+    #=======================================================
+        I. Compute initial points
+    =======================================================#
 
     # Compute x0
     v = F \ rhs
@@ -189,11 +171,9 @@ function compute_starting_point!(
     end
 
 
-    #==============================#
-    #
-    #   II. Compute correction
-    #
-    #==============================#
+    #=======================================================
+        II. Correction
+    =======================================================# 
 
     dp = zero(Tv)
     dd = zero(Tv)
@@ -232,11 +212,9 @@ function compute_starting_point!(
     dp += 0.5 * tmp / (sum(Λ.s + dd) + sum(Λ.z + dd))
     dd += 0.5 * tmp / (sum(Λ.x + dp) + sum(Λ.w + dp))
 
-    #==============================#
-    #
-    #   III. Apply correction
-    #
-    #==============================#
+    #=======================================================
+        III. Apply correction
+    =======================================================#
 
     @inbounds for i in 1:n
         Λ.x[i] += dp    
@@ -260,7 +238,7 @@ end
 
 function compute_next_iterate!(model::Model, F::Factorization)
     (x, y, s, w, z) = (model.sol.x, model.sol.y, model.sol.s, model.sol.w, model.sol.z)
-    (m, n, p) = model.nconstr, model.nvars, size(model.uind, 1)
+    (m, n, p) = model.n_con, model.n_var, model.n_var_ub
 
     d_aff = copy(model.sol)
     d_cc = copy(model.sol)
