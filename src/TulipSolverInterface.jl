@@ -90,7 +90,7 @@ function MPB.getobjbound(m::TulipMathProgModel)
     return dot(m.inner.b, m.inner.sol.y) - dot(m.inner.uind, m.inner.sol.z)
 end
 
-function MPB.getobjgap(m::Tulip)
+function MPB.getobjgap(m::TulipMathProgModel)
     warn("Result may be wrong if current solution is not feasible.")
     return dot(m.inner.sol.x, m.inner.sol.s) + dot(m.inner.sol.w, m.inner.sol.z)
 end
@@ -253,7 +253,7 @@ function MPB.delvars!(m::TulipMathProgModel, idxs)
     return nothing
 end
 
-function MPB.addconstrs!(m::TulipMathProgModel, varidx, coef, lb, ub)
+function MPB.addconstr!(m::TulipMathProgModel, varidx, coef, lb, ub)
     warn("MPB.addconstrs! currently not implemented. Function call ignored.")
     return nothing
 end
