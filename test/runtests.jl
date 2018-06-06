@@ -5,8 +5,6 @@ else
     using Test
 end
 
-include("../src/Tulip.jl")
-
 # write your own tests here
 const testdir = dirname(@__FILE__)
 
@@ -16,7 +14,7 @@ const test_files = [
     # "tst_basic",
     # "denseBlockAngular",
     # "linear_algebra",
-    "MPBInterface"
+    "mathprogbase"
 ]
 
 for f in test_files
