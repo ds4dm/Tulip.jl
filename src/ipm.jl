@@ -29,7 +29,11 @@ function optimize!(model::Model)
     compute_starting_point!(
         model.A,
         F,
-        model.sol,
+        model.sol.x,
+        model.sol.w,
+        model.sol.y,
+        model.sol.s,
+        model.sol.z,
         model.b, model.c, model.uind, model.uval
     )
 
@@ -56,7 +60,20 @@ function optimize!(model::Model)
         )
 
         # II. Compute and take step
-        compute_next_iterate!(model, F)
+        compute_next_iterate!(
+            model,
+            model.A,
+            F,
+            model.sol.x,
+            model.sol.w,
+            model.sol.y,
+            model.sol.s,
+            model.sol.z,
+            model.b,
+            model.c,
+            model.uind,
+            model.uval
+        )
 
         # III. Book-keeping + display log
         # compute residuals
@@ -88,10 +105,10 @@ function optimize!(model::Model)
 
         # check stopping criterion
         if (
-            (eps_p < model.ϵ_tol_p)
-            && (eps_u < model.ϵ_tol_p)
-            && (eps_d < model.ϵ_tol_d)
-            && (eps_g < model.ϵ_tol_g)
+            (eps_p < model.eps_tol_p)
+            && (eps_u < model.eps_tol_p)
+            && (eps_d < model.eps_tol_d)
+            && (eps_g < model.eps_tol_g)
         )
             model.status = :Optimal
         end
@@ -126,12 +143,16 @@ Compute a starting point
 function compute_starting_point!(
     A::AbstractMatrix{Tv},
     F::Factorization{Tv},
-    Λ::Tulip.PrimalDualPoint{Tv},
+    x::AbstractVector{Tv},
+    w::AbstractVector{Tv},
+    y::AbstractVector{Tv},
+    s::AbstractVector{Tv},
+    z::AbstractVector{Tv},
     b::StridedVector{Tv},
     c::StridedVector{Tv},
     uind::StridedVector{Ti},
     uval::StridedVector{Tv}
-    ) where{Tv<:Real, Ti<:Integer}
+) where{Tv<:Real, Ti<:Integer}
 
     (m, n) = size(A)
     p = size(uind, 1)
@@ -149,25 +170,25 @@ function compute_starting_point!(
     # Compute x0
     v = F \ rhs
 
-    copy!(Λ.x, -0.5 * At_mul_B(A, v))
-    spxpay!(0.5, Λ.x, uind, uval)
+    copy!(x, -0.5 * At_mul_B(A, v))
+    spxpay!(0.5, x, uind, uval)
 
     # Compute w0
     @inbounds for i in 1:p
         j = uind[i]
-        Λ.w[i] = uval[i] - Λ.x[j]
+        w[i] = uval[i] - x[j]
     end
 
     # Compute y0
-    copy!(Λ.y, F \ (A*c))
+    copy!(y, F \ (A*c))
 
     # Compute s0
-    copy!(Λ.s, 0.5 * (At_mul_B(A, Λ.y) - c))
+    copy!(s, 0.5 * (At_mul_B(A, y) - c))
 
     # Compute z0
     @inbounds for i in 1:p
         j = uind[i]
-        Λ.z[i] = - Λ.s[j]
+        z[i] = - s[j]
     end
 
 
@@ -179,14 +200,14 @@ function compute_starting_point!(
     dd = zero(Tv)
 
     @inbounds for i in 1:n
-        tmp = -1.5 * Λ.x[i]
+        tmp = -1.5 * x[i]
         if tmp > dp
             dp = tmp
         end
     end
 
     @inbounds for i in 1:p
-        tmp = -1.5 * Λ.w[i]
+        tmp = -1.5 * w[i]
         if tmp > dp
             dp = tmp
         end
@@ -194,50 +215,62 @@ function compute_starting_point!(
 
 
     @inbounds for i in 1:n
-        tmp = -1.5 * Λ.s[i]
+        tmp = -1.5 * s[i]
         if tmp > dd
             dd = tmp
         end
     end
 
     @inbounds for i in 1:p
-        tmp = -1.5 * Λ.z[i]
+        tmp = -1.5 * z[i]
         if tmp > dd
             dd = tmp
         end
     end
 
-    tmp = dot(Λ.x + dp, Λ.s + dd) + dot(Λ.w + dp, Λ.z + dd)
+    tmp = dot(x + dp, s + dd) + dot(w + dp, z + dd)
 
-    dp += 0.5 * tmp / (sum(Λ.s + dd) + sum(Λ.z + dd))
-    dd += 0.5 * tmp / (sum(Λ.x + dp) + sum(Λ.w + dp))
+    dp += 0.5 * tmp / (sum(s + dd) + sum(z + dd))
+    dd += 0.5 * tmp / (sum(x + dp) + sum(w + dp))
 
     #=======================================================
         III. Apply correction
     =======================================================#
 
     @inbounds for i in 1:n
-        Λ.x[i] += dp    
+        x[i] += dp    
     end
 
     @inbounds for i in 1:n
-        Λ.s[i] += dd    
+        s[i] += dd    
     end
 
     @inbounds for i in 1:p
-        Λ.w[i] += dp    
+        w[i] += dp    
     end
 
     @inbounds for i in 1:p
-        Λ.z[i] += dd    
+        z[i] += dd    
     end
 
     # Done
-    return Λ
+    return nothing
 end
 
-function compute_next_iterate!(model::Model, F::Factorization)
-    (x, y, s, w, z) = (model.sol.x, model.sol.y, model.sol.s, model.sol.w, model.sol.z)
+function compute_next_iterate!(
+    model,
+    A::AbstractMatrix{Tv},
+    F::Factorization{Tv},
+    x::AbstractVector{Tv},
+    w::AbstractVector{Tv},
+    y::AbstractVector{Tv},
+    s::AbstractVector{Tv},
+    z::AbstractVector{Tv},
+    b::StridedVector{Tv},
+    c::StridedVector{Tv},
+    uind::StridedVector{Ti},
+    uval::StridedVector{Tv}
+) where{Tv<:Real, Ti<:Integer}
     (m, n, p) = model.n_con, model.n_var, model.n_var_ub
 
     d_aff = copy(model.sol)
@@ -249,16 +282,16 @@ function compute_next_iterate!(model::Model, F::Factorization)
         / (n + p)
     )
 
-    rb = (model.A * x) - model.b
-    rc = At_mul_B(model.A, y) + s - model.c
-    spxpay!(-1.0, rc, model.uind, model.sol.z)
+    rb = (A * x) - b
+    rc = At_mul_B(A, y) + s - c
+    spxpay!(-1.0, rc, uind, z)
 
-    ru = x[model.uind] + w - model.uval
+    ru = x[uind] + w - uval
     rxs = x .* s
     rwz = w .* z
 
     θ = x ./ s
-    update_theta!(θ, x, s, z, w, model.uind)
+    update_theta!(θ, x, s, z, w, uind)
 
     # compute predictor
     solve_newton!(
@@ -307,11 +340,11 @@ function compute_next_iterate!(model::Model, F::Factorization)
     (α_p, α_d) = compute_stepsize(model.sol, d, damp=0.99995)
 
     # take step
-    model.sol.x += α_p * d.x
-    model.sol.y += α_d * d.y
-    model.sol.s += α_d * d.s
-    model.sol.w += α_p * d.w
-    model.sol.z += α_d * d.z
+    copy!(x, x + α_p * d.x)
+    copy!(y, y + α_d * d.y)
+    copy!(s, s + α_d * d.s)
+    copy!(w, w + α_p * d.w)
+    copy!(z, z + α_d * d.z)
 
     return model.sol
 end

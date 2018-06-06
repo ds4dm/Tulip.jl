@@ -9,5 +9,6 @@ export Model, PrimalDualPoint, readmps
     include("model.jl")
     include("ipm.jl")
     include("readmps.jl")
+    include("TulipSolverInterface.jl")
     
 end # module

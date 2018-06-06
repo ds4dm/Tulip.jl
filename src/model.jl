@@ -52,16 +52,16 @@ mutable struct Model
     #=======================================================
         Optimization-related parameters
     =======================================================#
-    
+
     # I/O behaviour
     output_level::Int       # 0 means no output, 1 means normal
 
     # Termination criteria
     n_iter_max::Int         # Maximum number of barrier iterations
-    time_limit::Real        # Time limit (in seconds)
-    ϵ_tol_p::Real               # Numerical tolerance for primal feasibility
-    ϵ_tol_d::Real               # Numerical tolerance for dual feasibility
-    ϵ_tol_g::Real               # Numerical tolerance for optimality gap
+    time_limit::Float64     # Time limit (in seconds)
+    eps_tol_p::Float64      # Numerical tolerance for primal feasibility
+    eps_tol_d::Float64      # Numerical tolerance for dual feasibility
+    eps_tol_g::Float64      # Numerical tolerance for optimality gap
 
 
     #=======================================================
@@ -95,7 +95,7 @@ mutable struct Model
     
     function Model(
         # Optimization parameters
-        output_level, n_iter_max, time_limit, ϵ_tol_p, ϵ_tol_d, ϵ_tol_g,
+        output_level, n_iter_max, time_limit, eps_tol_p, eps_tol_d, eps_tol_g,
         # Problem data
         A, b, c, uind, uval, sol
     )
@@ -104,9 +104,9 @@ mutable struct Model
         m.output_level = output_level
         m.n_iter_max = n_iter_max
         m.time_limit = time_limit
-        m.ϵ_tol_p = ϵ_tol_p
-        m.ϵ_tol_d = ϵ_tol_d
-        m.ϵ_tol_g = ϵ_tol_g
+        m.eps_tol_p = eps_tol_p
+        m.eps_tol_d = eps_tol_d
+        m.eps_tol_g = eps_tol_g
 
         # Dimension check
         n_con = size(A, 1)
@@ -154,10 +154,10 @@ function Model(
     uval::AbstractVector{T4};
     output_level=1,
     n_iter_max=100,
-    time_limit=86400,
-    ϵ_tol_p=10.0^-8,
-    ϵ_tol_d=10.0^-8,
-    ϵ_tol_g=10.0^-8
+    time_limit=Inf,
+    eps_tol_p=10.0^-8,
+    eps_tol_d=10.0^-8,
+    eps_tol_g=10.0^-8
     ) where{T1<:Real, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
     
     (m, n) = size(A)
@@ -166,9 +166,31 @@ function Model(
     sol0 = PrimalDualPoint(ones(n), ones(p), zeros(m), ones(n), ones(p))
 
     model = Model(
-        output_level, n_iter_max, time_limit, ϵ_tol_p, ϵ_tol_d, ϵ_tol_g,
+        output_level, n_iter_max, time_limit, eps_tol_p, eps_tol_d, eps_tol_g,
         A, b, c, uind, uval, sol0
     )
     return model
 
+end
+
+function Model(;
+    output_level=1,
+    n_iter_max=100,
+    time_limit=Inf,
+    eps_tol_p=10.0^-8,
+    eps_tol_d=10.0^-8,
+    eps_tol_g=10.0^-8
+)
+    Model(
+        spzeros(0, 0),
+        Vector{Float64}(0,),
+        Vector{Float64}(0,),
+        Vector{Int64}(0,),
+        Vector{Float64}(0,),
+        output_level=output_level,
+        n_iter_max=n_iter_max,
+        eps_tol_p=eps_tol_p,
+        eps_tol_d=eps_tol_d,
+        eps_tol_g=eps_tol_g
+    )
 end
