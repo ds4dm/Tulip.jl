@@ -44,25 +44,13 @@ function MPB.LinearQuadraticModel(s::TulipSolver)
     TulipMathProgModel(m)
 end
 
-function MPB.getsolution(m::TulipMathProgModel)
-    return copy(m.inner.sol.x)
-end
+MPB.getsolution(m::TulipMathProgModel) = copy(m.inner.sol.x)
 
-function MPB.getobjval(m::TulipMathProgModel)
-    return dot(m.inner.c, m.inner.sol.x)
-end
+MPB.getobjval(m::TulipMathProgModel) = dot(m.inner.c, m.inner.sol.x)
 
-function MPB.optimize!(m::TulipMathProgModel)
+MPB.optimize!(m::TulipMathProgModel) = optimize!(m.inner)
 
-    optimize!(m.inner)
-
-    return m.inner.status
-
-end
-
-function MPB.status(m::TulipMathProgModel)
-    return copy(m.inner.status)
-end
+MPB.status(m::TulipMathProgModel) = copy(m.inner.status)
 
 function MPB.getobjbound(m::TulipMathProgModel)
     warn("Result may be wrong if current solution is not feasible.")
@@ -74,9 +62,7 @@ function MPB.getobjgap(m::TulipMathProgModel)
     return dot(m.inner.sol.x, m.inner.sol.s) + dot(m.inner.sol.w, m.inner.sol.z)
 end
 
-function MPB.getrawsolver(m::TulipMathProgModel)
-    return m.inner
-end
+MPB.getrawsolver(m::TulipMathProgModel) = m.inner
 
 function MPB.getsolvetime(m::TulipMathProgModel)
     warn("MPB.getsolvetime currently not implemented. Function call ignored.")
@@ -92,13 +78,9 @@ function MPB.setsense!(m::TulipMathProgModel, sense)
     return nothing
 end
 
-function MPB.numvar(m::TulipMathProgModel)
-    return copy(m.inner.n_var)
-end
+MPB.numvar(m::TulipMathProgModel) = copy(m.inner.n_var)
 
-function MPB.numconstr(m::TulipMathProgModel)
-    return copy(m.inner.n_con)
-end
+MPB.numconstr(m::TulipMathProgModel) = copy(m.inner.n_con)
 
 
 
@@ -175,10 +157,8 @@ function MPB.setvarLB!(m::TulipMathProgModel, collb)
 end
 
 function MPB.getvarUB(m::TulipMathProgModel)
-
     u = Inf*ones(m.inner.n_var)
     u[m.inner.uind] = m.inner.uval
-    
     return u
 end
 
@@ -224,6 +204,7 @@ end
 
 function MPB.addvar!(m::TulipMathProgModel, constridx, constrcoef, l, u, objcoef)
     warn("MPB.addvar! currently not implemented. Function call ignored.")
+
     return nothing
 end
 
