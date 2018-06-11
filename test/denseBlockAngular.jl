@@ -76,7 +76,8 @@ colub_ind = collect(1:(n*R))
 colub_val = 10.0 * ones(n*R)
 
 # solve model
-model = Tulip.Model(A, b, c, colub_ind, colub_val, output_level=0)
+model = Tulip.Model(A, b, c, colub_ind, colub_val)
+model.env.output_level = 0
 Tulip.optimize!(model)
 
 

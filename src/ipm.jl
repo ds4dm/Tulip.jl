@@ -38,14 +38,14 @@ function optimize!(model::Model)
     )
 
     # IPM log
-    if model.output_level == 1
+    if model.env[:output_level] == 1
         println(" Itn      Primal Obj        Dual Obj    Prim Inf Dual Inf UBnd Inf\n")
     end
 
     # main loop
     # push!(X, copy(model.sol))
 
-    while niter < model.n_iter_max
+    while niter < model.env[:barrier_iter_max]
         
         # I. Form and factor Newton System
         compute_newton!(
@@ -92,7 +92,7 @@ function optimize!(model::Model)
         eps_d = (norm(rc)) / (1.0 + norm(model.c))
         eps_u = (norm(ru)) / (1.0 + norm(model.uval))
         eps_g = abs(obj_primal - obj_dual) / (1.0 + abs(obj_primal))
-        if model.output_level == 1
+        if model.env[:output_level] == 1
             print(@sprintf("%4d", niter))  # iteration count
             print(@sprintf("%+18.7e", obj_primal))  # primal objective
             print(@sprintf("%+16.7e", obj_dual))  # dual objective
@@ -105,17 +105,17 @@ function optimize!(model::Model)
 
         # check stopping criterion
         if (
-            (eps_p < model.eps_tol_p)
-            && (eps_u < model.eps_tol_p)
-            && (eps_d < model.eps_tol_d)
-            && (eps_g < model.eps_tol_g)
+            (eps_p < model.env[:barrier_tol_feas])
+            && (eps_u < model.env[:barrier_tol_feas])
+            && (eps_d < model.env[:barrier_tol_opt])
+            && (eps_g < model.env[:barrier_tol_conv])
         )
             model.status = :Optimal
         end
 
         # check status
         if model.status == :Optimal
-            if model.output_level == 1
+            if model.env[:output_level] == 1
                 println()
                 println("Optimal solution found.")
             end
@@ -498,7 +498,7 @@ function compute_stepsize(
 
 end
 
-function compute_stepsize(t::PrimalDualPoint{T}, d::PrimalDualPoint{T}; damp=1.0) where T<:Real
+function compute_stepsize(t::PrimalDualPoint{T}, d::PrimalDualPoint{T}; damp=1.0) where {T<:Real}
     (ap, ad) = compute_stepsize(t.x, t.w, t.s, t.z, d.x, d.w, d.s, d.z, damp=damp)
     return (ap, ad)
 end

@@ -35,8 +35,8 @@ copy(p::PrimalDualPoint) = PrimalDualPoint(copy(p.x), copy(p.w), copy(p.y), copy
     Data structure for a model
 
 # Attributes
--`nconstr::Integer`: Number of constraints
--`nvars::Integer`: Number of variables
+-`n_var::Int`: Number of variables
+-`n_con::Int`: Number of constraints
 -`A::AbstractMatrix{T1<:Real}`: Constraint matrix
 -`b::AbstractVector{T2<:Real}`: Right-hand side of the equality constraints
 -`c::AbstractVector{T3<:Real}`: Objective coefficient
@@ -48,39 +48,28 @@ copy(p::PrimalDualPoint) = PrimalDualPoint(copy(p.x), copy(p.w), copy(p.y), copy
 -`status::Symbol`: Optimization status
 """
 mutable struct Model
-
     #=======================================================
-        Optimization-related parameters
+        Optimization environment
     =======================================================#
 
-    # I/O behaviour
-    output_level::Int       # 0 means no output, 1 means normal
-
-    # Termination criteria
-    n_iter_max::Int         # Maximum number of barrier iterations
-    time_limit::Float64     # Time limit (in seconds)
-    eps_tol_p::Float64      # Numerical tolerance for primal feasibility
-    eps_tol_d::Float64      # Numerical tolerance for dual feasibility
-    eps_tol_g::Float64      # Numerical tolerance for optimality gap
+    env::TulipEnv
 
 
     #=======================================================
         Problem data
     =======================================================#
 
-    # Problem dimension
-    n_var::Integer          # Number of variables (total)
-    n_var_ub::Integer       # Number of upper-bounded variables
-    n_con::Integer          # Number of constraints
+    n_var::Int              # Number of variables (total)
+    n_var_ub::Int           # Number of upper-bounded variables
+    n_con::Int              # Number of constraints
 
-    # Actual data
     A::AbstractMatrix       # Constraints matrix
     b::AbstractVector       # Right-hand side of equality constraints
     c::AbstractVector       # Objective vector
     uind::AbstractVector{Int}  # Indices of upper-bounded variables
     uval::AbstractVector    # Values of upper bounds
 
-    
+
     #=======================================================
         Book-keeping
     =======================================================#
@@ -93,20 +82,10 @@ mutable struct Model
         Model constructor
     =======================================================#  
     
-    function Model(
-        # Optimization parameters
-        output_level, n_iter_max, time_limit, eps_tol_p, eps_tol_d, eps_tol_g,
-        # Problem data
-        A, b, c, uind, uval, sol
-    )
+    function Model(env, A, b, c, uind, uval, sol)
         m = new()
 
-        m.output_level = output_level
-        m.n_iter_max = n_iter_max
-        m.time_limit = time_limit
-        m.eps_tol_p = eps_tol_p
-        m.eps_tol_d = eps_tol_d
-        m.eps_tol_g = eps_tol_g
+        m.env = env
 
         # Dimension check
         n_con = size(A, 1)
@@ -146,51 +125,45 @@ mutable struct Model
     end
 end
 
+"""   
+    Model(A, b, c, uind, uval)
+
+Constructs a model with upper bounds on the specified variables
+
+    Model(A, b, c)
+
+Constructs a model with no upper bounds
+
+    Model()
+
+Empty model
+"""
 function Model(
     A::AbstractMatrix{T1},
     b::AbstractVector{T2},
     c::AbstractVector{T3},
     uind::AbstractVector{Ti},
-    uval::AbstractVector{T4};
-    output_level=1,
-    n_iter_max=100,
-    time_limit=Inf,
-    eps_tol_p=10.0^-8,
-    eps_tol_d=10.0^-8,
-    eps_tol_g=10.0^-8
+    uval::AbstractVector{T4}
     ) where{T1<:Real, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
     
+    env = TulipEnv()
+
     (m, n) = size(A)
     p = size(uind, 1)
 
     sol0 = PrimalDualPoint(ones(n), ones(p), zeros(m), ones(n), ones(p))
 
     model = Model(
-        output_level, n_iter_max, time_limit, eps_tol_p, eps_tol_d, eps_tol_g,
+        env,
         A, b, c, uind, uval, sol0
     )
     return model
 
 end
 
-function Model(;
-    output_level=1,
-    n_iter_max=100,
-    time_limit=Inf,
-    eps_tol_p=10.0^-8,
-    eps_tol_d=10.0^-8,
-    eps_tol_g=10.0^-8
-)
-    Model(
-        spzeros(0, 0),
-        Vector{Float64}(0,),
-        Vector{Float64}(0,),
-        Vector{Int64}(0,),
-        Vector{Float64}(0,),
-        output_level=output_level,
-        n_iter_max=n_iter_max,
-        eps_tol_p=eps_tol_p,
-        eps_tol_d=eps_tol_d,
-        eps_tol_g=eps_tol_g
-    )
-end
+Model() = Model(spzeros(0, 0), Vector{Float64}(0,), Vector{Float64}(0,))
+
+Model(A, b, c) = Model(A, b, c, Vector{Int}(0,), Vector{Float64}(0,))
+
+
+

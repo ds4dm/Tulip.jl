@@ -9,7 +9,9 @@ u = 10.0 * sprand(n, 1.0)
 b = 1.0 + rand(m)
 c = vcat(1.0 - 2.0 * rand(n), zeros(m))
 
-model = Tulip.Model(A, b, c, u.nzind, u.nzval, output_level=0)
+model = Tulip.Model(A, b, c, u.nzind, u.nzval)
+model.env.output_level = 0
+
 status = Tulip.optimize!(model)
 
 @test status == :Optimal
