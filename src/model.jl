@@ -1,3 +1,7 @@
+# extend Base operation on primal-dual points
+import Base:
+    copy, +
+
 """
     PrimalDualPoint
 
@@ -17,11 +21,8 @@ mutable struct PrimalDualPoint{T<:Real}
     z::AbstractVector{T}
 end
 
-# extend Base operation on primal-dual points
-import Base:
-    copy, +
-
 copy(p::PrimalDualPoint) = PrimalDualPoint(copy(p.x), copy(p.w), copy(p.y), copy(p.s), copy(p.z))
+
 +(p1::PrimalDualPoint, p2::PrimalDualPoint) = PrimalDualPoint(
     p1.x + p2.x,
     p1.w + p2.w,
@@ -139,11 +140,11 @@ Constructs a model with no upper bounds
 Empty model
 """
 function Model(
-    A::AbstractMatrix{T1},
-    b::AbstractVector{T2},
-    c::AbstractVector{T3},
-    uind::AbstractVector{Ti},
-    uval::AbstractVector{T4}
+        A::AbstractMatrix{T1},
+        b::AbstractVector{T2},
+        c::AbstractVector{T3},
+        uind::AbstractVector{Ti},
+        uval::AbstractVector{T4}
     ) where{T1<:Real, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
     
     env = TulipEnv()

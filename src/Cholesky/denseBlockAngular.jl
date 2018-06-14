@@ -236,19 +236,23 @@ function CpBDBt!(C::StridedMatrix{T}, B::StridedMatrix{T}, d::StridedVector{T}) 
     
     # compute symmetric rank-k update
     # only the upper-triangular part of C is modified
-    temp = zero(T)
-    for j=1:m
-        for l = 1:k
-            @inbounds temp = d[l] * B[j, l]
-            if temp == zero(T)
-                # skip loop if temp is zero
-                continue 
-            end
-            for i=1:j
-                @inbounds C[i, j] = C[i, j] + temp * B[i, l]
-            end
-        end
-    end
+    # temp = zero(T)
+    # for j=1:m
+    #     for l = 1:k
+    #         @inbounds temp = d[l] * B[j, l]
+    #         if temp == zero(T)
+    #             # skip loop if temp is zero
+    #             continue 
+    #         end
+    #         for i=1:j
+    #             @inbounds C[i, j] = C[i, j] + temp * B[i, l]
+    #         end
+    #     end
+    # end
+
+    # # Linear scaling + BLAS call is more efficient
+    B_ = B * Diagonal(sqrt.(d))
+    Base.BLAS.syrk!('U', 'N', 1.0, B_, 1.0, C)
     
     return C
 end
@@ -267,8 +271,9 @@ function cholesky!(
     C = zeros(Tv, A.m, A.m)
     
     for r in 1:A.R
+        # copying ararys uses more memory, but is faster
         θ_ = view(θ, A.colptr[r]:(A.colptr[r+1]-1))
-        A_ = view(A.cols, :, A.colptr[r]:(A.colptr[r+1]-1))
+        A_ = A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)]
         η_ = view(F.η, :, r)
         
         # diagonal elements
@@ -299,8 +304,8 @@ function cholesky(
     
     for r in 1:A.R
         θ_ = view(θ, A.colptr[r]:(A.colptr[r+1]-1))
-        A_ = view(A.cols, :, A.colptr[r]:(A.colptr[r+1]-1))
-        η_ = view(η, :, r)
+        A_ = A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)]
+        η_ = view(η, :, r)  # use view because η is modified in-place
         
         # diagonal elements
         d[r] = oneunit(Tv) / sum(θ_)
