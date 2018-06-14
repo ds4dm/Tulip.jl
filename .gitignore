@@ -1,3 +1,7 @@
+# Julia
 *.jl.cov
 *.jl.*.cov
 *.jl.mem
+
+# Ignore ./dat
+dat/*
