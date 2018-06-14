@@ -88,11 +88,7 @@ function optimize!(model::Model)
         eps_d = (norm(rc)) / (1.0 + norm(model.c))
         eps_u = (norm(ru)) / (1.0 + norm(model.uval))
         eps_g = abs(obj_primal - obj_dual) / (1.0 + abs(obj_primal))
-<<<<<<< HEAD
         if model.env[:output_level] == 1
-=======
-        if verbose == 1
->>>>>>> master
             print(@sprintf("%4d", niter))  # iteration count
             print(@sprintf("%+18.7e", obj_primal))  # primal objective
             print(@sprintf("%+16.7e", obj_dual))  # dual objective
@@ -124,10 +120,7 @@ function optimize!(model::Model)
 
     end
 
-<<<<<<< HEAD
     # END
-=======
->>>>>>> master
     return model.status
     
 end
@@ -144,7 +137,6 @@ Compute a starting point
     of the optimization problem.
 """
 function compute_starting_point!(
-<<<<<<< HEAD
     A::AbstractMatrix{Tv},
     F::Factorization{Tv},
     x::AbstractVector{Tv},
@@ -157,16 +149,6 @@ function compute_starting_point!(
     uind::StridedVector{Ti},
     uval::StridedVector{Tv}
 ) where{Tv<:Real, Ti<:Integer}
-=======
-        A::AbstractMatrix{Tv},
-        F::Factorization{Tv},
-        Λ::Tulip.PrimalDualPoint{Tv},
-        b::StridedVector{Tv},
-        c::StridedVector{Tv},
-        uind::StridedVector{Ti},
-        uval::StridedVector{Tv}
-    ) where {Tv<:Real, Ti<:Integer}
->>>>>>> master
 
     (m, n) = size(A)
     p = size(uind, 1)
@@ -176,16 +158,10 @@ function compute_starting_point!(
     spxpay!(1.0, u_, uind, uval)
     rhs += A* u_
 
-<<<<<<< HEAD
 
     #=======================================================
         I. Compute initial points
     =======================================================#
-=======
-    #==============================#
-    #   I. Solve two QPs
-    #==============================#
->>>>>>> master
 
     # Compute x0
     v = F \ rhs
@@ -212,15 +188,9 @@ function compute_starting_point!(
     end
 
 
-<<<<<<< HEAD
     #=======================================================
         II. Correction
     =======================================================# 
-=======
-    #==============================#
-    #   II. Compute correction
-    #==============================#
->>>>>>> master
 
     dp = zero(Tv)
     dd = zero(Tv)
@@ -259,15 +229,9 @@ function compute_starting_point!(
     dp += 0.5 * tmp / (sum(s + dd) + sum(z + dd))
     dd += 0.5 * tmp / (sum(x + dp) + sum(w + dp))
 
-<<<<<<< HEAD
     #=======================================================
         III. Apply correction
     =======================================================#
-=======
-    #==============================#
-    #   III. Apply correction
-    #==============================#
->>>>>>> master
 
     @inbounds for i in 1:n
         x[i] += dp    
@@ -289,7 +253,6 @@ function compute_starting_point!(
     return nothing
 end
 
-<<<<<<< HEAD
 function compute_next_iterate!(
     model,
     A::AbstractMatrix{Tv},
@@ -305,11 +268,6 @@ function compute_next_iterate!(
     uval::StridedVector{Tv}
 ) where{Tv<:Real, Ti<:Integer}
     (m, n, p) = model.n_con, model.n_var, model.n_var_ub
-=======
-function compute_next_iterate!(model::Model, F::Factorization)
-    (x, y, s, w, z) = model.sol.x, model.sol.y, model.sol.s, model.sol.w, model.sol.z
-    (m, n, p) = model.nconstr, model.nvars, size(model.uind, 1)
->>>>>>> master
 
     d_aff = copy(model.sol)
     d_cc = copy(model.sol)
@@ -317,15 +275,9 @@ function compute_next_iterate!(model::Model, F::Factorization)
     # compute residuals
     μ = (dot(x, s) + dot(w, z)) / (n + p)
 
-<<<<<<< HEAD
     rb = (A * x) - b
     rc = At_mul_B(A, y) + s - c
     spxpay!(-1.0, rc, uind, z)
-=======
-    rb = model.A * x - model.b
-    rc = At_mul_B(model.A, y) + s - model.c
-    spxpay!(-1.0, rc, model.uind, model.sol.z)
->>>>>>> master
 
     ru = x[uind] + w - uval
     rxs = x .* s
