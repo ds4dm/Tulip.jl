@@ -50,7 +50,7 @@ MPB.getobjval(m::TulipMathProgModel) = dot(m.inner.c, m.inner.sol.x)
 
 MPB.optimize!(m::TulipMathProgModel) = optimize!(m.inner)
 
-MPB.status(m::TulipMathProgModel) = copy(m.inner.status)
+MPB.status(m::TulipMathProgModel) = m.inner.status
 
 function MPB.getobjbound(m::TulipMathProgModel)
     warn("Result may be wrong if current solution is not feasible.")
@@ -125,88 +125,44 @@ function MPB.loadproblem!(
         end
     end
 
-    m.inner.n_var = n_var
-    m.inner.n_con = n_con
-    m.inner.n_var_ub = n_var_ub
-    m.inner.A = A
-    m.inner.b = ub
-    m.inner.c = c
-    m.inner.uind = uind
-    m.inner.uval = uval
-
-    m.inner.sol = PrimalDualPoint(
-        ones(n_var),
-        ones(n_var_ub),
-        zeros(n_con),
-        ones(n_var),
-        ones(n_var_ub)
-    )
-
-    m.inner.status = :Built
+    m.inner = Model(copy(m.inner.env), A, ub, c, uind, uval)
 
     return nothing
 end
 
-function MPB.getvarLB(m::TulipMathProgModel)
-    return zeros(m.inner.n_var)
-end
+MPB.getvarLB(m::TulipMathProgModel) = getvarlowerbounds(m.inner)
 
 function MPB.setvarLB!(m::TulipMathProgModel, collb)
     warn("MPB.setvarLB! currently not implemented. Function call ignored.")
     return nothing
 end
 
-function MPB.getvarUB(m::TulipMathProgModel)
-    u = Inf*ones(m.inner.n_var)
-    u[m.inner.uind] = m.inner.uval
-    return u
-end
+MPB.getvarUB(m::TulipMathProgModel) = getvarupperbounds(m.inner)
 
-function MPB.setvarUB!(m::TulipMathProgModel, colub)
-    warn("MPB.setvarUB! currently not implemented. Function call ignored.")
-    return nothing
-end
+MPB.setvarUB!(m::TulipMathProgModel, colub) = setvarupperbounds!(m.inner, colub)
 
-function MPB.getconstrLB(m::TulipMathProgModel)
-    return copy(m.inner.b)
-end
+MPB.getconstrLB(m::TulipMathProgModel) = getconstrlowerbound(m.inner)
 
 function MPB.setconstrLB!(m::TulipMathProgModel, rowlb)
     warn("MPB.setconstrLB! currently not implemented. Function call ignored.")
     return nothing
 end
 
-function MPB.getconstrUB(m::TulipMathProgModel)
-    return copy(m.inner.b)
-end
+MPB.getconstrUB(m::TulipMathProgModel) = getconstrupperbound(m.inner)
 
 function MPB.setconstrUB!(m::TulipMathProgModel, rowub)
     warn("MPB.setconstrUB! currently not implemented. Function call ignored.")
     return nothing
 end
 
-function MPB.getobj(m::TulipMathProgModel)
-    return copy(m.inner.c)
-end
+MPB.getobj(m::TulipMathProgModel) = getobjectivecoeffs(m.inner)
 
-function MPB.setobj!(m::TulipMathProgModel, c)
-    warn("MPB.setobj! currently not implemented. Function call ignored.")
-    return nothing
-end
+MPB.setobj!(m::TulipMathProgModel, c) = setobjectivecoeffs!(m, c)
 
-function MPB.getconstrmatrix(m::TulipMathProgModel)
-    return copy(m.inner.A)
-end
+MPB.getconstrmatrix(m::TulipMathProgModel) = getlinearconstrcoeffs(m.inner)
 
-function MPB.addvar!(m::TulipMathProgModel, l, u, objcoef)
-    MPB.addvar!(m, [], [], l, u, objcoef)
-end
-
-function MPB.addvar!(m::TulipMathProgModel, constridx, constrcoef, l, u, objcoef)
-    warn("MPB.addvar! currently not implemented. Function call ignored.")
-
-    return nothing
-end
+MPB.addvar!(m::TulipMathProgModel, constridx, constrcoef, l, u, objcoef) = addvar!(m.inner, constridx, constrcoef, l, u, objcoef)
+MPB.addvar!(m::TulipMathProgModel, l, u, objcoef) = MPB.addvar!(m, [], [], l, u, objcoef)
 
 function MPB.delvars!(m::TulipMathProgModel, idxs)
     warn("MPB.delvars! currently not implemented. Function call ignored.")
@@ -228,22 +184,15 @@ function MPB.changecoeffs!(m::TulipMathProgModel, cidxs, vidxs, val)
     return nothing
 end
 
-function MPB.numlinconstr(m::TulipMathProgModel)
-    return copy(m.inner.n_con)
-end
+MPB.numlinconstr(m::TulipMathProgModel) = getnumconstr(m.inner)
 
 function MPB.getconstrsolution(m::TulipMathProgModel)
     return copy(m.inner.A * m.inner.sol.x)
 end
 
-function MPB.getreducedcosts(m::TulipMathProgModel)
-    warn("MPB.changecoeffs! currently not implemented. Function call ignored.")
-    return Vector{Float64}(0,)
-end
+MPB.getreducedcosts(m::TulipMathProgModel) = getreducedcosts(m.inner)
 
-function MPB.getconstrduals(m::TulipMathProgModel)
-    return copy(m.inner.sol.y)
-end
+MPB.getconstrduals(m::TulipMathProgModel) = getconstrduals(m.inner)
 
 function MPB.getinfeasibilityray(m::TulipMathProgModel)
     warn("MPB.getinfeasibilityray! currently not implemented. Function call ignored.")

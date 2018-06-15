@@ -45,7 +45,15 @@ mutable struct TulipEnv
 
 end
 
+function Base.copy(env::TulipEnv)
+    env_ = TulipEnv()
 
+    for (k, v) in TLP_DEFAULT_PARAM
+        Core.setfield!(env_, k, Core.getfield(env, k))
+    end
+
+    return env_
+end
 """
     getindex(env::TulipEnv, param)
 
