@@ -13,7 +13,8 @@ const test_files = [
     "model",
     "denseBlockAngular",
     "linear_algebra",
-    "mathprogbase"
+    "mathprogbase",
+    "params"
 ]
 
 for f in test_files
