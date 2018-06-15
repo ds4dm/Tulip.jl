@@ -129,19 +129,19 @@ function Base.setindex!(env::TulipEnv, v, ::Type{Val{:time_limit}})
     return nothing
 end
 
-function Base.setindex!(env::TulipEnv, ::Type{Val{:barrier_tol_feas}}, v)
+function Base.setindex!(env::TulipEnv, v, ::Type{Val{:barrier_tol_feas}})
     @assert 0.0 <= v <= 1.0
     env.barrier_tol_feas = Float64(v)
     return nothing
 end
 
-function Base.setindex!(env::TulipEnv, ::Type{Val{:barrier_tol_opt}}, v)
+function Base.setindex!(env::TulipEnv, v, ::Type{Val{:barrier_tol_opt}})
     @assert 0.0 <= v <= 1.0
     env.barrier_tol_opt = Float64(v)
     return nothing
 end
 
-function Base.setindex!(env::TulipEnv, ::Type{Val{:barrier_tol_conv}}, v)
+function Base.setindex!(env::TulipEnv, v, ::Type{Val{:barrier_tol_conv}})
     @assert 0.0 <= v <= 1.0
     env.barrier_tol_conv = Float64(v)
     return nothing
