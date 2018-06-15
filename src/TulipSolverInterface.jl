@@ -141,14 +141,14 @@ MPB.getvarUB(m::TulipMathProgModel) = getvarupperbounds(m.inner)
 
 MPB.setvarUB!(m::TulipMathProgModel, colub) = setvarupperbounds!(m.inner, colub)
 
-MPB.getconstrLB(m::TulipMathProgModel) = getconstrlowerbound(m.inner)
+MPB.getconstrLB(m::TulipMathProgModel) = getconstrlowerbounds(m.inner)
 
 function MPB.setconstrLB!(m::TulipMathProgModel, rowlb)
     warn("MPB.setconstrLB! currently not implemented. Function call ignored.")
     return nothing
 end
 
-MPB.getconstrUB(m::TulipMathProgModel) = getconstrupperbound(m.inner)
+MPB.getconstrUB(m::TulipMathProgModel) = getconstrupperbounds(m.inner)
 
 function MPB.setconstrUB!(m::TulipMathProgModel, rowub)
     warn("MPB.setconstrUB! currently not implemented. Function call ignored.")

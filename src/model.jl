@@ -274,14 +274,14 @@ end
 
 Return lower bound on constraint.
 """
-getconstrlowerbound(m::Model) = copy(m.b)
+getconstrlowerbounds(m::Model) = copy(m.b)
 
 """
     getconstrupperbound
 
 Return upper bound on constraint.
 """
-getconstrupperbound(m::Model) = copy(m.b)
+getconstrupperbounds(m::Model) = copy(m.b)
 
 """
     getobjective(m::Model)
