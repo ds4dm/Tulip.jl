@@ -11,11 +11,11 @@ Solve model m using an infeasible predictor-corrector Interior-Point algorithm.
 """
 function optimize!(model::Model)
 
-    niter = 0  # number of IP iterations
+    model.numbarrieriter = 0  # number of IP iterations
 
     # TODO: pre-optimization stuff
-    F = symbolic_cholesky(model.A)  # Symbolic factorization
-    θ = zeros(model.sol.x)
+    model.F = symbolic_cholesky(model.A)  # Symbolic factorization
+    θ = zeros(model.x)
 
     # X = Array{PrimalDualPoint, 1}()
     # TODO: check stopping criterion for possible early termination
@@ -24,13 +24,16 @@ function optimize!(model::Model)
     # TODO: decide which starting point
     compute_starting_point!(
         model.A,
-        F,
-        model.sol.x,
-        model.sol.w,
-        model.sol.y,
-        model.sol.s,
-        model.sol.z,
-        model.b, model.c, model.uind, model.uval
+        model.F,
+        model.x,
+        model.w,
+        model.y,
+        model.s,
+        model.z,
+        model.b,
+        model.c,
+        model.uind,
+        model.uval
     )
 
     # IPM log
@@ -38,33 +41,31 @@ function optimize!(model::Model)
         println(" Itn      Primal Obj        Dual Obj    Prim Inf Dual Inf UBnd Inf\n")
     end
 
-    # main loop
-    # push!(X, copy(model.sol))
-
-    while niter < model.env[:barrier_iter_max]
+    # main IPM loop
+    while model.numbarrieriter < model.env[:barrier_iter_max]
         
         # I. Form and factor Newton System
         compute_newton!(
             model.A,
-            model.sol.x,
-            model.sol.s,
-            model.sol.w,
-            model.sol.z,
+            model.x,
+            model.s,
+            model.w,
+            model.z,
             model.uind,
             θ,
-            F
+            model.F
         )
 
         # II. Compute and take step
         compute_next_iterate!(
             model,
             model.A,
-            F,
-            model.sol.x,
-            model.sol.w,
-            model.sol.y,
-            model.sol.s,
-            model.sol.z,
+            model.F,
+            model.x,
+            model.w,
+            model.y,
+            model.s,
+            model.z,
             model.b,
             model.c,
             model.uind,
@@ -73,28 +74,32 @@ function optimize!(model::Model)
 
         # III. Book-keeping + display log
         # compute residuals
-        rb = model.A * model.sol.x - model.b
-        rc = At_mul_B(model.A, model.sol.y) + model.sol.s - model.c
-        spxpay!(-1.0, rc, model.uind, model.sol.z)
+        rb = model.A * model.x - model.b
+        rc = At_mul_B(model.A, model.y) + model.s - model.c
+        spxpay!(-1.0, rc, model.uind, model.z)
     
-        ru = model.sol.x[model.uind] + model.sol.w - model.uval
+        ru = model.x[model.uind] + model.w - model.uval
 
-        obj_primal = dot(model.sol.x, model.c)
-        obj_dual = dot(model.b, model.sol.y) - dot(model.uval, model.sol.z)
+        obj_primal = dot(model.x, model.c)
+        obj_dual = dot(model.b, model.y) - dot(model.uval, model.z)
 
-        niter += 1
+        model.numbarrieriter += 1
 
         eps_p = (norm(rb)) / (1.0 + norm(model.b))
         eps_d = (norm(rc)) / (1.0 + norm(model.c))
         eps_u = (norm(ru)) / (1.0 + norm(model.uval))
         eps_g = abs(obj_primal - obj_dual) / (1.0 + abs(obj_primal))
         if model.env[:output_level] == 1
-            print(@sprintf("%4d", niter))  # iteration count
-            print(@sprintf("%+18.7e", obj_primal))  # primal objective
-            print(@sprintf("%+16.7e", obj_dual))  # dual objective
+            # Iteration count
+            print(@sprintf("%4d", model.numbarrieriter))
+            # Primal and Dual objectives
+            print(@sprintf("%+18.7e", obj_primal))  
+            print(@sprintf("%+16.7e", obj_dual))
+            # Infeasibilities
             print(@sprintf("%10.2e", norm(rb, Inf)))  # primal infeas
             print(@sprintf("%9.2e", norm(rc, Inf)))  # dual infeas
             print(@sprintf("%9.2e", norm(ru, Inf)))  # upper bound infeas
+            # μ
             print(@sprintf("%9.2e", abs(obj_primal - obj_dual) / (model.n_var + model.n_var_ub)))
             print("\n")
         end
@@ -269,8 +274,19 @@ function compute_next_iterate!(
 ) where{Tv<:Real, Ti<:Integer}
     (m, n, p) = model.n_con, model.n_var, model.n_var_ub
 
-    d_aff = copy(model.sol)
-    d_cc = copy(model.sol)
+    # Affine-scaling direction
+    daff_x = copy(x)
+    daff_w = copy(w)
+    daff_y = copy(y)
+    daff_s = copy(s)
+    daff_z = copy(z)
+
+    # Corrector-Centering direction
+    dcc_x = copy(x)
+    dcc_w = copy(w)
+    dcc_y = copy(y)
+    dcc_s = copy(s)
+    dcc_z = copy(z)
     
     # compute residuals
     μ = (dot(x, s) + dot(w, z)) / (n + p)
@@ -288,12 +304,12 @@ function compute_next_iterate!(
 
     # compute predictor
     solve_newton!(
-        model.A,
+        A,
         θ,
         F,
-        model.sol,
-        d_aff,
-        model.uind,
+        x, w, y, s, z,
+        daff_x, daff_w, daff_y, daff_s, daff_z,
+        uind,
         -rb,
         -rc,
         -ru,
@@ -302,40 +318,52 @@ function compute_next_iterate!(
     )
 
     # compute step length
-    (α_pa, α_da) = compute_stepsize(model.sol, d_aff)
+    (α_pa, α_da) = compute_stepsize(
+        x, w, s, z,
+        daff_x, daff_w, daff_s, daff_z 
+    )
 
     # update centrality parameter
-    μ_aff = (dot(x + α_pa * d_aff.x, s + α_da * d_aff.s)
-            +dot(w + α_pa * d_aff.w, z + α_da * d_aff.z)) / (n + p)
+    μ_aff = (dot(x + α_pa * daff_x, s + α_da * daff_s)
+            +dot(w + α_pa * daff_w, z + α_da * daff_z)) / (n + p)
 
     σ = clamp((μ_aff / μ)^3, 10.0^-12, 1.0 - 10.0^-12)  # clamped for numerical stability
     # compute corrector
     solve_newton!(
-        model.A,
+        A,
         θ,
         F,
-        model.sol,
-        d_cc,
-        model.uind,
+        x, w, y, s, z,
+        dcc_x, dcc_w, dcc_y, dcc_s, dcc_z,
+        uind,
         zeros(m),
         zeros(n),
         zeros(p),
-        σ*μ*ones(n) - d_aff.x .* d_aff.s,
-        σ*μ*ones(p) - d_aff.w .* d_aff.z
+        σ*μ*ones(n) - daff_x .* daff_s,
+        σ*μ*ones(p) - daff_w .* daff_z
     )
 
     # final step size
-    d = d_aff + d_cc
-    (α_p, α_d) = compute_stepsize(model.sol, d, damp=0.99995)
+    dx = daff_x + dcc_x
+    dw = daff_w + dcc_w
+    dy = daff_y + dcc_y
+    ds = daff_s + dcc_s
+    dz = daff_z + dcc_z
+
+    (α_p, α_d) = compute_stepsize(
+        x, w, s, z,
+        dx, dw, ds, dz,
+        damp=0.99995
+    )
 
     # take step
-    copy!(x, x + α_p * d.x)
-    copy!(y, y + α_d * d.y)
-    copy!(s, s + α_d * d.s)
-    copy!(w, w + α_p * d.w)
-    copy!(z, z + α_d * d.z)
+    x .+= α_p * dx
+    w .+= α_p * dw
+    y .+= α_d * dy
+    s .+= α_d * ds
+    z .+= α_d * dz
 
-    return model.sol
+    return nothing
 end
 
 """
@@ -385,39 +413,39 @@ end
     Overwrites the input d
 """
 function solve_newton!(
-    A::AbstractMatrix{Ta},
-    θ::AbstractVector{T1},
-    F::Factorization{Ta},
-    Λ::PrimalDualPoint,
-    d::PrimalDualPoint,
-    uind::AbstractVector{Ti},
-    ξ_b::AbstractVector{T2},
-    ξ_c::AbstractVector{T3},
-    ξ_u::AbstractVector{T4},
-    ξ_xs::AbstractVector{T5},
-    ξ_wz::AbstractVector{T6},
-) where {Ta<:Real, T1<:Real, T2<:Real, T3<:Real, T4<:Real, T5<:Real, T6<:Real, Ti<:Integer}
+    A::Ta,
+    θ::AbstractVector{Tv},
+    F::Factorization{Tv},
+    x::AbstractVector{Tv},
+    w::AbstractVector{Tv},
+    y::AbstractVector{Tv},
+    s::AbstractVector{Tv},
+    z::AbstractVector{Tv},
+    dx::AbstractVector{Tv},
+    dw::AbstractVector{Tv},
+    dy::AbstractVector{Tv},
+    ds::AbstractVector{Tv},
+    dz::AbstractVector{Tv},
+    uind::AbstractVector{Int},
+    ξ_b::AbstractVector{Tv},
+    ξ_c::AbstractVector{Tv},
+    ξ_u::AbstractVector{Tv},
+    ξ_xs::AbstractVector{Tv},
+    ξ_wz::AbstractVector{Tv},
+) where {Tv<:Real, Ta<:AbstractMatrix{Tv}}
 
-    ξ_tmp = ξ_c - (ξ_xs ./ Λ.x)
-    ξ_tmp[uind] += (ξ_wz - (Λ.z .* ξ_u)) ./ Λ.w
+    ξ_tmp = ξ_c - (ξ_xs ./ x)
+    ξ_tmp[uind] += (ξ_wz - (z .* ξ_u)) ./ w
 
-    d.y = F \ (ξ_b + A * (θ .* ξ_tmp))
+    dy .= F \ (ξ_b + A * (θ .* ξ_tmp))
 
-    d.x = θ .* (At_mul_B(A, d.y) - ξ_tmp)
+    dx .= θ .* (At_mul_B(A, dy) - ξ_tmp)
 
-    d.z = (Λ.z .* (-ξ_u + d.x[uind]) + ξ_wz) ./ Λ.w
-    d.s = (ξ_xs - Λ.s .* d.x) ./ Λ.x
-    d.w = (ξ_wz - Λ.w .* d.z) ./ Λ.z
+    dz .= (z .* (-ξ_u + dx[uind]) + ξ_wz) ./ w
+    ds .= (ξ_xs - s .* dx) ./ x
+    dw .= (ξ_wz - w .* dz) ./ z
 
-    # # check if system is solved correctly
-    # rb = ξ_b - A*d.x
-    # rc = ξ_c - (A'*d.y + d.s)
-    # rc[uind] += d.z
-    # ru = ξ_u - (d.x[uind] + d.w)
-    # rxs = ξ_xs - (Λ.s .* d.x + Λ.x .* d.s)
-    # rwz = ξ_wz - (Λ.z .* d.w + Λ.w .* d.z)
-
-    return d
+    return nothing
 end
 
 
@@ -478,11 +506,6 @@ function compute_stepsize(
     
     return (ap, ad)
 
-end
-
-function compute_stepsize(t::PrimalDualPoint{T}, d::PrimalDualPoint{T}; damp=1.0) where {T<:Real}
-    (ap, ad) = compute_stepsize(t.x, t.w, t.s, t.z, d.x, d.w, d.s, d.z, damp=damp)
-    return (ap, ad)
 end
 
 function update_theta!(θ, x, s, z, w, colind)
