@@ -8,25 +8,29 @@ function test_linalg(
     A::AbstractMatrix{Tv},
     b::AbstractVector{Tv},
     c::AbstractVector{Tv},
-    uind::AbstractVector{Ti},
+    uind::AbstractVector{Int},
     uval::AbstractVector{Tv},
-    h::Tulip.PrimalDualPoint{Tv}
-) where{Tv<:Real, Ti<:Integer}
+    x::AbstractVector{Tv},
+    w::AbstractVector{Tv},
+    y::AbstractVector{Tv},
+    s::AbstractVector{Tv},
+    z::AbstractVector{Tv}
+) where{Tv<:Real}
 
     # Dimension check
     m = size(A, 1)
     n = size(A, 2)
     n == size(c, 1) || throw(DimensionMismatch(""))
     m == size(b, 1) || throw(DimensionMismatch(""))
-    n == size(h.x, 1) || throw(DimensionMismatch(""))
-    m == size(h.y, 1) || throw(DimensionMismatch(""))
-    n == size(h.s, 1) || throw(DimensionMismatch(""))
+    n == size(x, 1) || throw(DimensionMismatch(""))
+    m == size(y, 1) || throw(DimensionMismatch(""))
+    n == size(s, 1) || throw(DimensionMismatch(""))
     size(uind, 1) == size(uval, 1) || throw(DimensionMismatch(""))
 
     # matrix-vector multiplication
-    A * h.x;
+    A * x;
     Base.LinAlg.At_mul_B(A, b)
-    Base.LinAlg.A_mul_B!(h.y, A, h.x)
+    Base.LinAlg.A_mul_B!(y, A, x)
 
     # Cholesky factorization
     F = Tulip.symbolic_cholesky(A)
@@ -52,8 +56,7 @@ uind = u.nzind
 uval = u.nzval
 p = nnz(u)
 A = sprand(m, n, 1.0)
-h = Tulip.PrimalDualPoint(zeros(n), zeros(p), zeros(m), zeros(n), zeros(p))
-test_linalg(A, b, c, uind, uval, h)
+test_linalg(A, b, c, uind, uval, zeros(n), zeros(p), zeros(m), zeros(n), zeros(p))
 
 # BlockAngular matrix
 srand(0)
@@ -68,6 +71,4 @@ uind = u.nzind
 uval = u.nzval
 p = nnz(u)
 
-h = Tulip.PrimalDualPoint(zeros(n), zeros(p), zeros(m), zeros(n), zeros(p))
-
-test_linalg(A, b, c, uind, uval, h)
+test_linalg(A, b, c, uind, uval, zeros(n), zeros(p), zeros(m), zeros(n), zeros(p))

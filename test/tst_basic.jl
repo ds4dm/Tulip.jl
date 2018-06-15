@@ -16,7 +16,7 @@ status = Tulip.optimize!(model)
 
 @test status == :Optimal
 
-objval = dot(model.sol.x, model.c)
+objval = dot(model.x, model.c)
 const OBJVAL = -15.989485968940144
 @test abs(objval - OBJVAL) <= 10.0^-8
 
