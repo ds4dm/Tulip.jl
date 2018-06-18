@@ -1,10 +1,15 @@
-print("\tmodel.jl")
-
 #= Create and solve the following model:
-    min  x + 2*y
-    s.t. x + y = 2
-            y < 1
-            x, y >0
+    min  x1 + 2*x2
+    s.t. x1 + x2 = 2
+            x2 < 1
+            x1, x2 >0
+
+The solution to this problem is:
+    x1 = 2.0, x2 = 0.0
+    y = 1.0
+    s1 = 0.0, s2 = 1.0
+    w2 = 1.0
+    z2 = 0.0
 =#
 A = sparse([1.0 1.0])
 c = [1.0, 2.0]
@@ -29,11 +34,15 @@ Tulip.optimize!(model)
 @test [2.0] == Tulip.getconstrupperbounds(model)
 @test [1.0, 2.0] == Tulip.getobjectivecoeffs(model)
 @test A == Tulip.getlinearconstrcoeffs(model)
+@test abs(2.0 - Tulip.getobjectivevalue(model)) <= 10.0^-8
+@test abs(2.0 - Tulip.getdualbound(model)) <= 10.0^-8
+@test Tulip.getobjectivedualgap(model) <= 10.0^-8
+@test Tulip.getnumbarrieriter(model) <= 100
+
 x_ = Tulip.getsolution(model)
 y_ = Tulip.getconstrduals(model)
 s_ = Tulip.getreducedcosts(model)
+
 @test norm(x_ - [2.0, 0.0], Inf) <= 10.0^-8
 @test norm(y_ - [1.0], Inf) <= 10.0^-8
 @test norm(s_ - [0.0, 1.0], Inf) <= 10.0^-8
-
-println("\tPassed.")
