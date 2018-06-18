@@ -11,6 +11,8 @@ Solve model m using an infeasible predictor-corrector Interior-Point algorithm.
 """
 function optimize!(model::Model)
 
+    tstart = time()
+    model.runtime = 0.0
     model.numbarrieriter = 0  # number of IP iterations
 
     # TODO: pre-optimization stuff
@@ -38,11 +40,15 @@ function optimize!(model::Model)
 
     # IPM log
     if model.env[:output_level] == 1
-        println(" Itn      Primal Obj        Dual Obj    Prim Inf Dual Inf UBnd Inf\n")
+        println(" Itn    Primal Obj      Dual Obj        Prim Inf Dual Inf UBnd Inf")
     end
 
     # main IPM loop
-    while model.numbarrieriter < model.env[:barrier_iter_max]
+    while (
+        model.numbarrieriter < model.env[:barrier_iter_max]
+        && model.status != :Optimal
+        && model.runtime < model.env[:time_limit]
+    )
         
         # I. Form and factor Newton System
         compute_newton!(
@@ -89,20 +95,7 @@ function optimize!(model::Model)
         eps_d = (norm(rc)) / (1.0 + norm(model.c))
         eps_u = (norm(ru)) / (1.0 + norm(model.uval))
         eps_g = abs(obj_primal - obj_dual) / (1.0 + abs(obj_primal))
-        if model.env[:output_level] == 1
-            # Iteration count
-            print(@sprintf("%4d", model.numbarrieriter))
-            # Primal and Dual objectives
-            print(@sprintf("%+18.7e", obj_primal))
-            print(@sprintf("%+16.7e", obj_dual))
-            # Infeasibilities
-            print(@sprintf("%10.2e", norm(rb, Inf)))  # primal infeas
-            print(@sprintf("%9.2e", norm(rc, Inf)))  # dual infeas
-            print(@sprintf("%9.2e", norm(ru, Inf)))  # upper bound infeas
-            # μ
-            print(@sprintf("%9.2e", abs(obj_primal - obj_dual) / (model.n_var + model.n_var_ub)))
-            print("\n")
-        end
+
 
         # check stopping criterion
         if (
@@ -114,13 +107,23 @@ function optimize!(model::Model)
             model.status = :Optimal
         end
 
-        # check status
-        if model.status == :Optimal
-            if model.env[:output_level] == 1
-                println()
-                println("Optimal solution found.")
-            end
-            return model.status
+        # Log
+        model.runtime = time() - tstart
+
+        if model.env[:output_level] == 1
+            # Iteration count
+            print(@sprintf("%4d", model.numbarrieriter))
+            # Primal and Dual objectives
+            print(@sprintf("%+18.7e", obj_primal))
+            print(@sprintf("%+16.7e", obj_dual))
+            # Infeasibilities
+            print(@sprintf("%10.2e", norm(rb, Inf)))  # primal infeas
+            print(@sprintf("%9.2e", norm(rc, Inf)))  # dual infeas
+            print(@sprintf("%9.2e", norm(ru, Inf)))  # upper bound infeas
+            # μ
+            print(@sprintf("  %8.2e", abs(obj_primal - obj_dual) / (model.n_var + model.n_var_ub)))
+            print(@sprintf("  %.2f", model.runtime))
+            print("\n")
         end
 
     end
