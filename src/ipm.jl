@@ -372,7 +372,7 @@ end
 """
 function symbolic_cholesky(A::AbstractMatrix{T}) where {T<:Real}
 
-    F = Cholesky.cholesky(A, ones(A.n))
+    F = LinearAlgebra.cholesky(A, ones(A.n))
     return F
 
 end
@@ -401,7 +401,7 @@ function compute_newton!(
     end
 
     # Form the normal equations matrix and compute its factorization
-    Cholesky.cholesky!(A, θ, F)
+    LinearAlgebra.cholesky!(A, θ, F)
 
     return θ
 end

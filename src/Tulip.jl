@@ -1,9 +1,9 @@
 module Tulip
 
-export Model, PrimalDualPoint, readmps
+export Model, readmps
 
 # Cholesky module
-    include("Cholesky/Cholesky.jl")
+    include("LinearAlgebra/LinearAlgebra.jl")
 
 # package code goes here
     include("params.jl")

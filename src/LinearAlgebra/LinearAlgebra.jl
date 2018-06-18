@@ -1,4 +1,4 @@
-module Cholesky
+module LinearAlgebra
 
 export DenseBlockAngular, FactorBlockAngular
 

@@ -35,7 +35,7 @@ function test_linalg(
     # Cholesky factorization
     F = Tulip.symbolic_cholesky(A)
     d = 1.0 + rand(n)
-    Tulip.Cholesky.cholesky!(A, d, F)  # in-place update
+    Tulip.LinearAlgebra.cholesky!(A, d, F)  # in-place update
 
     # solve linear system
     y = F \ b
@@ -62,7 +62,7 @@ test_linalg(A, b, c, uind, uval, zeros(n), zeros(p), zeros(m), zeros(n), zeros(p
 srand(0)
 nblocks = 4
 cols = [rand(m, 4) for _ in 1:nblocks]
-A = Tulip.Cholesky.DenseBlockAngular(cols)
+A = Tulip.LinearAlgebra.DenseBlockAngular(cols)
 (m, n) = size(A)
 c = rand(n)
 b = rand(m)
