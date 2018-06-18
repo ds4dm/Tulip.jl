@@ -77,7 +77,7 @@ function optimize!(model::Model)
         rb = model.A * model.x - model.b
         rc = At_mul_B(model.A, model.y) + model.s - model.c
         spxpay!(-1.0, rc, model.uind, model.z)
-    
+
         ru = model.x[model.uind] + model.w - model.uval
 
         obj_primal = dot(model.x, model.c)
@@ -93,7 +93,7 @@ function optimize!(model::Model)
             # Iteration count
             print(@sprintf("%4d", model.numbarrieriter))
             # Primal and Dual objectives
-            print(@sprintf("%+18.7e", obj_primal))  
+            print(@sprintf("%+18.7e", obj_primal))
             print(@sprintf("%+16.7e", obj_dual))
             # Infeasibilities
             print(@sprintf("%10.2e", norm(rb, Inf)))  # primal infeas

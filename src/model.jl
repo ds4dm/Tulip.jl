@@ -23,7 +23,7 @@ mutable struct Model{Tv<:Real, Ta<:AbstractMatrix{Tv}}
     env::TulipEnv           # Environment
     status::Symbol          # Optimization status
     numbarrieriter::Int     # Number of barrier iterations
-    solvetime::Float64      # Elapsed solution time, in seconds
+    runtime::Float64      # Elapsed solution time, in seconds
 
 
     #=======================================================
@@ -130,7 +130,7 @@ mutable struct Model{Tv<:Real, Ta<:AbstractMatrix{Tv}}
 
         m.status = :Built
         m.numbarrieriter = 0
-        m.solvetime = 0.0
+        m.runtime = 0.0
 
         return m
     end
@@ -214,6 +214,33 @@ Return best known (primal) solution to the problem.
 getsolution(m::Model) = copy(m.x)
 
 """
+    getobjectivevalue(m::Model)
+
+Return objective value of the best known solution
+"""
+getobjectivevalue(m::Model) = dot(m.c, m.x)
+
+"""
+    getdualbound(m::Model)
+
+Return dual bound on the obective value. Returns a lower (resp. upper) bound
+if the problem is a minimization (resp. maximization).
+"""
+getdualbound(m::Model) = dot(m.b, m.y) - dot(m.uval, m.z)
+
+"""
+    getobjectivedualgap(m::Model)
+
+Return the duality gap. 
+"""
+getobjectivedualgap(m::Model) = dot(m.x, m.s) + dot(m.w, m.z)
+
+"""
+    getelapsed
+"""
+getsolutiontime
+
+"""
     getvarlowerbounds(m::Model)
 
 Return lower bounds on the variables.
@@ -267,7 +294,6 @@ function setvarupperbounds!(m::Model, ub::AbstractArray{Tv}) where{Tv<:Real}
 
     return nothing
 end
-
 
 """
     getconstrlowerbound
@@ -381,3 +407,10 @@ getconstrduals(m::Model) = copy(m.y)
 Return reduced costs of primal variables.
 """
 getreducedcosts(m::Model) = copy(m.s)
+
+"""
+    getnumbarrieriter(m::Model)
+
+Return number of barrier iterations.
+"""
+getnumbarrieriter(m::Model) = m.numbarrieriter

@@ -23,6 +23,10 @@ try env["UNDEFINED"] = 0.0
 catch err
     @test isa(err, ErrorException)
 end
+try env["UNDEFINED"]
+catch err
+    @test isa(err, ErrorException)
+end
 
 try env[:output_level] = -1
 catch err

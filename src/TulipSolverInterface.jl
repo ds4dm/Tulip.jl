@@ -44,43 +44,32 @@ function MPB.LinearQuadraticModel(s::TulipSolver)
     TulipMathProgModel(m)
 end
 
-MPB.getsolution(m::TulipMathProgModel) = copy(m.inner.sol.x)
+MPB.getsolution(m::TulipMathProgModel) = getsolution(m.inner)
 
-MPB.getobjval(m::TulipMathProgModel) = dot(m.inner.c, m.inner.sol.x)
+MPB.getobjval(m::TulipMathProgModel) = getobjectivevalue(m.inner)
 
 MPB.optimize!(m::TulipMathProgModel) = optimize!(m.inner)
 
 MPB.status(m::TulipMathProgModel) = m.inner.status
 
-function MPB.getobjbound(m::TulipMathProgModel)
-    warn("Result may be wrong if current solution is not feasible.")
-    return dot(m.inner.b, m.inner.sol.y) - dot(m.inner.uind, m.inner.sol.z)
-end
+MPB.getobjbound(m::TulipMathProgModel) = getdualbound(m.inner)
 
-function MPB.getobjgap(m::TulipMathProgModel)
-    warn("Result may be wrong if current solution is not feasible.")
-    return dot(m.inner.sol.x, m.inner.sol.s) + dot(m.inner.sol.w, m.inner.sol.z)
-end
+MPB.getobjgap(m::TulipMathProgModel) = getobjectivedualgap(m.inner)
 
 MPB.getrawsolver(m::TulipMathProgModel) = m.inner
 
-function MPB.getsolvetime(m::TulipMathProgModel)
-    warn("MPB.getsolvetime currently not implemented. Function call ignored.")
-    return -1.0
-end
+MPB.getsolvetime(m::TulipMathProgModel) = m.inner.runtime
 
-function MPB.getsense(m::TulipMathProgModel)
-    return :Min
-end
+MPB.getsense(m::TulipMathProgModel) = :Min
 
 function MPB.setsense!(m::TulipMathProgModel, sense)
     warn("MPB.setsense! currently not implemented. Function call ignored.")
     return nothing
 end
 
-MPB.numvar(m::TulipMathProgModel) = copy(m.inner.n_var)
+MPB.numvar(m::TulipMathProgModel) = getnumvar(m.inner)
 
-MPB.numconstr(m::TulipMathProgModel) = copy(m.inner.n_con)
+MPB.numconstr(m::TulipMathProgModel) = getnumconstr(m.inner)
 
 
 
@@ -199,7 +188,4 @@ function MPB.getinfeasibilityray(m::TulipMathProgModel)
     return Vector{Float64}(0,)
 end
 
-function MPB.getbarrieriter(m::TulipMathProgModel)
-    warn("MPB.getbarrieriter! currently not implemented. Function call ignored.")
-    return -1
-end
+MPB.getbarrieriter(m::TulipMathProgModel) = getnumbarrieriter(m.inner)
