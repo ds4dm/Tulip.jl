@@ -136,6 +136,10 @@ mutable struct Model{Tv<:Real, Ta<:AbstractMatrix{Tv}}
     end
 end
 
+#=======================================================
+    Constructors
+=======================================================#
+
 """
     Model(A, b, c, uind, uval)
 
@@ -186,7 +190,9 @@ Model(A, b, c) = Model(A, b, c, Vector{Int}(0,), Vector{Float64}(0,))
 
 
 #=======================================================
-    Interface
+    Model interface
+
+Retrieve and modify problem-related information
 =======================================================#
 
 """
@@ -207,38 +213,27 @@ Return the number of constraints in the model. This number does not include
 getnumconstr(m::Model) = m.n_con
 
 """
-    getsolution(m::Model)
+    getobjectivecoeffs(m::Model)
 
-Return best known (primal) solution to the problem.
+Return the objective coefficients.
 """
-getsolution(m::Model) = copy(m.x)
-
-"""
-    getobjectivevalue(m::Model)
-
-Return objective value of the best known solution
-"""
-getobjectivevalue(m::Model) = dot(m.c, m.x)
+getobjectivecoeffs(m::Model) = copy(m.c)
 
 """
-    getdualbound(m::Model)
+    setobjectivecoeffs!(m::Model, c)
 
-Return dual bound on the obective value. Returns a lower (resp. upper) bound
-if the problem is a minimization (resp. maximization).
+Set new objective coefficients.
 """
-getdualbound(m::Model) = dot(m.b, m.y) - dot(m.uval, m.z)
+function setobjectivecoeffs!(m::Model, c::AbstractVector{T}) where T<:Real
 
-"""
-    getobjectivedualgap(m::Model)
+    # Dimension check
+    size(c, 1) == m.n_var || throw(DimensionMismatch(
+        "c has $(size(c, 1)) coeffs but model has $(m.n_var) variables"
+    ))
 
-Return the duality gap. 
-"""
-getobjectivedualgap(m::Model) = dot(m.x, m.s) + dot(m.w, m.z)
-
-"""
-    getelapsed
-"""
-getsolutiontime
+    m.c = copy(c)
+    return nothing
+end
 
 """
     getvarlowerbounds(m::Model)
@@ -296,54 +291,6 @@ function setvarupperbounds!(m::Model, ub::AbstractArray{Tv}) where{Tv<:Real}
 end
 
 """
-    getconstrlowerbound
-
-Return lower bound on constraint.
-"""
-getconstrlowerbounds(m::Model) = copy(m.b)
-
-"""
-    getconstrupperbound
-
-Return upper bound on constraint.
-"""
-getconstrupperbounds(m::Model) = copy(m.b)
-
-"""
-    getobjective(m::Model)
-
-Return the objective coefficients.
-"""
-getobjectivecoeffs(m::Model) = copy(m.c)
-
-"""
-    setobjectivecoeffs!(m::Model, c)
-
-Set new objective coefficients.
-"""
-function setobjectivecoeffs!(m::Model, c)
-    error("Wrong argument type: c must be a real-valued vector")
-    return nothing
-end
-function setobjectivecoeffs!(m::Model, c::AbstractVector{T}) where T<:Real
-
-    # Dimension check
-    size(c, 1) == m.n_var || throw(DimensionMismatch(
-        "c has $(size(c, 1)) coeffs but model has $(m.n_var) variables"
-    ))
-
-    m.c = copy(c)
-    return nothing
-end
-
-"""
-    getlinearconstrcoeffs(m::Model)
-
-Return the matrix of linear constraints.
-"""
-getlinearconstrcoeffs(m::Model) = copy(m.A)
-
-"""
     addvar!(m::Model, colval, l, u, objcoeff)
 
 Add a variable to the model.
@@ -375,6 +322,20 @@ addvar!(m::Model, constridx, constrcoef, l, u, objcoef) = addvar!(m, sparsevec(c
 addvar!(m::Model, col::AbstractVector{Tv}, objcoef::Real) where Tv<:Real = addvar!(m, col, 0.0, Inf, objcoef)
 
 """
+    getconstrlowerbound
+
+Return lower bound on constraint.
+"""
+getconstrlowerbounds(m::Model) = copy(m.b)
+
+"""
+    getconstrupperbound
+
+Return upper bound on constraint.
+"""
+getconstrupperbounds(m::Model) = copy(m.b)
+
+"""
     addconstr!(m::Model, rowvals, rhs)
 
 Add a constraint to the model.
@@ -394,6 +355,50 @@ function addconstr!(m::Model, rowvals::AbstractVector{Tv}, rhs::Real) where Tv<:
 
     return nothing
 end
+
+"""
+    getlinearconstrcoeffs(m::Model)
+
+Return the matrix of linear constraints.
+"""
+getlinearconstrcoeffs(m::Model) = copy(m.A)
+
+
+#=======================================================
+    Solution interface
+
+Retrieve solution-related information
+=======================================================#
+
+"""
+    getobjectivevalue(m::Model)
+
+Return objective value of the best known solution
+"""
+getobjectivevalue(m::Model) = dot(m.c, m.x)
+
+"""
+    getdualbound(m::Model)
+
+Return dual bound on the obective value. Returns a lower (resp. upper) bound
+if the problem is a minimization (resp. maximization).
+"""
+getdualbound(m::Model) = dot(m.b, m.y) - dot(m.uval, m.z)
+
+"""
+    getobjectivedualgap(m::Model)
+
+Return the duality gap. 
+"""
+getobjectivedualgap(m::Model) = dot(m.x, m.s) + dot(m.w, m.z)
+
+"""
+    getsolution(m::Model)
+
+Return best known (primal) solution to the problem.
+"""
+getsolution(m::Model) = copy(m.x)
+
 """
     getconstrduals(m::Model)
 
@@ -414,3 +419,10 @@ getreducedcosts(m::Model) = copy(m.s)
 Return number of barrier iterations.
 """
 getnumbarrieriter(m::Model) = m.numbarrieriter
+
+"""
+    getsolutiontime(m::Model)
+
+Return runtime of the optimizer.
+"""
+getsolutiontime(m::Model) = m.runtime
