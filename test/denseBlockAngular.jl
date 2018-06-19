@@ -13,7 +13,7 @@ A = Tulip.LinearAlgebra.DenseBlockAngular(u)
 @test R*n == A.n
 @test R == A.R
 for r in 1:R
-    @test u[r] == A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)]
+    @test u[r] == A.cols[r]
 end
 
 
@@ -64,12 +64,11 @@ err = maximum(abs.(A_ * (θ .* (A_' * y)) - b))
 # Tulip tests
 # create and solve model
 m, n, R = 2, 2, 4
-u = 1.0 - 2.0 * rand(m, n*R)
+u = [1.0 - 2.0 * rand(m, n) for _ in 1:R]
 for r in 1:R
-    u[:, 1+n*(r-1)] = 0.0
+    u[r][:, 1] = 0.0
 end
-colptr = [1+n*(r-1) for r in 1:(R+1)]
-A = Tulip.LinearAlgebra.DenseBlockAngular(m, n*R, R, colptr, u)
+A = Tulip.LinearAlgebra.DenseBlockAngular(u)
 b = vcat(ones(R), zeros(m))
 c = rand(n*R)
 colub_ind = collect(1:(n*R))

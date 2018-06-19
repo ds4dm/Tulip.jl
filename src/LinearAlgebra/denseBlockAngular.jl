@@ -15,18 +15,18 @@ import Base.LinAlg:
 -`R::Ti`: Number of blocks
 -`colptr::Vector{Ti}`: Index of first column of each block. The columns of
     block `r` are columns `colptr[k] ... colptr[k+1]-1`.
--`cols::Matrix{Tv}`: A `m x n` matrix containing the columns.
+-`cols::Vector{Matrix{Tv}}`: List of R blocks of columns
 """
-struct DenseBlockAngular{Tv<:Real, Ti<:Integer} <: AbstractMatrix{Tv}
-    m::Ti
-    n::Ti
-    R::Ti
+struct DenseBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
+    m::Int
+    n::Int
+    R::Int
 
-    colptr::Vector{Ti}
-    cols::Matrix{Tv}
+    colptr::Vector{Int}
+    cols::Vector{Matrix{Tv}}
 
-    DenseBlockAngular(m::Ti, n::Ti, R::Ti, colptr::Vector{Ti}, cols::Matrix{Tv}) where {Tv<:Real, Ti<:Integer} =
-        new{Tv, Ti}(m, n, R, colptr, cols)
+    DenseBlockAngular(m::Ti, n::Ti, R::Ti, colptr::Vector{Ti}, cols::Vector{Matrix{Tv}}
+    ) where {Tv<:Real, Ti<:Integer} = new{Tv}(m, n, R, colptr, cols)
 end
 
 
@@ -47,18 +47,21 @@ function DenseBlockAngular(col_list::Vector{Matrix{T}}) where T<:Real
         colptr[r+1] = colptr[r] + size(col_list[r], 2)
     end
 
-    cols = hcat(col_list...)
+    cols = deepcopy(col_list)
 
     return DenseBlockAngular(m, colptr[end]-1, R, colptr, cols)
 end
 
 
 size(M::DenseBlockAngular) = (M.m+M.R, M.n)
-function getindex(M::DenseBlockAngular{Tv, Ti}, i::Integer, j::Integer) where {Tv<:Real, Ti<:Integer}
+function getindex(M::DenseBlockAngular{Tv}, i::Integer, j::Integer) where {Tv<:Real}
     if !(1 <= i <= (M.m+M.R) && 1 <= j <= (M.n)); throw(BoundsError()); end
     
     if i > M.R
-        return M.cols[i - M.R, j]
+        # find index of block that contains column j
+        blockidx = searchsortedlast(M.colptr, j)
+        # return corresponding coefficient
+        return M.cols[blockidx][i-M.R, j - M.colptr[blockidx]+1]
     else
         # find if column j belongs to block i
         return (M.colptr[i] <= j < M.colptr[i+1]) ? oneunit(Tv) : zero(Tv)
@@ -69,52 +72,54 @@ function getindex(M::DenseBlockAngular{Tv, Ti}, i::Integer, j::Integer) where {T
 end
 
 # Matrix-vector Multiplication
-function *(A::DenseBlockAngular{Tv, Ti}, x::AbstractVector{Tv}) where{Tv<:Real, Ti<:Integer}
+function *(A::DenseBlockAngular{Tv}, x::AbstractVector{Tv}) where{Tv<:Real}
     
     n = size(x, 1)
     n == A.n || throw(DimensionMismatch("A has dimensions $(size(A)) but x has dimension $(size(x))"))
     
-    y = zeros(Tv, size(A, 1))
-    r = 1
-    for i in 1:n
-        if i == A.colptr[r+1]
-            r += 1
-        end
-        y[r] += x[i]
-    end
+    y = zeros(Tv, A.m+A.R)
+    y_ = view(y, (A.R+1):(A.R+A.m))
     
-    Base.BLAS.gemv!('N', 1.0, A.cols, x, 0.0, view(y, (A.R+1):size(A, 1)))
+    for r in 1:A.R
+        x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
+        y[r] = sum(x_)
+        Base.BLAS.gemv!('N', 1.0, A.cols[r], x_, 1.0, y_)
+    end
     
     return y
 end
 
-function A_mul_B!(y::AbstractVector{Tv}, A::DenseBlockAngular{Tv, Ti}, x::AbstractVector{Tv}) where{Tv<:Real, Ti<:Integer}
+function A_mul_B!(y::AbstractVector{Tv}, A::DenseBlockAngular{Tv}, x::AbstractVector{Tv}) where{Tv<:Real}
     
     m, n = size(A)
     n == size(x, 1) || throw(DimensionMismatch("A has dimensions $(size(A)) but x has dimension $(size(x))"))
     m == size(y, 1) || throw(DimensionMismatch("A has dimensions $(size(A)) but y has dimension $(size(y))"))
     
-    @inbounds for r in 1:A.R
-        @views y[r] = sum(x[A.colptr[r]:(A.colptr[r+1]-1)])
+    y_ = view(y, (A.R+1):(A.R+A.m))
+    y_ .= zero(Tv)
+
+    for r in 1:A.R
+        x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
+        y[r] = sum(x_)
+        Base.BLAS.gemv!('N', 1.0, A.cols[r], x_, 1.0, y_)
     end
-    
-    Base.BLAS.gemv!('N', 1.0, A.cols, x, 0.0, view(y, (A.R+1):size(A, 1)))
     
     return y
 end
 
-function At_mul_B(A::DenseBlockAngular{Tv, Ti}, y::AbstractVector{Tv}) where{Tv<:Real, Ti<:Integer}
+function At_mul_B(A::DenseBlockAngular{Tv}, y::AbstractVector{Tv}) where{Tv<:Real}
     
     m, n = size(A)
     m == size(y, 1) || throw(DimensionMismatch("A has dimension $(size(A)) but y has dimension $(size(y))"))
     
-    x = ones(n)
+    x = zeros(n)
+    y_ = y[(A.R+1):end]
+    
     @inbounds for r in 1:A.R
-        for i in A.colptr[r]:(A.colptr[r+1]-1)
-            x[i] = y[r]
-        end
+        x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
+        x_ .= y[r]
+        Base.BLAS.gemv!('T', 1.0, A.cols[r], y_, 1.0, x_)
     end
-    @views Base.BLAS.gemv!('T', 1.0, A.cols, y[(A.R+1):end], 1.0, x)
     
     return x
 end
@@ -136,12 +141,12 @@ end
 -`Fc::Base.LinAlg.Cholesky{T, Matrix{T}}`: Cholesky factor of the dense
     Schur complement.
 """
-mutable struct FactorBlockAngular{Tv<:Real, Ti<:Integer} <: Factorization{Tv}
-    m::Ti
-    n::Ti
-    R::Ti
+mutable struct FactorBlockAngular{Tv<:Real} <: Factorization{Tv}
+    m::Int
+    n::Int
+    R::Int
 
-    colptr::Vector{Ti}
+    colptr::Vector{Int}
     
     d::Vector{Tv}
     η::Matrix{Tv}
@@ -152,7 +157,7 @@ mutable struct FactorBlockAngular{Tv<:Real, Ti<:Integer} <: Factorization{Tv}
         m::Ti, n::Ti, R::Ti,
         colptr::Vector{Ti}, d::Vector{Tv}, η::Matrix{Tv},
         Fc::Base.LinAlg.Cholesky{Tv, Matrix{Tv}}
-    ) where{Tv<:Real, Ti<:Integer} = new{Tv, Ti}(m, n, R, colptr, d, η, Fc)
+    ) where{Tv<:Real, Ti<:Integer} = new{Tv}(m, n, R, colptr, d, η, Fc)
 end
 
 size(F::FactorBlockAngular) = (F.m+F.R, F.n)
@@ -162,7 +167,7 @@ size(F::FactorBlockAngular) = (F.m+F.R, F.n)
     A_ldiv_B!
 
 """
-function A_ldiv_B!(F::FactorBlockAngular{Tv, Ti}, b::AbstractVector{Tv}) where{Tv<:Real, Ti<:Integer}
+function A_ldiv_B!(F::FactorBlockAngular{Tv}, b::AbstractVector{Tv}) where{Tv<:Real}
     
     # Dimension check
     (F.m + F.R) == size(b, 1) || throw(DimensionMismatch("F has dimensions $(size(F)) but b has dimensions $(size(b))"))
@@ -183,7 +188,7 @@ function A_ldiv_B!(F::FactorBlockAngular{Tv, Ti}, b::AbstractVector{Tv}) where{T
     return b
 end
 
-function A_ldiv_B!(y::AbstractVector{Tv}, F::FactorBlockAngular{Tv, Ti}, b::AbstractVector{Tv}) where{Tv<:Real, Ti<:Integer}
+function A_ldiv_B!(y::AbstractVector{Tv}, F::FactorBlockAngular{Tv}, b::AbstractVector{Tv}) where{Tv<:Real}
     
     # Dimension check
     (F.m + F.R) == size(b, 1) || throw(DimensionMismatch("F has dimensions $(size(F)) but b has dimensions $(size(b))"))
@@ -262,10 +267,10 @@ end
 
 
 function cholesky!(
-    A::DenseBlockAngular{Tv, Ti},
+    A::DenseBlockAngular{Tv},
     θ::AbstractVector{Tv},
-    F::FactorBlockAngular{Tv, Ti}
-    ) where{Tv<:Real, Ti<:Integer}
+    F::FactorBlockAngular{Tv}
+    ) where{Tv<:Real}
     
     # Schur complement
     C = zeros(Tv, A.m, A.m)
@@ -273,17 +278,17 @@ function cholesky!(
     for r in 1:A.R
         # copying ararys uses more memory, but is faster
         θ_ = view(θ, A.colptr[r]:(A.colptr[r+1]-1))
-        A_ = A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)]
+        # A_ = A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)]
         η_ = view(F.η, :, r)
         
         # diagonal elements
         F.d[r] = oneunit(Tv) / sum(θ_)
         
         # lower factors
-        Base.BLAS.gemv!('N', 1.0, A_, θ_, 0.0, η_)
+        Base.BLAS.gemv!('N', 1.0, A.cols[r], θ_, 0.0, η_)
 
         # Schur complement
-        CpBDBt!(C, A_, θ_)
+        CpBDBt!(C, A.cols[r], θ_)
         Base.BLAS.syr!('U', -F.d[r], η_, C)
     end
 
@@ -293,9 +298,9 @@ function cholesky!(
 end
 
 function cholesky(
-    A::DenseBlockAngular{Tv, Ti},
+    A::DenseBlockAngular{Tv},
     θ::AbstractVector{Tv}
-    ) where{Tv<:Real, Ti<:Integer}
+    ) where{Tv<:Real}
     
     # Schur complement
     C = zeros(Tv, A.m, A.m)
@@ -304,17 +309,17 @@ function cholesky(
     
     for r in 1:A.R
         θ_ = view(θ, A.colptr[r]:(A.colptr[r+1]-1))
-        A_ = A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)]
+        # A_ = A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)]
         η_ = view(η, :, r)  # use view because η is modified in-place
         
         # diagonal elements
         d[r] = oneunit(Tv) / sum(θ_)
         
         # lower factors
-        Base.BLAS.gemv!('N', 1.0, A_, θ_, 0.0, η_)
+        Base.BLAS.gemv!('N', 1.0, A.cols[r], θ_, 0.0, η_)
         
         # Schur complement
-        CpBDBt!(C, A_, θ_)
+        CpBDBt!(C, A.cols[r], θ_)
         Base.BLAS.syr!('U', -d[r], η_, C)
     end
     
