@@ -330,3 +330,35 @@ function cholesky(
     
     return F
 end
+
+function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}, blockidx::Int) where Tv<:Real
+
+    # Dimension check
+    A.m == size(a, 1) || throw(DimensionMismatch(""))
+
+    # add column
+    A.cols[blockidx] = hcat(A.cols[blockidx], a)
+    k = A.colptr[blockidx+1]
+
+    # book-keeping
+    A.n += 1
+    for r in (blockidx+1):A.R
+        A.colptr[r] += 1
+    end
+
+    return A, k
+end
+
+function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}) where Tv<:Real
+
+    # find index of block to which column pertains
+    blockidx = 1
+    for r in 1:A.R
+        if a[r] > 0
+            blockidx = r
+            break
+        end
+    end
+
+    addcolumn!(A, a[(A.R+1):end], blockidx)
+end

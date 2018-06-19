@@ -12,10 +12,7 @@ struct TulipSolver <: MPB.AbstractMathProgSolver
     options
 end
 
-function TulipSolver(;kwargs...)
-
-    TulipSolver(kwargs)
-end
+TulipSolver(;kwargs...) = TulipSolver(kwargs)
 
 """
     TulipMathProgModel
@@ -96,10 +93,10 @@ function MPB.loadproblem!(
     # Verify if problem is in standard form
     # TODO: handle conversion to standard form in model constructor
     if lb != ub
-        error("Only equality constraints are supported.")
+        warn("Only equality constraints are supported.")
     end
     if sense != :Min
-        error("Only minimization is supported.")
+        warn("Only minimization is supported.")
     end
 
     # extract upper bounds
@@ -175,9 +172,7 @@ end
 
 MPB.numlinconstr(m::TulipMathProgModel) = getnumconstr(m.inner)
 
-function MPB.getconstrsolution(m::TulipMathProgModel)
-    return copy(m.inner.A * m.inner.sol.x)
-end
+MPB.getconstrsolution(m::TulipMathProgModel) = copy(m.inner.A * m.inner.sol.x)
 
 MPB.getreducedcosts(m::TulipMathProgModel) = getreducedcosts(m.inner)
 

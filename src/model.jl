@@ -15,7 +15,7 @@
     the beginning of the optimization)
 -`status::Symbol`: Optimization status
 """
-mutable struct Model{Tv<:Real, Ta<:AbstractMatrix{Tv}}
+mutable struct Model{Ta<:AbstractMatrix{Float64}}
     #=======================================================
         Optimization environment
     =======================================================#
@@ -35,29 +35,29 @@ mutable struct Model{Tv<:Real, Ta<:AbstractMatrix{Tv}}
     n_con::Int              # Number of constraints
 
     A::Ta                   # Constraints matrix
-    b::AbstractVector{Tv}   # Right-hand side of equality constraints
-    c::AbstractVector{Tv}   # Objective vector
+    b::AbstractVector{Float64}   # Right-hand side of equality constraints
+    c::AbstractVector{Float64}   # Objective vector
     uind::AbstractVector{Int}  # Indices of upper-bounded variables
-    uval::AbstractVector{Tv}   # Values of upper bounds
+    uval::AbstractVector{Float64}   # Values of upper bounds
 
 
     #=======================================================
         Book-keeping
     =======================================================#
 
-    F::Factorization{Tv}    # Factorization object
+    F::Factorization{Float64}    # Factorization object
 
-    x::AbstractVector{Tv}   # Vector of original primal variables
-    w::AbstractVector{Tv}   # Vector of primal upper bound slack variables
-    y::AbstractVector{Tv}   # Vector of dual variables for equality constraints
-    s::AbstractVector{Tv}   # Vector of reduced costs of `x`
-    z::AbstractVector{Tv}   # Vector of reduced costs of `w`
+    x::AbstractVector{Float64}   # Vector of original primal variables
+    w::AbstractVector{Float64}   # Vector of primal upper bound slack variables
+    y::AbstractVector{Float64}   # Vector of dual variables for equality constraints
+    s::AbstractVector{Float64}   # Vector of reduced costs of `x`
+    z::AbstractVector{Float64}   # Vector of reduced costs of `w`
 
-    rb::AbstractVector{Tv}  # Vector of primal residuals `Ax - b`
-    rc::AbstractVector{Tv}  # Vector of dual residuals `A'y + s - c`
-    ru::AbstractVector{Tv}  # Vector of primal residuals 'x + w - u``
-    rxs::AbstractVector{Tv} # Right-hand side for omplimentarity product `x*s`
-    rwz::AbstractVector{Tv} # Right-hand side for omplimentarity product `w*z`
+    rb::AbstractVector{Float64}  # Vector of primal residuals `Ax - b`
+    rc::AbstractVector{Float64}  # Vector of dual residuals `A'y + s - c`
+    ru::AbstractVector{Float64}  # Vector of primal residuals 'x + w - u``
+    rxs::AbstractVector{Float64} # Right-hand side for omplimentarity product `x*s`
+    rwz::AbstractVector{Float64} # Right-hand side for omplimentarity product `w*z`
 
 
     #=======================================================
@@ -80,8 +80,8 @@ mutable struct Model{Tv<:Real, Ta<:AbstractMatrix{Tv}}
         ru::AbstractVector,
         rxs::AbstractVector,
         rwz::AbstractVector
-    ) where{Tv<:Real, Ta<:AbstractMatrix{Tv}}
-        m = new{Tv, Ta}()
+    ) where{Ta<:AbstractMatrix{Float64}}
+        m = new{Ta}()
 
         m.env = env
 
@@ -92,7 +92,7 @@ mutable struct Model{Tv<:Real, Ta<:AbstractMatrix{Tv}}
             "A has size $(size(A)) but b has size $(size(b))"
         ))
         n_var == size(c, 1) || throw(DimensionMismatch(
-            "A has size $(size(A)) but c has size $(size(b))"
+            "A has size $(size(A)) but c has size $(size(c))"
         ))
         n_var_ub = size(uind, 1)
         n_var_ub == size(uval, 1) || throw(DimensionMismatch(
@@ -154,20 +154,20 @@ Construct an empty model.
 Construct a model with no upper bounds.
 """
 function Model(
-        env::TulipEnv,
-        A::Ta,
-        b::AbstractVector{T2},
-        c::AbstractVector{T3},
-        uind::AbstractVector{Ti},
-        uval::AbstractVector{T4}
-    ) where{T1<:Real, Ta<:AbstractMatrix{T1}, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
+    env::TulipEnv,
+    A::Ta,
+    b::AbstractVector{T2},
+    c::AbstractVector{T3},
+    uind::AbstractVector{Ti},
+    uval::AbstractVector{T4}
+) where{T1<:Real, Ta<:AbstractMatrix{T1}, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
     
     (m, n) = size(A)
     p = size(uind, 1)
 
     model = Model(
         env,
-        A, b, c, uind, uval,
+        float(A), b, c, uind, uval,
         # initial solution
         ones(n),  # x
         ones(p),  # w
@@ -184,7 +184,10 @@ function Model(
     return model
 end
 
+
 Model(A, b, c, uind, uval) = Model(TulipEnv(), A, b, c, uind, uval)
+Model(A::Ta, b, c, uind, uval) where{Tv<:Real, Ta<:Matrix{Tv}} = Model(sparse(float(A)), b, c, uind, uval)
+Model(env, A::Ta, b, c, uind, uval) where{Tv<:Real, Ta<:Matrix{Tv}} = Model(env, sparse(float(A)), b, c, uind, uval)
 Model() = Model(spzeros(0, 0), Vector{Float64}(0,), Vector{Float64}(0,))
 Model(A, b, c) = Model(A, b, c, Vector{Int}(0,), Vector{Float64}(0,))
 
@@ -301,19 +304,59 @@ function addvar!(m::Model, colvals::AbstractVector{Tv}, l::Real, u::Real, objcoe
     m.n_con == size(colvals, 1) || throw(DimensionMismatch(
         "Column has $(size(col, 1)) coeffs but model has $(m.n_con) constraints"
     ))
-    u >= 0.0 || error("Upper bound must be non-negative")
-    l == 0.0 || error("Non-zero lower bounds are not supported")
+    l <= u || error("Upper-bound must be greater than lower bound")
 
-    # Add the variable
-    m.n_var += 1
-    m.A = hcat(m.A, colvals)
-    m.c = vcat(m.c, objcoef)
+    if l == -Inf && u == Inf
+        # free variable: add positive and negative parts
+        m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, colvals)
+        m.n_var += 1
 
-    # Update upper bounds
-    if u < Inf
-        push!(m.uind, m.n_var)
-        push!(m.uval, u)
+        insert!(m.c, k, objcoef)
+
+        m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, -colvals)
+        m.n_var += 1
+
+        insert!(m.c, k, -objcoef)
+
+
+    elseif l == -Inf && u < Inf
+        # upperbounded, no lower bound
+        m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, -colvals)
+        m.n_var += 1
+
+        # Update objective
+        insert!(m.c, k, -objval)
+
+        # Update right-hand side
+        m.b .+= u * colvals
+
+    elseif -Inf < l && u < Inf
+        # lower- and upper-bounded
+        m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, colvals)
+        m.n_var += 1
+
+        # Update objective
+        insert!(m.c, k, objcoef)
+
+        # Update right-hand side
+        m.b .-= l * colvals
+
+        # Update upper bounds
+        insert!(m.uind, k, k)
+        insert!(m.uind, k, u-l)
         m.n_var_ub += 1
+
+    else
+        # lower-bounded
+        # Add column
+        m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, colvals)
+        m.n_var += 1
+
+        # Update objective
+        insert!(m.c, k, objcoef)
+
+        # Update right-hand side
+        m.b .-= l * colvals
     end
 
     return nothing
