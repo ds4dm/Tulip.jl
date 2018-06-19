@@ -96,7 +96,7 @@ mutable struct Model{Ta<:AbstractMatrix{Float64}}
         ))
         n_var_ub = size(uind, 1)
         n_var_ub == size(uval, 1) || throw(DimensionMismatch(
-            "uind has size $(size(uval)) but uval has size $(size(uval))"
+            "uind has size $(size(uind)) but uval has size $(size(uval))"
         ))
         n_var_ub <= n_var || throw(DimensionMismatch(
             "Too many upper bounds were specified"
