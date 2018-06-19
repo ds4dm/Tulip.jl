@@ -6,9 +6,10 @@ m = 24
 n = 32
 R = 16
 u = [rand(m, n) for _ in 1:R]
+B = zeros(m, 0)
 
 # Constructor test
-A = Tulip.LinearAlgebra.DenseBlockAngular(u)
+A = Tulip.LinearAlgebra.DenseBlockAngular(u, B)
 @test m == A.m
 @test R*n == A.n
 @test R == A.R
@@ -68,16 +69,16 @@ u = [1.0 - 2.0 * rand(m, n) for _ in 1:R]
 for r in 1:R
     u[r][:, 1] = 0.0
 end
-A = Tulip.LinearAlgebra.DenseBlockAngular(u)
+B = eye(m)
+A = Tulip.LinearAlgebra.DenseBlockAngular(u, B)
 b = vcat(ones(R), zeros(m))
-c = rand(n*R)
-colub_ind = collect(1:(n*R))
-colub_val = 10.0 * ones(n*R)
+c = rand(A.n)
+colub_ind = collect(1:(A.n))
+colub_val = 10.0 * ones(A.n)
 
 # solve model
 model = Tulip.Model(A, b, c, colub_ind, colub_val)
 model.env.output_level = 0
 Tulip.optimize!(model)
-
 
 println("\tPassed.")

@@ -1,6 +1,6 @@
 # Base Interface
 import Base:
-    size, getindex, *
+    size, getindex
 import Base.LinAlg:
     A_mul_B!, At_mul_B, A_ldiv_B!
 
@@ -24,13 +24,14 @@ struct DenseBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
 
     colptr::Vector{Int}
     cols::Vector{Matrix{Tv}}
+    colslink::Matrix{Tv}
 
-    DenseBlockAngular(m::Ti, n::Ti, R::Ti, colptr::Vector{Ti}, cols::Vector{Matrix{Tv}}
-    ) where {Tv<:Real, Ti<:Integer} = new{Tv}(m, n, R, colptr, cols)
+    DenseBlockAngular(m::Ti, n::Ti, R::Ti, colptr::Vector{Ti}, cols::Vector{Matrix{Tv}}, colslink::Matrix{Tv}
+    ) where {Tv<:Real, Ti<:Integer} = new{Tv}(m, n, R, colptr, cols, colslink)
 end
 
 
-function DenseBlockAngular(col_list::Vector{Matrix{T}}) where T<:Real
+function DenseBlockAngular(col_list::Vector{Matrix{T}}, colslink::Matrix{T}) where T<:Real
 
     R = size(col_list, 1)
     if R == 0
@@ -38,7 +39,7 @@ function DenseBlockAngular(col_list::Vector{Matrix{T}}) where T<:Real
     end
     m = size(col_list[1], 1)
 
-    colptr = Vector{Int}(R+1)
+    colptr = Vector{Int}(R+2)
     colptr[1] = 1
 
     # Dimension check
@@ -46,11 +47,15 @@ function DenseBlockAngular(col_list::Vector{Matrix{T}}) where T<:Real
         m == size(col_list[r], 1) || throw(DimensionMismatch("Block 1 has dimensions $(size(col_list[1])) but block $(r) has dimensions $(size(col_list[r]))"))
         colptr[r+1] = colptr[r] + size(col_list[r], 2)
     end
+    m == size(colslink, 1) || throw(DimensionMismatch("Block 1 has dimensions $(size(col_list[1])) but B has dimensions $(size(colslink))"))
+    colptr[R+2] = colptr[R+1] + size(colslink, 2)
 
     cols = deepcopy(col_list)
+    B = deepcopy(colslink)
 
-    return DenseBlockAngular(m, colptr[end]-1, R, colptr, cols)
+    return DenseBlockAngular(m, colptr[end]-1, R, colptr, cols, B)
 end
+DenseBlockAngular(col_list::Vector{Matrix{T}}) where T<:Real = DenseBlockAngular(col_list, zeros(T, size(col_list[1], 1), 0))
 
 
 size(M::DenseBlockAngular) = (M.m+M.R, M.n)
@@ -60,8 +65,12 @@ function getindex(M::DenseBlockAngular{Tv}, i::Integer, j::Integer) where {Tv<:R
     if i > M.R
         # find index of block that contains column j
         blockidx = searchsortedlast(M.colptr, j)
-        # return corresponding coefficient
-        return M.cols[blockidx][i-M.R, j - M.colptr[blockidx]+1]
+        if blockidx == M.R+1
+            return M.colslink[i-M.R, j - M.colptr[blockidx]+1]
+        else
+            # return corresponding coefficient
+            return M.cols[blockidx][i-M.R, j - M.colptr[blockidx]+1]
+        end
     else
         # find if column j belongs to block i
         return (M.colptr[i] <= j < M.colptr[i+1]) ? oneunit(Tv) : zero(Tv)
@@ -72,23 +81,6 @@ function getindex(M::DenseBlockAngular{Tv}, i::Integer, j::Integer) where {Tv<:R
 end
 
 # Matrix-vector Multiplication
-function *(A::DenseBlockAngular{Tv}, x::AbstractVector{Tv}) where{Tv<:Real}
-    
-    n = size(x, 1)
-    n == A.n || throw(DimensionMismatch("A has dimensions $(size(A)) but x has dimension $(size(x))"))
-    
-    y = zeros(Tv, A.m+A.R)
-    y_ = view(y, (A.R+1):(A.R+A.m))
-    
-    for r in 1:A.R
-        x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
-        y[r] = sum(x_)
-        Base.BLAS.gemv!('N', 1.0, A.cols[r], x_, 1.0, y_)
-    end
-    
-    return y
-end
-
 function A_mul_B!(y::AbstractVector{Tv}, A::DenseBlockAngular{Tv}, x::AbstractVector{Tv}) where{Tv<:Real}
     
     m, n = size(A)
@@ -103,6 +95,7 @@ function A_mul_B!(y::AbstractVector{Tv}, A::DenseBlockAngular{Tv}, x::AbstractVe
         y[r] = sum(x_)
         Base.BLAS.gemv!('N', 1.0, A.cols[r], x_, 1.0, y_)
     end
+    @views Base.BLAS.gemv!('N', 1.0, A.colslink, x[A.colptr[A.R+1]:end], 1.0, y_)
     
     return y
 end
@@ -120,6 +113,7 @@ function At_mul_B(A::DenseBlockAngular{Tv}, y::AbstractVector{Tv}) where{Tv<:Rea
         x_ .= y[r]
         Base.BLAS.gemv!('T', 1.0, A.cols[r], y_, 1.0, x_)
     end
+    @views Base.BLAS.gemv!('T', 1.0, A.colslink, y_, 1.0, x[A.colptr[A.R+1]:end])
     
     return x
 end
@@ -291,6 +285,7 @@ function cholesky!(
         CpBDBt!(C, A.cols[r], θ_)
         Base.BLAS.syr!('U', -F.d[r], η_, C)
     end
+    @views CpBDBt!(C, A.colslink, θ[A.colptr[(A.R+1)]:end])
 
     F.Fc = cholfact(Symmetric(C))
     
@@ -322,13 +317,12 @@ function cholesky(
         CpBDBt!(C, A.cols[r], θ_)
         Base.BLAS.syr!('U', -d[r], η_, C)
     end
+    @views CpBDBt!(C, A.colslink, θ[A.colptr[(A.R+1)]:end])
     
     # compute Cholesky factor of C
     Fc = cholfact(Symmetric(C))
     
     F = FactorBlockAngular(A.m, A.n, A.R, A.colptr, d,η, Fc)
-    
-    return F
 end
 
 function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}, blockidx::Int) where Tv<:Real

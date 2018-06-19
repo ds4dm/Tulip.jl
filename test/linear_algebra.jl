@@ -62,7 +62,8 @@ test_linalg(A, b, c, uind, uval, zeros(n), zeros(p), zeros(m), zeros(n), zeros(p
 srand(0)
 nblocks = 4
 cols = [rand(m, 4) for _ in 1:nblocks]
-A = Tulip.LinearAlgebra.DenseBlockAngular(cols)
+B = zeros(m, 0)
+A = Tulip.LinearAlgebra.DenseBlockAngular(cols, B)
 (m, n) = size(A)
 c = rand(n)
 b = rand(m)
