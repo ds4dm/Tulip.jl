@@ -18,6 +18,11 @@ function optimize!(model::Model)
     # TODO: pre-optimization stuff
     model.F = symbolic_cholesky(model.A)  # Symbolic factorization
     θ = zeros(model.x)
+    model.x = Vector{Float64}(model.n_var)
+    model.w = Vector{Float64}(model.n_var_ub)
+    model.y = Vector{Float64}(model.n_con)
+    model.s = Vector{Float64}(model.n_var)
+    model.z = Vector{Float64}(model.n_var_ub)
 
     # X = Array{PrimalDualPoint, 1}()
     # TODO: check stopping criterion for possible early termination
