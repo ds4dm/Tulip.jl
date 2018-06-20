@@ -17,7 +17,7 @@ import Base.LinAlg:
     block `r` are columns `colptr[k] ... colptr[k+1]-1`.
 -`cols::Vector{Matrix{Tv}}`: List of R blocks of columns
 """
-struct DenseBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
+mutable struct DenseBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
     m::Int
     n::Int
     R::Int
@@ -336,7 +336,7 @@ function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}, blockidx::I
 
     # book-keeping
     A.n += 1
-    for r in (blockidx+1):A.R
+    for r in (blockidx+1):(A.R+2)
         A.colptr[r] += 1
     end
 

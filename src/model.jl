@@ -361,7 +361,7 @@ function addvar!(m::Model, colvals::AbstractVector{Tv}, l::Real, u::Real, objcoe
 
     return nothing
 end
-addvar!(m::Model, constridx, constrcoef, l, u, objcoef) = addvar!(m, sparsevec(constridx, constrcoef, m.inner.n_con), l, u, objcoef)
+addvar!(m::Model, constridx, constrcoef, l, u, objcoef) = addvar!(m, sparsevec(constridx, constrcoef, m.n_con), l, u, objcoef)
 addvar!(m::Model, col::AbstractVector{Tv}, objcoef::Real) where Tv<:Real = addvar!(m, col, 0.0, Inf, objcoef)
 
 """
