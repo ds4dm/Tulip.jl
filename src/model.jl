@@ -359,6 +359,8 @@ function addvar!(m::Model, colvals::AbstractVector{Tv}, l::Real, u::Real, objcoe
         m.b .-= l * colvals
     end
 
+    m.status = :Built
+
     return nothing
 end
 addvar!(m::Model, constridx, constrcoef, l, u, objcoef) = addvar!(m, sparsevec(constridx, constrcoef, m.n_con), l, u, objcoef)
