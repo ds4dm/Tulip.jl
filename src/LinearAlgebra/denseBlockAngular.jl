@@ -1,6 +1,6 @@
 # Base Interface
 import Base:
-    size, getindex
+    size, getindex, copy
 import Base.LinAlg:
     A_mul_B!, At_mul_B, A_ldiv_B!
 
@@ -79,6 +79,8 @@ function getindex(M::DenseBlockAngular{Tv}, i::Integer, j::Integer) where {Tv<:R
     # never reached, for type stability
     return zero(Tv)
 end
+
+copy(M::DenseBlockAngular) = DenseBlockAngular(M.m, M.n, M.R, deepcopy(M.colptr), deepcopy(M.cols), deepcopy(M.colslink))
 
 # Matrix-vector Multiplication
 function A_mul_B!(y::AbstractVector{Tv}, A::DenseBlockAngular{Tv}, x::AbstractVector{Tv}) where{Tv<:Real}

@@ -110,23 +110,23 @@ mutable struct Model{Ta<:AbstractMatrix{Float64}}
         m.n_var = n_var
         m.n_var_ub = n_var_ub
         m.n_con = n_con
-        m.A = A
-        m.b = b
-        m.c = c
-        m.uind = uind
-        m.uval = uval
+        m.A = copy(A)
+        m.b = copy(b)
+        m.c = copy(c)
+        m.uind = copy(uind)
+        m.uval = copy(uval)
 
-        m.x = x
-        m.w = w
-        m.y = y
-        m.s = s
-        m.z = z
+        m.x = copy(x)
+        m.w = copy(w)
+        m.y = copy(y)
+        m.s = copy(s)
+        m.z = copy(z)
 
-        m.rb = rb
-        m.rc = rc
-        m.ru = ru
-        m.rxs = rxs
-        m.rwz = rwz
+        m.rb = copy(rb)
+        m.rc = copy(rc)
+        m.ru = copy(ru)
+        m.rxs = copy(rxs)
+        m.rwz = copy(rwz)
 
         m.status = :Built
         m.numbarrieriter = 0
