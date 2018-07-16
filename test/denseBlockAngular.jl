@@ -6,14 +6,15 @@ m = 24
 n = 32
 R = 16
 u = [rand(m, n) for _ in 1:R]
+B = zeros(m, 0)
 
 # Constructor test
-A = Tulip.Cholesky.DenseBlockAngular(u)
+A = Tulip.LinearAlgebra.DenseBlockAngular(u, B)
 @test m == A.m
 @test R*n == A.n
 @test R == A.R
 for r in 1:R
-    @test u[r] == A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)]
+    @test u[r] == A.cols[r]
 end
 
 
@@ -35,14 +36,14 @@ y_ = hcat(u...) * x
 
 
 # factorization tests
-F = Tulip.Cholesky.cholesky(A, ones(A.n))
+F = Tulip.LinearAlgebra.cholesky(A, ones(A.n))
 @test m == F.m
 @test R == F.R
 @test n*R == F.n
 @test F.colptr[end] == (F.n+1)
 # factor update
 θ = rand(A.n)
-Tulip.Cholesky.cholesky!(A, θ, F)
+Tulip.LinearAlgebra.cholesky!(A, θ, F)
 
 # Left division tests
 A_ = sparse(A)  # sparse representation of A
@@ -64,20 +65,20 @@ err = maximum(abs.(A_ * (θ .* (A_' * y)) - b))
 # Tulip tests
 # create and solve model
 m, n, R = 2, 2, 4
-u = 1.0 - 2.0 * rand(m, n*R)
+u = [1.0 - 2.0 * rand(m, n) for _ in 1:R]
 for r in 1:R
-    u[:, 1+n*(r-1)] = 0.0
+    u[r][:, 1] = 0.0
 end
-colptr = [1+n*(r-1) for r in 1:(R+1)]
-A = Tulip.Cholesky.DenseBlockAngular(m, n*R, R, colptr, u)
+B = eye(m)
+A = Tulip.LinearAlgebra.DenseBlockAngular(u, B)
 b = vcat(ones(R), zeros(m))
-c = rand(n*R)
-colub_ind = collect(1:(n*R))
-colub_val = 10.0 * ones(n*R)
+c = rand(A.n)
+colub_ind = collect(1:(A.n))
+colub_val = 10.0 * ones(A.n)
 
 # solve model
 model = Tulip.Model(A, b, c, colub_ind, colub_val)
-Tulip.solve!(model, verbose=0, tol=10.0^-8)
-
+model.env.output_level = 0
+Tulip.optimize!(model)
 
 println("\tPassed.")
