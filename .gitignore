@@ -3,5 +3,6 @@
 *.jl.*.cov
 *.jl.mem
 
-# Ignore ./dat
+# Ignore data files
 dat/*
+*.csv
