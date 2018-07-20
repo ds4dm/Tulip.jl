@@ -1,30 +1,34 @@
 # Default parameters
 const TLP_DEFAULT_PARAM = Dict(
+    :algo => 1,
     :output_level => 1,
     :barrier_iter_max => 100,
     :time_limit => Inf,
     :barrier_tol_feas => 10.0^-8,
     :barrier_tol_opt => 10.0^-8,
-    :barrier_tol_conv => 10.0^-8
+    :barrier_tol_conv => 10.0^-8,
+    :barrier_tol_infeas => 10.0^-8
 )
 
 mutable struct TulipEnv
+    #=======================================================
+        Algorithmic features
+    =======================================================#
+
+    algo::Int   # Which interior-point algorithm
+
 
     #=======================================================
-        Termination criteria
+        Stopping criteria & tolerances
     =======================================================#
 
     barrier_iter_max::Int       # Maximum number of barrier iterations
     time_limit::Float64         # Time limit (in seconds)
 
-
-    #=======================================================
-        Tolerances
-    =======================================================#
-
     barrier_tol_feas::Float64   # Primal feasibility tolerance
     barrier_tol_opt::Float64    # Dual feasibility tolerance
     barrier_tol_conv::Float64   # Optimality gap tolerance
+    barrier_tol_infeas::Float64   # Infeasibility tolerance
 
 
     #=======================================================
@@ -54,6 +58,7 @@ function Base.copy(env::TulipEnv)
 
     return env_
 end
+
 """
     getindex(env::TulipEnv, param)
 
@@ -68,19 +73,29 @@ function Base.getindex(env::TulipEnv, param::Symbol)
 end
 Base.getindex(env::TulipEnv, param::String) = Base.getindex(env, Symbol(param))
 
+Base.getindex(env::TulipEnv, ::Type{Val{:algo}}) = 
+    copy(Core.getfield(env, :algo))
 
 Base.getindex(env::TulipEnv, ::Type{Val{:output_level}}) = 
     copy(Core.getfield(env, :output_level))
+
 Base.getindex(env::TulipEnv, ::Type{Val{:barrier_iter_max}}) = 
     copy(Core.getfield(env, :barrier_iter_max))
+
 Base.getindex(env::TulipEnv, ::Type{Val{:time_limit}}) = 
     copy(Core.getfield(env, :time_limit))
+
 Base.getindex(env::TulipEnv, ::Type{Val{:barrier_tol_feas}}) = 
     copy(Core.getfield(env, :barrier_tol_feas))
+
 Base.getindex(env::TulipEnv, ::Type{Val{:barrier_tol_opt}}) = 
     copy(Core.getfield(env, :barrier_tol_opt))
+    
 Base.getindex(env::TulipEnv, ::Type{Val{:barrier_tol_conv}}) = 
     copy(Core.getfield(env, :barrier_tol_conv))
+
+Base.getindex(env::TulipEnv, ::Type{Val{:barrier_tol_infeas}}) = 
+    copy(Core.getfield(env, :barrier_tol_infeas))
 
 """
     setindex!(env, param, v)
@@ -105,6 +120,13 @@ Base.setindex!(env::TulipEnv, v, param::String) = setindex!(env, v, Symbol(param
 
 function Base.setindex!(env::TulipEnv, v, param)
     error("Function _setparam! not implemented for $param")
+    return nothing
+end
+
+function Base.setindex!(env::TulipEnv, v::Int, ::Type{Val{:algo}})
+
+    @assert 0 <= v <= 1
+    env.algo = floor(Int, v)
     return nothing
 end
 
@@ -144,5 +166,11 @@ end
 function Base.setindex!(env::TulipEnv, v, ::Type{Val{:barrier_tol_conv}})
     @assert 0.0 <= v <= 1.0
     env.barrier_tol_conv = Float64(v)
+    return nothing
+end
+
+function Base.setindex!(env::TulipEnv, v, ::Type{Val{:barrier_tol_infeas}})
+    @assert 0.0 <= v <= 1.0
+    env.barrier_tol_infeas = Float64(v)
     return nothing
 end

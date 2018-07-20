@@ -3,17 +3,6 @@
     Data structure for a model
 
 # Attributes
--`n_var::Int`: Number of variables
--`n_con::Int`: Number of constraints
--`A::AbstractMatrix{T1<:Real}`: Constraint matrix
--`b::AbstractVector{T2<:Real}`: Right-hand side of the equality constraints
--`c::AbstractVector{T3<:Real}`: Objective coefficient
--`uind::AbstractVector{Ti<:Integer}`: Indices of upper-bounded variables
--`uval::AbstractVector{T4<:Real}`: Upper bounds on the variables. Only finite
-    upper bounds are stored.
--`sol::PrimalDualPoint`: Current solution to the problem (may be infeasible at
-    the beginning of the optimization)
--`status::Symbol`: Optimization status
 """
 mutable struct Model{Ta<:AbstractMatrix{Float64}}
     #=======================================================
@@ -23,7 +12,7 @@ mutable struct Model{Ta<:AbstractMatrix{Float64}}
     env::TulipEnv           # Environment
     status::Symbol          # Optimization status
     numbarrieriter::Int     # Number of barrier iterations
-    runtime::Float64      # Elapsed solution time, in seconds
+    runtime::Float64        # Elapsed solution time, in seconds
 
 
     #=======================================================
@@ -32,12 +21,12 @@ mutable struct Model{Ta<:AbstractMatrix{Float64}}
 
     n_var::Int              # Number of variables (total)
     n_var_ub::Int           # Number of upper-bounded variables
-    n_con::Int              # Number of constraints
+    n_constr::Int           # Number of constraints
 
-    A::Ta                   # Constraints matrix
-    b::AbstractVector{Float64}   # Right-hand side of equality constraints
-    c::AbstractVector{Float64}   # Objective vector
-    uind::AbstractVector{Int}  # Indices of upper-bounded variables
+    A::Ta                           # Constraints matrix
+    b::AbstractVector{Float64}      # Right-hand side of equality constraints
+    c::AbstractVector{Float64}      # Objective vector
+    uind::AbstractVector{Int}       # Indices of upper-bounded variables
     uval::AbstractVector{Float64}   # Values of upper bounds
 
 
@@ -52,13 +41,20 @@ mutable struct Model{Ta<:AbstractMatrix{Float64}}
     y::AbstractVector{Float64}   # Vector of dual variables for equality constraints
     s::AbstractVector{Float64}   # Vector of reduced costs of `x`
     z::AbstractVector{Float64}   # Vector of reduced costs of `w`
+    t::Float64                   # Artificial homogeneous variable
+    k::Float64                   # Artificial homogeneous variable
+    μ::Float64                   # Current barrier parameter
 
-    rb::AbstractVector{Float64}  # Vector of primal residuals `Ax - b`
-    rc::AbstractVector{Float64}  # Vector of dual residuals `A'y + s - c`
-    ru::AbstractVector{Float64}  # Vector of primal residuals 'x + w - u``
-    rxs::AbstractVector{Float64} # Right-hand side for omplimentarity product `x*s`
-    rwz::AbstractVector{Float64} # Right-hand side for omplimentarity product `w*z`
+    rp::AbstractVector{Float64}  # Vector of primal residuals `Ax - b`
+    rd::AbstractVector{Float64}  # Vector of dual residuals `A'y + s - c`
+    ru::AbstractVector{Float64}  # Vector of primal residuals 'x + w - u`
+    rg::Float64                  # Residual for optimality gap
+    rxs::AbstractVector{Float64} # Right-hand side for complimentarity product `x*s`
+    rwz::AbstractVector{Float64} # Right-hand side for complimentarity product `w*z`
+    rtk::Float64                 # Right-hand side for complimentarity product `t*k`
 
+    primal_bound::Float64        # Current primal bound
+    dual_bound::Float64          # Current dual bound
 
     #=======================================================
         Model constructor
@@ -70,25 +66,15 @@ mutable struct Model{Ta<:AbstractMatrix{Float64}}
         c::AbstractVector,
         uind::AbstractVector{Int},
         uval::AbstractVector,
-        x::AbstractVector,
-        w::AbstractVector,
-        y::AbstractVector,
-        s::AbstractVector,
-        z::AbstractVector,
-        rb::AbstractVector,
-        rc::AbstractVector,
-        ru::AbstractVector,
-        rxs::AbstractVector,
-        rwz::AbstractVector
     ) where{Ta<:AbstractMatrix{Float64}}
         m = new{Ta}()
 
         m.env = env
 
         # Dimension check
-        n_con = size(A, 1)
+        n_constr = size(A, 1)
         n_var = size(A, 2)
-        n_con == size(b, 1) || throw(DimensionMismatch(
+        n_constr == size(b, 1) || throw(DimensionMismatch(
             "A has size $(size(A)) but b has size $(size(b))"
         ))
         n_var == size(c, 1) || throw(DimensionMismatch(
@@ -107,27 +93,38 @@ mutable struct Model{Ta<:AbstractMatrix{Float64}}
             ))
         end
 
+        # Copy problem data
         m.n_var = n_var
         m.n_var_ub = n_var_ub
-        m.n_con = n_con
+        m.n_constr = n_constr
         m.A = copy(A)
         m.b = copy(b)
         m.c = copy(c)
         m.uind = copy(uind)
         m.uval = copy(uval)
 
-        m.x = copy(x)
-        m.w = copy(w)
-        m.y = copy(y)
-        m.s = copy(s)
-        m.z = copy(z)
+        # Allocate memory for optimization algo
+        m.x = Vector{Float64}(n_var)
+        m.w = Vector{Float64}(n_var_ub)
+        m.y = Vector{Float64}(n_constr)
+        m.s = Vector{Float64}(n_var)
+        m.z = Vector{Float64}(n_var_ub)
+        m.t = 1.0
+        m.k = 1.0
+        m.μ = 1.0
 
-        m.rb = copy(rb)
-        m.rc = copy(rc)
-        m.ru = copy(ru)
-        m.rxs = copy(rxs)
-        m.rwz = copy(rwz)
+        m.rp = Vector{Float64}(n_constr)
+        m.rd = Vector{Float64}(n_var)
+        m.ru = Vector{Float64}(n_var_ub)
+        m.rg = 1.0
+        m.rxs = Vector{Float64}(n_var)
+        m.rwz = Vector{Float64}(n_var_ub)
+        m.rtk = 1.0
 
+        m.primal_bound = Inf
+        m.dual_bound = -Inf
+
+        # Book-keeping stuff
         m.status = :Built
         m.numbarrieriter = 0
         m.runtime = 0.0
@@ -153,36 +150,41 @@ Construct an empty model.
 
 Construct a model with no upper bounds.
 """
-function Model(
-    env::TulipEnv,
-    A::Ta,
-    b::AbstractVector{T2},
-    c::AbstractVector{T3},
-    uind::AbstractVector{Ti},
-    uval::AbstractVector{T4}
-) where{T1<:Real, Ta<:AbstractMatrix{T1}, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
+# function Model(
+#     env::TulipEnv,
+#     A::Ta,
+#     b::AbstractVector{T2},
+#     c::AbstractVector{T3},
+#     uind::AbstractVector{Ti},
+#     uval::AbstractVector{T4}
+# ) where{T1<:Real, Ta<:AbstractMatrix{T1}, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
     
-    (m, n) = size(A)
-    p = size(uind, 1)
+#     (m, n) = size(A)
+#     p = size(uind, 1)
 
-    model = Model(
-        env,
-        float(A), b, c, uind, uval,
-        # initial solution
-        ones(n),  # x
-        ones(p),  # w
-        zeros(m), # y
-        ones(n),  # s
-        ones(p),  # w
-        # residuals
-        fill(Inf, m),  # rb
-        fill(Inf, n),  # rc
-        fill(Inf, p),  # ru
-        ones(n),  # rxs
-        ones(p)   # rwz
-    )
-    return model
-end
+#     model = Model(
+#         env,
+#         float(A), b, c, uind, uval,
+#         # initial solution
+#         ones(n),  # x
+#         ones(p),  # w
+#         zeros(m), # y
+#         ones(n),  # s
+#         ones(p),  # w
+#         1.0,      # t
+#         1.0,      # k
+#         1.0,      # μ
+#         # residuals
+#         fill(Inf, m),  # rp
+#         fill(Inf, n),  # rd
+#         fill(Inf, p),  # ru
+#         Inf,           # rg
+#         ones(n),   # rxs
+#         ones(p),   # rwz
+#         Inf        # rtk
+#     )
+#     return model
+# end
 
 
 Model(A, b, c, uind, uval) = Model(TulipEnv(), A, b, c, uind, uval)
@@ -213,7 +215,7 @@ getnumvar(m::Model) = m.n_var
 Return the number of constraints in the model. This number does not include
     explicit bounds on the variables.
 """
-getnumconstr(m::Model) = m.n_con
+getnumconstr(m::Model) = m.n_constr
 
 """
     getobjectivecoeffs(m::Model)
@@ -301,8 +303,8 @@ Add a variable to the model.
 function addvar!(m::Model, colvals::AbstractVector{Tv}, l::Real, u::Real, objcoef::Real) where Tv<:Real
 
     # Dimension check
-    m.n_con == size(colvals, 1) || throw(DimensionMismatch(
-        "Column has $(size(col, 1)) coeffs but model has $(m.n_con) constraints"
+    m.n_constr == size(colvals, 1) || throw(DimensionMismatch(
+        "Column has $(size(col, 1)) coeffs but model has $(m.n_constr) constraints"
     ))
     l <= u || error("Upper-bound must be greater than lower bound")
 
@@ -363,7 +365,7 @@ function addvar!(m::Model, colvals::AbstractVector{Tv}, l::Real, u::Real, objcoe
 
     return nothing
 end
-addvar!(m::Model, constridx, constrcoef, l, u, objcoef) = addvar!(m, sparsevec(constridx, constrcoef, m.n_con), l, u, objcoef)
+addvar!(m::Model, constridx, constrcoef, l, u, objcoef) = addvar!(m, sparsevec(constridx, constrcoef, m.n_constr), l, u, objcoef)
 addvar!(m::Model, col::AbstractVector{Tv}, objcoef::Real) where Tv<:Real = addvar!(m, col, 0.0, Inf, objcoef)
 
 """
@@ -394,7 +396,7 @@ function addconstr!(m::Model, rowvals::AbstractVector{Tv}, rhs::Real) where Tv<:
     -Inf < rhs < Inf || error("Right-hand side must have finite value")
 
     # Add constraint
-    m.n_con += 1
+    m.n_constr += 1
     m.b = vcat(m.b, rhs)
     m.A = vcat(m.A, rowvals)
 
@@ -420,7 +422,7 @@ Retrieve solution-related information
 
 Return objective value of the best known solution
 """
-getobjectivevalue(m::Model) = dot(m.c, m.x)
+getobjectivevalue(m::Model) = dot(m.c, m.x) / m.t
 
 """
     getdualbound(m::Model)
@@ -428,35 +430,35 @@ getobjectivevalue(m::Model) = dot(m.c, m.x)
 Return dual bound on the obective value. Returns a lower (resp. upper) bound
 if the problem is a minimization (resp. maximization).
 """
-getdualbound(m::Model) = dot(m.b, m.y) - dot(m.uval, m.z)
+getdualbound(m::Model) = (dot(m.b, m.y) - dot(m.uval, m.z)) / m.t
 
 """
     getobjectivedualgap(m::Model)
 
 Return the duality gap. 
 """
-getobjectivedualgap(m::Model) = dot(m.x, m.s) + dot(m.w, m.z)
+getobjectivedualgap(m::Model) = (dot(m.x, m.s) + dot(m.w, m.z)) / (m.t)^2
 
 """
     getsolution(m::Model)
 
 Return best known (primal) solution to the problem.
 """
-getsolution(m::Model) = copy(m.x)
+getsolution(m::Model) = copy(m.x / m.t)
 
 """
     getconstrduals(m::Model)
 
 Return dual variables associated to linear constraints.
 """
-getconstrduals(m::Model) = copy(m.y)
+getconstrduals(m::Model) = copy(m.y / m.t)
 
 """
     getreducedcosts(m::Model)
 
 Return reduced costs of primal variables.
 """
-getreducedcosts(m::Model) = copy(m.s)
+getreducedcosts(m::Model) = copy(m.s / m.t)
 
 """
     getnumbarrieriter(m::Model)
