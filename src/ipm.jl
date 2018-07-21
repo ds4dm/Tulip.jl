@@ -218,7 +218,7 @@ function solve_mpc!(model::Model)
         # compute residuals
         rp = model.A * model.x - model.b
         rd = At_mul_B(model.A, model.y) + model.s - model.c
-        spxpay!(-1.0, rd, model.uind, model.z)
+        aUtxpy!(-1.0, model.uind, model.z, rd)
 
         ru = model.x[model.uind] + model.w - model.uval
 
@@ -370,7 +370,7 @@ function compute_starting_point!(
 
     rhs = - 2 * b
     u_ = zeros(n)
-    spxpay!(1.0, u_, uind, uval)
+    aUtxpy!(1.0, uind, uval, u_)
     rhs += A* u_
 
 
@@ -382,7 +382,7 @@ function compute_starting_point!(
     v = F \ rhs
 
     copy!(x, -0.5 * At_mul_B(A, v))
-    spxpay!(0.5, x, uind, uval)
+    aUtxpy!(0.5, uind, uval, x)
 
     # Compute w0
     @inbounds for i in 1:p
@@ -503,7 +503,7 @@ function compute_next_iterate!(
 
     rp = (A * x) - b
     rd = At_mul_B(A, y) + s - c
-    spxpay!(-1.0, rd, uind, z)
+    aUtxpy!(-1.0, uind, z, rd)
 
     ru = x[uind] + w - uval
     rxs = x .* s
@@ -808,20 +808,6 @@ function update_theta!(θ, x, s, z, w, colind)
 end
 
 """
-    spxpay!(α, x, y_ind, y_val)
-
-In-place computation of x += α * y, where y = sparse(y_ind, y_val)
-
-# Arguments
-"""
-function spxpay!(α::Tv, x::AbstractVector{Tv}, y_ind::AbstractVector{Ti}, y_val::AbstractVector{Tv}) where{Ti<:Integer, Tv<:Real}
-    for i in 1:size(y_ind, 1)
-        j = y_ind[i]
-        x[j] = x[j] + α * y_val[i]
-    end
-end
-
-"""
     aUtxpy!(a, xval, xind, y)
 
 Lift `x` to a `n`-dimensional space, and add the scaled result to `y`.
@@ -842,11 +828,11 @@ function aUtxpy!(a, xind, xval, y)
     
     if a == oneunit(a)
         @inbounds for (j, i) in enumerate(xind)
-            y[i] += xval[j]
+            y[i] += xval[j]  # i = xind[j]
         end
     else
         @inbounds for (j, i) in enumerate(xind)
-            y[i] += a * xval[j]
+            y[i] += a * xval[j]  # i = xind[j]
         end
     end
     return y
@@ -874,11 +860,11 @@ function aUxpy!(a, x, yind, yval)
     
     if a == oneunit(a)
         @inbounds for (j, i) in enumerate(yind)
-            yval[j] += x[i]
+            yval[j] += x[i]  # i = xind[j]
         end
     else
         @inbounds for (j, i) in enumerate(yind)
-            yval[j] += a * x[i]
+            yval[j] += a * x[i]  # i = xind[j]
         end
     end
     
