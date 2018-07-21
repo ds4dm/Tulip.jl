@@ -117,6 +117,7 @@ end
 
 function generate_solver(::Type{Val{:TLP}};time_limit=300, nthreads=1, verbose::Int=0)
     Tulip.TulipSolver(
+        algo=1,
         output_level=verbose,
         time_limit=time_limit
     )
