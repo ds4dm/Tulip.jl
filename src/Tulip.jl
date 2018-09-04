@@ -7,6 +7,7 @@ export Model, readmps
 
 # package code goes here
 include("env.jl")
+include("status.jl")
 include("model.jl")
 include("ipm.jl")
 include("readmps.jl")
