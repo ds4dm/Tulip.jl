@@ -7,15 +7,15 @@ import Base.LinAlg:
 # TODO: make sure this implementation is stable
 
 """
-    DenseBlockAngular{Tv<:Real, Ti<:Integer}
+    DenseBlockAngular{Tv<:Real}
 
 # Attributes
--`m::Ti`: Number of linking constraints
--`n::Ti`: Total number of columns
--`R::Ti`: Number of blocks
--`colptr::Vector{Ti}`: Index of first column of each block. The columns of
+-`m`: Number of linking constraints
+-`n`: Total number of columns
+-`R`: Number of blocks
+-`colptr`: Index of first column of each block. The columns of
     block `r` are columns `colptr[k] ... colptr[k+1]-1`.
--`cols::Vector{Matrix{Tv}}`: List of R blocks of columns
+-`cols`: List of R blocks of columns
 """
 mutable struct DenseBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
     m::Int
@@ -125,17 +125,16 @@ end
     FactorBlockAngular
 
 # Attributes
--`m::Integer`: number of linking constraints
--`n::Integer`: total number of columns
--`R::Integer`: number of blocks
--`colptr::Vector{Int}`: index of first column of each block. The columns of
+-`m`: number of linking constraints
+-`n`: total number of columns
+-`R`: number of blocks
+-`colptr`: index of first column of each block. The columns of
     block `r` are columns `colptr[k] ... colptr[k+1]-1`.
--`d::Vector{T}`: `R`-dimensional vector containing the diagonal coefficients
+-`d`: `R`-dimensional vector containing the diagonal coefficients
     of the implicit Cholesky factor.
--`η::Matrix{T}`: An `m x R` matrix containing the lower blocks of the
+-`η`: An `m x R` matrix containing the lower blocks of the
     implicit Cholesky factor.
--`Fc::Base.LinAlg.Cholesky{T, Matrix{T}}`: Cholesky factor of the dense
-    Schur complement.
+-`Fc`: Cholesky factor of the dense Schur complement.
 """
 mutable struct FactorBlockAngular{Tv<:Real} <: Factorization{Tv}
     m::Int
@@ -215,43 +214,27 @@ end
     CpBDBt!(C, B, d)
 
 Compute C += B*D*B'
-    where B' is the transpose of B, and D = diag(d1, ..., dn)
+    where B' is the transpose of B, D = diag(d1, ..., dn),
     and B is mxn dense, C is mxm (dense), d is nx1 (dense).
 
 C is modified in-place (no memory allocated),
 only its upper-triangular part is modified.
 
 # Arguments
--`C::StridedMatrix{T}`: An `m`-by-`m` dense matrix, modified in place
--`B::StridedMatrix{T}`: An `m`-by-`k` dense matrix
--`d::StridedVector{T}`: A vector of length `k`
+-`C`: An `m`-by-`m` dense matrix, modified in place
+-`B`: An `m`-by-`k` dense matrix
+-`d`: A vector of length `k`
 """
 function CpBDBt!(C::StridedMatrix{T}, B::StridedMatrix{T}, d::StridedVector{T}) where {T<:Real}
-    # TODO: allow user to specify which triangular part should be update
+    # TODO: allow user to specify which triangular part should be updated
     # TODO: add parameter for computing C = α C + B*D*B'
     
     # Dimension checks
     (m, k) = size(B)
     (m, m) == size(C) || throw(DimensionMismatch("C has dimensions $(size(C)) but B has dimensions $(size(B))"))
     k == size(d, 1) || throw(DimensionMismatch("d has dimensions $(size(d)) but B has dimensions $(size(B))"))
-    
-    # compute symmetric rank-k update
-    # only the upper-triangular part of C is modified
-    # temp = zero(T)
-    # for j=1:m
-    #     for l = 1:k
-    #         @inbounds temp = d[l] * B[j, l]
-    #         if temp == zero(T)
-    #             # skip loop if temp is zero
-    #             continue 
-    #         end
-    #         for i=1:j
-    #             @inbounds C[i, j] = C[i, j] + temp * B[i, l]
-    #         end
-    #     end
-    # end
 
-    # # Linear scaling + BLAS call is more efficient
+    # Linear scaling + BLAS call
     B_ = B * Diagonal(sqrt.(d))
     Base.BLAS.syrk!('U', 'N', 1.0, B_, 1.0, C)
     
@@ -277,18 +260,13 @@ function cholesky!(
         # A_ = A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)]
         η_ = view(F.η, :, r)
         
-        # diagonal elements
-        F.d[r] = oneunit(Tv) / sum(θ_)
-        
-        # lower factors
-        Base.BLAS.gemv!('N', 1.0, A.cols[r], θ_, 0.0, η_)
-
-        # Schur complement
-        CpBDBt!(C, A.cols[r], θ_)
-        Base.BLAS.syr!('U', -F.d[r], η_, C)
+        block_update!(r, A.cols[r], θ_, η_, F.d, C)
     end
+
+    # Linking columns
     @views CpBDBt!(C, A.colslink, θ[A.colptr[(A.R+1)]:end])
 
+    # Cholesky factorization of (dense) Schur complement
     F.Fc = cholfact(Symmetric(C))
     
     return F
@@ -306,22 +284,15 @@ function cholesky(
     
     for r in 1:A.R
         θ_ = view(θ, A.colptr[r]:(A.colptr[r+1]-1))
-        # A_ = A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)]
         η_ = view(η, :, r)  # use view because η is modified in-place
         
-        # diagonal elements
-        d[r] = oneunit(Tv) / sum(θ_)
-        
-        # lower factors
-        Base.BLAS.gemv!('N', 1.0, A.cols[r], θ_, 0.0, η_)
-        
-        # Schur complement
-        CpBDBt!(C, A.cols[r], θ_)
-        Base.BLAS.syr!('U', -d[r], η_, C)
+        block_update!(r, A.cols[r], θ_, η_, d, C)
     end
+
+    # Linking columns
     @views CpBDBt!(C, A.colslink, θ[A.colptr[(A.R+1)]:end])
     
-    # compute Cholesky factor of C
+    # Cholesky factorization of (dense) Schur complement
     Fc = cholfact(Symmetric(C))
     
     F = FactorBlockAngular(A.m, A.n, A.R, A.colptr, d,η, Fc)
@@ -357,4 +328,24 @@ function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}) where Tv<:R
     end
 
     addcolumn!(A, a[(A.R+1):end], blockidx)
+end
+
+function block_update!(
+    r::Int,
+    A::StridedMatrix{Tv},
+    θ::StridedVector{Tv},
+    η::StridedVector{Tv},
+    d::StridedVector{Tv},
+    C::StridedMatrix{Tv}
+) where Tv<:Real
+    
+    d_ = oneunit(Tv) / sum(θ)
+    Base.BLAS.gemv!('N', 1.0, A, θ, 0.0, η)
+    CpBDBt!(C, A, θ)
+    Base.BLAS.syr!('U', -d_, η, C)
+
+    d[r] = d_
+
+    return nothing
+
 end
