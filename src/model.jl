@@ -36,14 +36,14 @@ mutable struct Model{Ta<:AbstractMatrix{Float64}}
 
     F::Factorization{Float64}    # Factorization object
 
-    x::AbstractVector{Float64}   # Vector of original primal variables
-    w::AbstractVector{Float64}   # Vector of primal upper bound slack variables
-    y::AbstractVector{Float64}   # Vector of dual variables for equality constraints
-    s::AbstractVector{Float64}   # Vector of reduced costs of `x`
-    z::AbstractVector{Float64}   # Vector of reduced costs of `w`
-    t::Float64                   # Artificial homogeneous variable
-    k::Float64                   # Artificial homogeneous variable
-    μ::Float64                   # Current barrier parameter
+    x::Vector{Float64}   # Vector of original primal variables
+    w::Vector{Float64}   # Vector of primal upper bound slack variables
+    y::Vector{Float64}   # Vector of dual variables for equality constraints
+    s::Vector{Float64}   # Vector of reduced costs of `x`
+    z::Vector{Float64}   # Vector of reduced costs of `w`
+    t::Float64           # Artificial homogeneous variable
+    k::Float64           # Artificial homogeneous variable
+    μ::Float64           # Current barrier parameter
 
     rp::AbstractVector{Float64}  # Vector of primal residuals `Ax - b`
     rd::AbstractVector{Float64}  # Vector of dual residuals `A'y + s - c`
@@ -324,6 +324,7 @@ function addvar!(m::Model, colvals::AbstractVector{Tv}, l::Real, u::Real, objcoe
     elseif l == -Inf && u < Inf
         # upperbounded, no lower bound
         m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, -colvals)
+        # insert!(m.x, k, 1.0)
         m.n_var += 1
 
         # Update objective
@@ -335,6 +336,7 @@ function addvar!(m::Model, colvals::AbstractVector{Tv}, l::Real, u::Real, objcoe
     elseif -Inf < l && u < Inf
         # lower- and upper-bounded
         m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, colvals)
+        # insert!(m.x, k, 1.0)
         m.n_var += 1
 
         # Update objective
