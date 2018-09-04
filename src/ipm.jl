@@ -32,13 +32,18 @@ function solve_hsd!(model::Model)
 
     # Starting point
     # TODO: enable warm-start
-    model.x .= 1.0
-    model.w .= 1.0
-    model.y .= 0.0
-    model.s .= 1.0
-    model.z .= 1.0
+    model.x = ones(model.n_var)
+    model.w = ones(model.n_var_ub)
+    model.y = zeros(model.n_constr)
+    model.s = ones(model.n_var)
+    model.z = ones(model.n_var_ub)
     model.t = 1.0
     model.k = 1.0
+
+    model.rp = Inf*ones(model.n_constr)
+    model.ru = Inf*ones(model.n_var_ub)
+    model.rd = Inf*ones(model.n_var)
+    model.rg = Inf
 
     # IPM log
     if model.env[:output_level] == 1
