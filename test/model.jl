@@ -22,7 +22,7 @@ n = 2
 
 # Create random instance and run checks
 model = Tulip.Model(A, b, c, u.nzind, u.nzval)
-model.env[:output_level] = 0
+model.env[:verbose] = 0
 Tulip.optimize!(model)
 
 # Low-level interface

@@ -2,7 +2,7 @@ import MathProgBase
 
 const MPB = MathProgBase
 
-solver_tlp = Tulip.TulipSolver(output_level=0, time_limit=10)
+solver_tlp = Tulip.TulipSolver(verbose=0, time_limit=10)
 
 m, n, c, b, A, collb, colub, ranges = Tulip.readmps(testdir*"/../dat/netlib/AFIRO.SIF");
 
@@ -25,7 +25,7 @@ MPB.optimize!(model_tlp)
 
 
 # # TODO: Run MathProgBase tests instead
-# solver_tlp = Tulip.TulipSolver(output_level=0, time_limit=100.0)
+# solver_tlp = Tulip.TulipSolver(verbose=0, time_limit=100.0)
 # include(joinpath(Pkg.dir("MathProgBase"),"test","linprog.jl"))
 # linprogtest(solver_tlp)
 # MathProgBase.setparameters!(solver_tlp, Silent=true, TimeLimit=100.0)

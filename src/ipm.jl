@@ -46,7 +46,7 @@ function solve_hsd!(model::Model)
     model.rg = Inf
 
     # IPM log
-    if model.env[:output_level] == 1
+    if model.env[:verbose] == 1
         println(" Itn    Primal Obj      Dual Obj        PFeas    DFeas    GFeas     Mu       Time")
     end
 
@@ -70,7 +70,7 @@ function solve_hsd!(model::Model)
         
         # I.B - Log
         model.runtime = time() - tstart
-        if model.env[:output_level] == 1
+        if model.env[:verbose] == 1
             # Iteration count
             @printf("%4d", model.numbarrieriter)
             # Primal and Dual objectives
@@ -94,7 +94,7 @@ function solve_hsd!(model::Model)
             && ((abs(model.primal_bound - model.dual_bound) / (model.t + abs(model.dual_bound))) < model.env[:barrier_tol_conv])
         )
             # optimal solution found
-            if model.env[:output_level] == 1
+            if model.env[:verbose] == 1
                 println("\nOptimal solution found.")
             end
             model.status = :Optimal
@@ -103,7 +103,7 @@ function solve_hsd!(model::Model)
         
         if (model.μ < model.env[:barrier_tol_feas]) && ((model.t / model.k) < model.env[:barrier_tol_feas])
             # infeasibility detected
-            if model.env[:output_level] == 1
+            if model.env[:verbose] == 1
                 println("\nInfeasibility detected.")
             end
             model.status = :Infeasible
@@ -180,7 +180,7 @@ function solve_mpc!(model::Model)
     )
 
     # IPM log
-    if model.env[:output_level] == 1
+    if model.env[:verbose] == 1
         println(" Itn    Primal Obj      Dual Obj        Prim Inf Dual Inf UBnd Inf")
     end
 
@@ -251,7 +251,7 @@ function solve_mpc!(model::Model)
         # Log
         model.runtime = time() - tstart
 
-        if model.env[:output_level] == 1
+        if model.env[:verbose] == 1
             # Iteration count
             print(@sprintf("%4d", model.numbarrieriter))
             # Primal and Dual objectives

@@ -78,7 +78,7 @@ colub_val = 10.0 * ones(A.n)
 
 # solve model
 model = Tulip.Model(A, b, c, colub_ind, colub_val)
-model.env.output_level = 0
+model.env[:verbose] = 0
 Tulip.optimize!(model)
 
 println("\tPassed.")
