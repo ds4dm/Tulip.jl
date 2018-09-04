@@ -142,57 +142,21 @@ end
 
 Construct a model with upper bounds on the specified variables.
 
-    Model()
-
-Construct an empty model.
-
     Model(A, b, c)
 
 Construct a model with no upper bounds.
+
+Model()
+
+Construct an empty model.
 """
-# function Model(
-#     env::TulipEnv,
-#     A::Ta,
-#     b::AbstractVector{T2},
-#     c::AbstractVector{T3},
-#     uind::AbstractVector{Ti},
-#     uval::AbstractVector{T4}
-# ) where{T1<:Real, Ta<:AbstractMatrix{T1}, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
-    
-#     (m, n) = size(A)
-#     p = size(uind, 1)
-
-#     model = Model(
-#         env,
-#         float(A), b, c, uind, uval,
-#         # initial solution
-#         ones(n),  # x
-#         ones(p),  # w
-#         zeros(m), # y
-#         ones(n),  # s
-#         ones(p),  # w
-#         1.0,      # t
-#         1.0,      # k
-#         1.0,      # μ
-#         # residuals
-#         fill(Inf, m),  # rp
-#         fill(Inf, n),  # rd
-#         fill(Inf, p),  # ru
-#         Inf,           # rg
-#         ones(n),   # rxs
-#         ones(p),   # rwz
-#         Inf        # rtk
-#     )
-#     return model
-# end
-
-
 Model(A, b, c, uind, uval) = Model(TulipEnv(), A, b, c, uind, uval)
 Model(A::Ta, b, c, uind, uval) where{Tv<:Real, Ta<:Matrix{Tv}} = Model(sparse(float(A)), b, c, uind, uval)
 Model(env, A::Ta, b, c, uind, uval) where{Tv<:Real, Ta<:Matrix{Tv}} = Model(env, sparse(float(A)), b, c, uind, uval)
-Model() = Model(spzeros(0, 0), Vector{Float64}(0,), Vector{Float64}(0,))
+
 Model(A, b, c) = Model(A, b, c, Vector{Int}(0,), Vector{Float64}(0,))
 
+Model() = Model(spzeros(0, 0), Vector{Float64}(0,), Vector{Float64}(0,))
 
 #=======================================================
     Model interface
@@ -475,3 +439,17 @@ getnumbarrieriter(m::Model) = m.numbarrieriter
 Return runtime of the optimizer.
 """
 getsolutiontime(m::Model) = m.runtime
+
+"""
+    getinfeasibilityray(m::Model)
+
+Retrieve infeasibility ray when problem is proven infeasible.
+"""
+getinfeasibilityray(m::Model) = copy(m.y ./ m.t)
+
+"""
+    getunboundedray(m::Model)
+
+Retrieve unbounded ray when model is proven unbounded.
+"""
+getunboundedray(m::Model) = copy(m.x ./ m.t)

@@ -178,9 +178,8 @@ MPB.getreducedcosts(m::TulipMathProgModel) = getreducedcosts(m.inner)
 
 MPB.getconstrduals(m::TulipMathProgModel) = getconstrduals(m.inner)
 
-function MPB.getinfeasibilityray(m::TulipMathProgModel)
-    warn("MPB.getinfeasibilityray! currently not implemented. Function call ignored.")
-    return Vector{Float64}(0,)
-end
+MPB.getinfeasibilityray(m::TulipMathProgModel) = getinfeasibilityray(m.inner)
+
+MPB.getunboundedray(m::TulipMathProgModel) = getunboundedray(m.inner)
 
 MPB.getbarrieriter(m::TulipMathProgModel) = getnumbarrieriter(m.inner)
