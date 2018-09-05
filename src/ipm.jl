@@ -8,7 +8,7 @@ Run the optimizer.
 """
 function optimize!(model::Model)
 
-    if model.env[:algo] == 0
+    if model.env[Val{:algo}] == 0
         return solve_mpc!(model)
     else
         return solve_hsd!(model)
@@ -24,11 +24,11 @@ function solve_hsd!(model::Model)
 
     # Initialization
     tstart = time()
-    model.runtime = 0.0
-    model.numbarrieriter = 0  # number of IP iterations
+    model.time_total = 0.0
+    model.num_bar_iter = 0  # number of IP iterations
 
     # Allocate memory for Cholesky factor
-    model.F = symbolic_cholesky(model.A)  # Symbolic factorization
+    F = symbolic_cholesky(model.A)  # Symbolic factorization
 
     # Starting point
     # TODO: enable warm-start
@@ -37,8 +37,8 @@ function solve_hsd!(model::Model)
     model.y = zeros(model.n_constr)
     model.s = ones(model.n_var)
     model.z = ones(model.n_var_ub)
-    model.t = 1.0
-    model.k = 1.0
+    model.t = ones(1)
+    model.k = ones(1)
 
     model.rp = Inf*ones(model.n_constr)
     model.ru = Inf*ones(model.n_var_ub)
@@ -46,68 +46,68 @@ function solve_hsd!(model::Model)
     model.rg = Inf
 
     # IPM log
-    if model.env[:verbose] == 1
+    if model.env[Val{:verbose}] == 1
         println(" Itn    Primal Obj      Dual Obj        PFeas    DFeas    GFeas     Mu       Time")
     end
 
     # main IPM loop
     while (
-        model.numbarrieriter < model.env[:barrier_iter_max]
-        && model.runtime < model.env[:time_limit]
+        model.num_bar_iter < model.env[Val{:barrier_iter_max}]
+        && model.time_total < model.env[Val{:time_limit}]
     )
         # I.A - Compute residuals
         model.μ = (
-            (dot(model.x, model.s) + dot(model.w, model.z) + model.t * model.k)
+            (dot(model.x, model.s) + dot(model.w, model.z) + model.t[1] * model.k[1])
             / (model.n_var + model.n_var_ub + 1)
         )
         model.primal_bound = dot(model.c, model.x)
         model.dual_bound = dot(model.b, model.y) - dot(model.uval, model.z)
         compute_residuals_hsd!(
             model, model.A, model.b, model.c, model.uind, model.uval,
-            model.x, model.w, model.y, model.s, model.z, model.t, model.k,
+            model.x, model.w, model.y, model.s, model.z, model.t[1], model.k[1],
             model.rp, model.ru, model.rd, model.rg
         )
         
         # I.B - Log
-        model.runtime = time() - tstart
-        if model.env[:verbose] == 1
+        model.time_total = time() - tstart
+        if model.env[Val{:verbose}] == 1
             # Iteration count
-            @printf("%4d", model.numbarrieriter)
+            @printf("%4d", model.num_bar_iter)
             # Primal and Dual objectives
-            @printf("%+18.7e", model.primal_bound / model.t)
-            @printf("%+16.7e", model.dual_bound / model.t)
+            @printf("%+18.7e", model.primal_bound / model.t[1])
+            @printf("%+16.7e", model.dual_bound / model.t[1])
             # Infeasibilities
             @printf("%10.2e", max(norm(model.rp, Inf), norm(model.ru, Inf)))  # primal infeas
             @printf("%9.2e", norm(model.rd, Inf))  # dual infeas
             @printf("%9.2e", norm(model.rg, Inf))  # optimality gap
             # μ
             @printf("  %7.1e", model.μ)
-            @printf("  %.2f", model.runtime)
+            @printf("  %.2f", model.time_total)
             print("\n")
         end
 
         # I.C - Stopping criteria
         if (
-            (norm(model.rp, Inf) / (model.t + norm(model.b, Inf)) < model.env[:barrier_tol_feas])
-            && (norm(model.ru, Inf) / (model.t + norm(model.uval, Inf)) < model.env[:barrier_tol_feas])
-            && (((norm(model.rd, Inf)) / (model.t + norm(model.c, Inf))) < model.env[:barrier_tol_opt]) 
-            && ((abs(model.primal_bound - model.dual_bound) / (model.t + abs(model.dual_bound))) < model.env[:barrier_tol_conv])
+            (norm(model.rp, Inf) / (model.t[1] + norm(model.b, Inf)) < model.env[Val{:barrier_tol_feas}])
+            && (norm(model.ru, Inf) / (model.t[1] + norm(model.uval, Inf)) < model.env[Val{:barrier_tol_feas}])
+            && (((norm(model.rd, Inf)) / (model.t[1] + norm(model.c, Inf))) < model.env[Val{:barrier_tol_opt}]) 
+            && ((abs(model.primal_bound - model.dual_bound) / (model.t[1] + abs(model.dual_bound))) < model.env[Val{:barrier_tol_conv}])
         )
             # optimal solution found
-            if model.env[:verbose] == 1
+            if model.env[Val{:verbose}] == 1
                 println("\nOptimal solution found.")
             end
-            model.status = :Optimal
-            return model.status
+            model.sol_status = Optimal
+            return Success
         end
         
-        if (model.μ < model.env[:barrier_tol_feas]) && ((model.t / model.k) < model.env[:barrier_tol_feas])
+        if (model.μ < model.env[Val{:barrier_tol_feas}]) && ((model.t[1] / model.k[1]) < model.env[Val{:barrier_tol_feas}])
             # infeasibility detected
-            if model.env[:verbose] == 1
+            if model.env[Val{:verbose}] == 1
                 println("\nInfeasibility detected.")
             end
-            model.status = :Infeasible
-            return model.status
+            model.sol_status = PrimalInfeasible
+            return Success
         end
 
         # II.
@@ -116,29 +116,29 @@ function solve_hsd!(model::Model)
         θ = model.s ./ model.x
         aUtxpy!(1.0, model.uind, θ_wz, θ)
         θ .\= 1.0
-        LinearAlgebra.cholesky!(model.A, θ, model.F)
+        LinearAlgebra.cholesky!(model.A, θ, F)
 
         # II.B - Compute search direction
         dx, dw, dy, ds, dz, dt, dk = compute_direction_hsd(
-            model, model.A, model.F, model.b, model.c, model.uval, model.uind,
+            model, model.A, F, model.b, model.c, model.uval, model.uind,
             θ, θ_wz, model.μ,
-            model.x, model.w, model.y, model.s, model.z, model.t, model.k,
+            model.x, model.w, model.y, model.s, model.z, model.t[1], model.k[1],
             model.rp, model.ru, model.rd, model.rg
         )
 
         # II.C - Make step
         make_step_hsd!(
             model,
-            model.x, model.w, model.y, model.s, model.z, model.t, model.k,
+            model.x, model.w, model.y, model.s, model.z, model.t[1], model.k[1],
             dx, dw, dy, ds, dz, dt, dk
         )
 
-        model.numbarrieriter += 1
+        model.num_bar_iter += 1
 
     end
 
     # END
-    return model.status
+    return model.sol_status
     
 end
 
@@ -151,11 +151,11 @@ function solve_mpc!(model::Model)
 
     # Initialization
     tstart = time()
-    model.runtime = 0.0
-    model.numbarrieriter = 0  # number of IP iterations
+    model.time_total = 0.0
+    model.num_bar_iter = 0  # number of IP iterations
 
     # Initialize iterates
-    model.F = symbolic_cholesky(model.A)  # Symbolic factorization
+    F = symbolic_cholesky(model.A)  # Symbolic factorization
     θ = zeros(model.x)
     model.x = Vector{Float64}(model.n_var)
     model.w = Vector{Float64}(model.n_var_ub)
@@ -167,7 +167,7 @@ function solve_mpc!(model::Model)
     # TODO: decide which starting point
     compute_starting_point!(
         model.A,
-        model.F,
+        F,
         model.x,
         model.w,
         model.y,
@@ -180,15 +180,15 @@ function solve_mpc!(model::Model)
     )
 
     # IPM log
-    if model.env[:verbose] == 1
+    if model.env[Val{:verbose}] == 1
         println(" Itn    Primal Obj      Dual Obj        Prim Inf Dual Inf UBnd Inf")
     end
 
     # main IPM loop
     while (
-        model.numbarrieriter < model.env[:barrier_iter_max]
-        && model.status != :Optimal
-        && model.runtime < model.env[:time_limit]
+        model.num_bar_iter < model.env[Val{:barrier_iter_max}]
+        && model.sol_status != :Optimal
+        && model.time_total < model.env[Val{:time_limit}]
     )
 
         # I. Form and factor Newton System
@@ -200,14 +200,14 @@ function solve_mpc!(model::Model)
             model.z,
             model.uind,
             θ,
-            model.F
+            F
         )
 
         # II. Compute and take step
         compute_next_iterate!(
             model,
             model.A,
-            model.F,
+            F,
             model.x,
             model.w,
             model.y,
@@ -230,7 +230,7 @@ function solve_mpc!(model::Model)
         obj_primal = dot(model.x, model.c)
         obj_dual = dot(model.b, model.y) - dot(model.uval, model.z)
 
-        model.numbarrieriter += 1
+        model.num_bar_iter += 1
 
         eps_p = (norm(rp)) / (1.0 + norm(model.b))
         eps_d = (norm(rd)) / (1.0 + norm(model.c))
@@ -240,20 +240,20 @@ function solve_mpc!(model::Model)
 
         # check stopping criterion
         if (
-            (eps_p < model.env[:barrier_tol_feas])
-            && (eps_u < model.env[:barrier_tol_feas])
-            && (eps_d < model.env[:barrier_tol_opt])
-            && (eps_g < model.env[:barrier_tol_conv])
+            (eps_p < model.env[Val{:barrier_tol_feas}])
+            && (eps_u < model.env[Val{:barrier_tol_feas}])
+            && (eps_d < model.env[Val{:barrier_tol_opt}])
+            && (eps_g < model.env[Val{:barrier_tol_conv}])
         )
-            model.status = :Optimal
+            model.sol_status = :Optimal
         end
 
         # Log
-        model.runtime = time() - tstart
+        model.time_total = time() - tstart
 
-        if model.env[:verbose] == 1
+        if model.env[Val{:verbose}] == 1
             # Iteration count
-            print(@sprintf("%4d", model.numbarrieriter))
+            print(@sprintf("%4d", model.num_bar_iter))
             # Primal and Dual objectives
             print(@sprintf("%+18.7e", obj_primal))
             print(@sprintf("%+16.7e", obj_dual))
@@ -263,14 +263,14 @@ function solve_mpc!(model::Model)
             print(@sprintf("%9.2e", norm(ru, Inf)))  # upper bound infeas
             # μ
             print(@sprintf("  %8.2e", abs(obj_primal - obj_dual) / (model.n_var + model.n_var_ub)))
-            print(@sprintf("  %.2f", model.runtime))
+            print(@sprintf("  %.2f", model.time_total))
             print("\n")
         end
 
     end
 
     # END
-    return model.status
+    return model.sol_status
     
 end
 
@@ -798,8 +798,8 @@ function make_step_hsd!(
     y .+= a * dy
     s .+= a * ds
     z .+= a * dz
-    model.t += a * dt
-    model.k += a * dk
+    model.t[1] += a * dt
+    model.k[1] += a * dk
 
     return nothing
 end

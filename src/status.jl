@@ -48,3 +48,4 @@ Solution Status code
     DualInfeasible,
     PrimalDualInfeasible
 )
+

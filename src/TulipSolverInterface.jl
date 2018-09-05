@@ -55,7 +55,7 @@ MPB.getobjgap(m::TulipMathProgModel) = getobjectivedualgap(m.inner)
 
 MPB.getrawsolver(m::TulipMathProgModel) = m.inner
 
-MPB.getsolvetime(m::TulipMathProgModel) = m.inner.runtime
+MPB.getsolvetime(m::TulipMathProgModel) = m.inner.time_total
 
 MPB.getsense(m::TulipMathProgModel) = :Min
 

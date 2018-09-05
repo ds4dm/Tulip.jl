@@ -1,19 +1,22 @@
 """
     Model
-    Data structure for a model
+    
+Data structure for a model.
 
 # Attributes
 """
-mutable struct Model{Ta<:AbstractMatrix{Float64}}
+mutable struct Model
     #=======================================================
         Optimization environment
     =======================================================#
 
-    env::TulipEnv           # Environment
-    status::Symbol          # Optimization status
-    numbarrieriter::Int     # Number of barrier iterations
-    runtime::Float64        # Elapsed solution time, in seconds
-
+    env::TulipEnv                   # Environment
+    sol_status::SolutionStatus      # Solution status
+    
+    time_total::Float64     # Total time spent by the optimization
+    num_bar_iter::Int       # Total number of Interior-Point iterations
+    primal_bound::Float64   # Best known primal bound
+    dual_bound::Float64     # Best known dual bound
 
     #=======================================================
         Problem data
@@ -23,7 +26,7 @@ mutable struct Model{Ta<:AbstractMatrix{Float64}}
     n_var_ub::Int           # Number of upper-bounded variables
     n_constr::Int           # Number of constraints
 
-    A::Ta                           # Constraints matrix
+    A::AbstractMatrix{Float64}      # Constraints matrix
     b::AbstractVector{Float64}      # Right-hand side of equality constraints
     c::AbstractVector{Float64}      # Objective vector
     uind::AbstractVector{Int}       # Indices of upper-bounded variables
@@ -33,41 +36,35 @@ mutable struct Model{Ta<:AbstractMatrix{Float64}}
     #=======================================================
         Book-keeping
     =======================================================#
-
-    F::Factorization{Float64}    # Factorization object
-
-    x::Vector{Float64}   # Vector of original primal variables
-    w::Vector{Float64}   # Vector of primal upper bound slack variables
-    y::Vector{Float64}   # Vector of dual variables for equality constraints
+    x::Vector{Float64}   # Vector of primal variables (original variables)
+    w::Vector{Float64}   # Vector of primal variables (upper bound slack)
+    y::Vector{Float64}   # Vector of dual variables (equality constraints)
     s::Vector{Float64}   # Vector of reduced costs of `x`
     z::Vector{Float64}   # Vector of reduced costs of `w`
-    t::Float64           # Artificial homogeneous variable
-    k::Float64           # Artificial homogeneous variable
+    t::Vector{Float64}   # Artificial homogeneous variable
+    k::Vector{Float64}   # Artificial homogeneous variable
     μ::Float64           # Current barrier parameter
 
-    rp::AbstractVector{Float64}  # Vector of primal residuals `Ax - b`
-    rd::AbstractVector{Float64}  # Vector of dual residuals `A'y + s - c`
-    ru::AbstractVector{Float64}  # Vector of primal residuals 'x + w - u`
-    rg::Float64                  # Residual for optimality gap
-    rxs::AbstractVector{Float64} # Right-hand side for complimentarity product `x*s`
-    rwz::AbstractVector{Float64} # Right-hand side for complimentarity product `w*z`
-    rtk::Float64                 # Right-hand side for complimentarity product `t*k`
-
-    primal_bound::Float64        # Current primal bound
-    dual_bound::Float64          # Current dual bound
+    rp::Vector{Float64}  # Vector of primal residuals `Ax - b`
+    rd::Vector{Float64}  # Vector of dual residuals `A'y + s - c`
+    ru::Vector{Float64}  # Vector of primal residuals 'x + w - u`
+    rg::Float64          # Residual for optimality gap
+    rxs::Vector{Float64} # Right-hand side for complimentarity product `x*s`
+    rwz::Vector{Float64} # Right-hand side for complimentarity product `w*z`
+    rtk::Float64         # Right-hand side for complimentarity product `t*k`
 
     #=======================================================
         Model constructor
     =======================================================#  
     function Model(
         env::TulipEnv,
-        A::Ta,
+        A::AbstractMatrix,
         b::AbstractVector,
         c::AbstractVector,
         uind::AbstractVector{Int},
         uval::AbstractVector,
-    ) where{Ta<:AbstractMatrix{Float64}}
-        m = new{Ta}()
+    )
+        m = new()
 
         m.env = env
 
@@ -109,8 +106,8 @@ mutable struct Model{Ta<:AbstractMatrix{Float64}}
         m.y = Vector{Float64}(n_constr)
         m.s = Vector{Float64}(n_var)
         m.z = Vector{Float64}(n_var_ub)
-        m.t = 1.0
-        m.k = 1.0
+        m.t = ones(1)
+        m.k = ones(1)
         m.μ = 1.0
 
         m.rp = Vector{Float64}(n_constr)
@@ -121,17 +118,13 @@ mutable struct Model{Ta<:AbstractMatrix{Float64}}
         m.rwz = Vector{Float64}(n_var_ub)
         m.rtk = 1.0
 
-        m.primal_bound = Inf
-        m.dual_bound = -Inf
-
         # Book-keeping stuff
-        m.status = :Built
-        m.numbarrieriter = 0
-        m.runtime = 0.0
+        m.sol_status = Unknown
 
         return m
     end
 end
+
 
 #=======================================================
     Constructors
@@ -388,7 +381,7 @@ Retrieve solution-related information
 
 Return objective value of the best known solution
 """
-getobjectivevalue(m::Model) = dot(m.c, m.x) / m.t
+getobjectivevalue(m::Model) = dot(m.c, m.x) / m.t[1]
 
 """
     getdualbound(m::Model)
@@ -396,60 +389,60 @@ getobjectivevalue(m::Model) = dot(m.c, m.x) / m.t
 Return dual bound on the obective value. Returns a lower (resp. upper) bound
 if the problem is a minimization (resp. maximization).
 """
-getdualbound(m::Model) = (dot(m.b, m.y) - dot(m.uval, m.z)) / m.t
+getdualbound(m::Model) = (dot(m.b, m.y) - dot(m.uval, m.z)) / m.t[1]
 
 """
     getobjectivedualgap(m::Model)
 
 Return the duality gap. 
 """
-getobjectivedualgap(m::Model) = (dot(m.x, m.s) + dot(m.w, m.z)) / (m.t)^2
+getobjectivedualgap(m::Model) = (dot(m.x, m.s) + dot(m.w, m.z)) / (m.t[1])^2
 
 """
     getsolution(m::Model)
 
 Return best known (primal) solution to the problem.
 """
-getsolution(m::Model) = copy(m.x / m.t)
+getsolution(m::Model) = copy(m.x / m.t[1])
 
 """
     getconstrduals(m::Model)
 
 Return dual variables associated to linear constraints.
 """
-getconstrduals(m::Model) = copy(m.y / m.t)
+getconstrduals(m::Model) = copy(m.y / m.t[1])
 
 """
     getreducedcosts(m::Model)
 
 Return reduced costs of primal variables.
 """
-getreducedcosts(m::Model) = copy(m.s / m.t)
+getreducedcosts(m::Model) = copy(m.s / m.t[1])
 
 """
     getnumbarrieriter(m::Model)
 
 Return number of barrier iterations.
 """
-getnumbarrieriter(m::Model) = m.numbarrieriter
+getnumbarrieriter(m::Model) = m.num_bar_iter
 
 """
     getsolutiontime(m::Model)
 
 Return runtime of the optimizer.
 """
-getsolutiontime(m::Model) = m.runtime
+getsolutiontime(m::Model) = m.time_total
 
 """
     getinfeasibilityray(m::Model)
 
 Retrieve infeasibility ray when problem is proven infeasible.
 """
-getinfeasibilityray(m::Model) = copy(m.y ./ m.t)
+getinfeasibilityray(m::Model) = copy(m.y ./ m.t[1])
 
 """
     getunboundedray(m::Model)
 
 Retrieve unbounded ray when model is proven unbounded.
 """
-getunboundedray(m::Model) = copy(m.x ./ m.t)
+getunboundedray(m::Model) = copy(m.x ./ m.t[1])
