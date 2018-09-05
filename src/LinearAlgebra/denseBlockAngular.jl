@@ -23,40 +23,54 @@ mutable struct DenseBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
     R::Int
 
     colptr::Vector{Int}
-    cols::Vector{Matrix{Tv}}
+    blocks::Vector{Matrix{Tv}}
     colslink::Matrix{Tv}
 
-    DenseBlockAngular(m::Ti, n::Ti, R::Ti, colptr::Vector{Ti}, cols::Vector{Matrix{Tv}}, colslink::Matrix{Tv}
-    ) where {Tv<:Real, Ti<:Integer} = new{Tv}(m, n, R, colptr, cols, colslink)
+    DenseBlockAngular(m::Ti, n::Ti, R::Ti, colptr::Vector{Ti}, blocks::Vector{Matrix{Tv}}, colslink::Matrix{Tv}
+    ) where {Tv<:Real, Ti<:Integer} = new{Tv}(m, n, R, colptr, blocks, colslink)
 end
 
+"""
+    DenseBlockAngular(blocks, C)
 
-function DenseBlockAngular(col_list::Vector{Matrix{T}}, colslink::Matrix{T}) where T<:Real
+Construct a dense block-angular matrix from a list of blocks and linking columns `C`.
+"""
+function DenseBlockAngular(blocks, C::AbstractMatrix{T}) where T<:Real
 
-    R = size(col_list, 1)
+    R = size(blocks, 1)
     if R == 0
-        return DenseBlockAngular(0, 0, 0, Vector{Int}(0), Matrix{T}(0, 0))
+        # No blocks, early return
+        return DenseBlockAngular(size(C, 1), size(C, 2), 0, Vector{Int}(0), Vector{Matrix{T}}(), C)
     end
-    m = size(col_list[1], 1)
 
+    m = size(C, 1)
     colptr = Vector{Int}(R+2)
     colptr[1] = 1
 
     # Dimension check
-    for r in 1:R
-        m == size(col_list[r], 1) || throw(DimensionMismatch("Block 1 has dimensions $(size(col_list[1])) but block $(r) has dimensions $(size(col_list[r]))"))
-        colptr[r+1] = colptr[r] + size(col_list[r], 2)
+    for r in Base.OneTo(R)
+        m == size(blocks[r], 1) || throw(DimensionMismatch("Block 1 has dimensions $(size(col_list[1])) but block $(r) has dimensions $(size(col_list[r]))"))
+        colptr[r+1] = colptr[r] + size(blocks[r], 2)
     end
-    m == size(colslink, 1) || throw(DimensionMismatch("Block 1 has dimensions $(size(col_list[1])) but B has dimensions $(size(colslink))"))
-    colptr[R+2] = colptr[R+1] + size(colslink, 2)
+    colptr[R+2] = colptr[R+1] + size(C, 2)
 
-    cols = deepcopy(col_list)
-    B = deepcopy(colslink)
+    cols = deepcopy(blocks)
+    B = deepcopy(C)
 
     return DenseBlockAngular(m, colptr[end]-1, R, colptr, cols, B)
 end
-DenseBlockAngular(col_list::Vector{Matrix{T}}) where T<:Real = DenseBlockAngular(col_list, zeros(T, size(col_list[1], 1), 0))
 
+"""
+    DenseBlockAngular(blocks)
+
+"""
+function DenseBlockAngular(blocks::Vector{Matrix{T}}) where T<:Real 
+    if length(blocks) == 0
+        return DenseBlockAngular(0, 0, 0, Vector{Int}(0), Vector{Matrix{T}}(), Matrix{T}(0, 0))
+    else
+        return DenseBlockAngular(blocks, zeros(T, size(blocks[1], 1), 0))
+    end
+end
 
 size(M::DenseBlockAngular) = (M.m+M.R, M.n)
 function getindex(M::DenseBlockAngular{Tv}, i::Integer, j::Integer) where {Tv<:Real}
@@ -69,7 +83,7 @@ function getindex(M::DenseBlockAngular{Tv}, i::Integer, j::Integer) where {Tv<:R
             return M.colslink[i-M.R, j - M.colptr[blockidx]+1]
         else
             # return corresponding coefficient
-            return M.cols[blockidx][i-M.R, j - M.colptr[blockidx]+1]
+            return M.blocks[blockidx][i-M.R, j - M.colptr[blockidx]+1]
         end
     else
         # find if column j belongs to block i
@@ -80,7 +94,7 @@ function getindex(M::DenseBlockAngular{Tv}, i::Integer, j::Integer) where {Tv<:R
     return zero(Tv)
 end
 
-copy(M::DenseBlockAngular) = DenseBlockAngular(M.m, M.n, M.R, deepcopy(M.colptr), deepcopy(M.cols), deepcopy(M.colslink))
+copy(M::DenseBlockAngular) = DenseBlockAngular(M.m, M.n, M.R, deepcopy(M.colptr), deepcopy(M.blocks), deepcopy(M.colslink))
 
 # Matrix-vector Multiplication
 function A_mul_B!(y::AbstractVector{Tv}, A::DenseBlockAngular{Tv}, x::AbstractVector{Tv}) where{Tv<:Real}
@@ -95,7 +109,7 @@ function A_mul_B!(y::AbstractVector{Tv}, A::DenseBlockAngular{Tv}, x::AbstractVe
     for r in 1:A.R
         x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
         y[r] = sum(x_)
-        Base.BLAS.gemv!('N', 1.0, A.cols[r], x_, 1.0, y_)
+        Base.BLAS.gemv!('N', 1.0, A.blocks[r], x_, 1.0, y_)
     end
     @views Base.BLAS.gemv!('N', 1.0, A.colslink, x[A.colptr[A.R+1]:end], 1.0, y_)
     
@@ -113,7 +127,7 @@ function At_mul_B(A::DenseBlockAngular{Tv}, y::AbstractVector{Tv}) where{Tv<:Rea
     @inbounds for r in 1:A.R
         x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
         x_ .= y[r]
-        Base.BLAS.gemv!('T', 1.0, A.cols[r], y_, 1.0, x_)
+        Base.BLAS.gemv!('T', 1.0, A.blocks[r], y_, 1.0, x_)
     end
     @views Base.BLAS.gemv!('T', 1.0, A.colslink, y_, 1.0, x[A.colptr[A.R+1]:end])
     
@@ -257,10 +271,10 @@ function cholesky!(
     for r in 1:A.R
         # copying ararys uses more memory, but is faster
         θ_ = view(θ, A.colptr[r]:(A.colptr[r+1]-1))
-        # A_ = A.cols[:, A.colptr[r]:(A.colptr[r+1]-1)]
+        # A_ = A.blocks[:, A.colptr[r]:(A.colptr[r+1]-1)]
         η_ = view(F.η, :, r)
         
-        block_update!(r, A.cols[r], θ_, η_, F.d, C)
+        block_update!(r, A.blocks[r], θ_, η_, F.d, C)
     end
 
     # Linking columns
@@ -286,7 +300,7 @@ function cholesky(
         θ_ = view(θ, A.colptr[r]:(A.colptr[r+1]-1))
         η_ = view(η, :, r)  # use view because η is modified in-place
         
-        block_update!(r, A.cols[r], θ_, η_, d, C)
+        block_update!(r, A.blocks[r], θ_, η_, d, C)
     end
 
     # Linking columns
@@ -298,36 +312,56 @@ function cholesky(
     F = FactorBlockAngular(A.m, A.n, A.R, A.colptr, d,η, Fc)
 end
 
-function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}, blockidx::Int) where Tv<:Real
+"""
+    addcolumn!(A, a)
 
-    # Dimension check
-    A.m == size(a, 1) || throw(DimensionMismatch(""))
-
-    # add column
-    A.cols[blockidx] = hcat(A.cols[blockidx], a)
-    k = A.colptr[blockidx+1]
-
-    # book-keeping
-    A.n += 1
-    for r in (blockidx+1):(A.R+2)
-        A.colptr[r] += 1
-    end
-
-    return A, k
-end
-
+"""
 function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}) where Tv<:Real
 
-    # find index of block to which column pertains
-    blockidx = 1
-    for r in 1:A.R
-        if a[r] > 0
+    # Dimension check
+    (A.m + A.R) == length(a) || throw(DimensionMismatch("A has $(A.m + A.R) rows but a has dimension $(length(a))"))
+
+    # Find index of block to which column pertains, i.e. the smallest index 1 <= i <= A.R such that `a[i]` is non-zero.
+    # If no such index is found, the column is added as a linking column.
+    blockidx = A.R+1
+    for r in Base.OneTo(A.R)
+        if !iszero(a[r])
             blockidx = r
             break
         end
     end
 
     addcolumn!(A, a[(A.R+1):end], blockidx)
+end
+
+"""
+    addcolumn!(A, a, i)
+
+Add column `a` to block `i`. If 
+"""
+function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}, i::Int) where Tv<:Real
+
+    # Dimension check
+    A.m == size(a, 1) || throw(DimensionMismatch(""))
+
+    if 1 <= i <= A.R
+        # add column
+        A.blocks[i] = hcat(A.blocks[i], a)
+        k = A.colptr[i+1]
+
+    elseif i == (A.R+1)
+        A.colslink = hcat(A.colslink, a)
+        k = A.n + 1
+    else
+        throw(DimensionMismatch("Attempting to add to block $(i) while A has $(A.R) blocks"))
+    end
+        
+    # book-keeping
+    A.n += 1
+    for r in (i+1):(A.R+2)
+        A.colptr[r] += 1
+    end
+    return A, k
 end
 
 function block_update!(
