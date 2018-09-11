@@ -26,7 +26,11 @@ mutable struct DenseBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
     blocks::Vector{Matrix{Tv}}
     colslink::Matrix{Tv}
 
-    DenseBlockAngular(m::Ti, n::Ti, R::Ti, colptr::Vector{Ti}, blocks::Vector{Matrix{Tv}}, colslink::Matrix{Tv}
+    DenseBlockAngular(
+        m::Ti, n::Ti, R::Ti,
+        colptr::Vector{Ti},
+        blocks::Vector{Matrix{Tv}},
+        colslink::Matrix{Tv}
     ) where {Tv<:Real, Ti<:Integer} = new{Tv}(m, n, R, colptr, blocks, colslink)
 end
 
@@ -40,7 +44,12 @@ function DenseBlockAngular(blocks, C::AbstractMatrix{T}) where T<:Real
     R = size(blocks, 1)
     if R == 0
         # No blocks, early return
-        return DenseBlockAngular(size(C, 1), size(C, 2), 0, Vector{Int}(0), Vector{Matrix{T}}(), C)
+        return DenseBlockAngular(
+            size(C, 1), size(C, 2), 0,
+            Vector{Int}(0),
+            Vector{Matrix{T}}(),
+            C
+        )
     end
 
     m = size(C, 1)
@@ -66,7 +75,12 @@ end
 """
 function DenseBlockAngular(blocks::Vector{Matrix{T}}) where T<:Real 
     if length(blocks) == 0
-        return DenseBlockAngular(0, 0, 0, Vector{Int}(0), Vector{Matrix{T}}(), Matrix{T}(0, 0))
+        return DenseBlockAngular(
+            0, 0, 0,
+            Vector{Int}(0),
+            Vector{Matrix{T}}(),
+            Matrix{T}(0, 0)
+        )
     else
         return DenseBlockAngular(blocks, zeros(T, size(blocks[1], 1), 0))
     end
@@ -94,14 +108,23 @@ function getindex(M::DenseBlockAngular{Tv}, i::Integer, j::Integer) where {Tv<:R
     return zero(Tv)
 end
 
-copy(M::DenseBlockAngular) = DenseBlockAngular(M.m, M.n, M.R, deepcopy(M.colptr), deepcopy(M.blocks), deepcopy(M.colslink))
+copy(M::DenseBlockAngular) = DenseBlockAngular(
+    M.m, M.n, M.R,
+    deepcopy(M.colptr),
+    deepcopy(M.blocks),
+    deepcopy(M.colslink)
+)
 
 # Matrix-vector Multiplication
 function A_mul_B!(y::AbstractVector{Tv}, A::DenseBlockAngular{Tv}, x::AbstractVector{Tv}) where{Tv<:Real}
     
     m, n = size(A)
-    n == size(x, 1) || throw(DimensionMismatch("A has dimensions $(size(A)) but x has dimension $(size(x))"))
-    m == size(y, 1) || throw(DimensionMismatch("A has dimensions $(size(A)) but y has dimension $(size(y))"))
+    n == size(x, 1) || throw(DimensionMismatch(
+        "A has dimensions $(size(A)) but x has dimension $(size(x))")
+    )
+    m == size(y, 1) || throw(DimensionMismatch(
+        "A has dimensions $(size(A)) but y has dimension $(size(y))")
+    )
     
     y_ = view(y, (A.R+1):(A.R+A.m))
     y_ .= zero(Tv)
@@ -119,7 +142,9 @@ end
 function At_mul_B(A::DenseBlockAngular{Tv}, y::AbstractVector{Tv}) where{Tv<:Real}
     
     m, n = size(A)
-    m == size(y, 1) || throw(DimensionMismatch("A has dimension $(size(A)) but y has dimension $(size(y))"))
+    m == size(y, 1) || throw(DimensionMismatch(
+        "A has dimension $(size(A)) but y has dimension $(size(y))")
+    )
     
     x = zeros(n)
     y_ = y[(A.R+1):end]
@@ -239,9 +264,9 @@ only its upper-triangular part is modified.
 -`B`: An `m`-by-`k` dense matrix
 -`d`: A vector of length `k`
 """
-function CpBDBt!(C::StridedMatrix{T}, B::StridedMatrix{T}, d::StridedVector{T}) where {T<:Real}
+function CpBDBt!(C::StridedMatrix, B::StridedMatrix, d::StridedVector)
     # TODO: allow user to specify which triangular part should be updated
-    # TODO: add parameter for computing C = α C + B*D*B'
+    # TODO: add parameters for computing C = α C + β B*D*B'
     
     # Dimension checks
     (m, k) = size(B)
@@ -315,6 +340,9 @@ end
 """
     addcolumn!(A, a)
 
+Add column `a` to PrimalBlockAngular matrix `A`.
+The index of the block is defined as the index of the first non-zero
+element of `a[1:A.R]`.
 """
 function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}) where Tv<:Real
 
@@ -337,7 +365,7 @@ end
 """
     addcolumn!(A, a, i)
 
-Add column `a` to block `i`. If 
+Add column `a` to block `i` of matrix `A`.
 """
 function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}, i::Int) where Tv<:Real
 
@@ -353,7 +381,7 @@ function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}, i::Int) whe
         A.colslink = hcat(A.colslink, a)
         k = A.n + 1
     else
-        throw(DimensionMismatch("Attempting to add to block $(i) while A has $(A.R) blocks"))
+        throw(DimensionMismatch("Attempting to add column to block $(i) while A has $(A.R) blocks"))
     end
         
     # book-keeping

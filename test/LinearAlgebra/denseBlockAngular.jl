@@ -7,7 +7,7 @@ R = 2
 u = [ones(m, n) for _ in 1:R]
 B = eye(m)
 
-# Empty constructor
+# Constructors
 A = Tulip.LinearAlgebra.DenseBlockAngular([], zeros(0, 0))
 @test size(A) == (0, 0)
 
@@ -53,7 +53,7 @@ x = Base.LinAlg.At_mul_B(A, y)
 x_ = Base.LinAlg.At_mul_B(A_, y_)
 @test x == x_
 
-# Facotization tests
+# Factorization tests
 F = Tulip.LinearAlgebra.cholesky(A, ones(A.n))
 @test m == F.m
 @test R == F.R
