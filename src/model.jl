@@ -22,9 +22,9 @@ mutable struct Model
         Problem data
     =======================================================#
 
-    n_var::Int              # Number of variables (total)
+    num_var::Int              # Number of variables (total)
     n_var_ub::Int           # Number of upper-bounded variables
-    n_constr::Int           # Number of constraints
+    num_constr::Int           # Number of constraints
 
     A::AbstractMatrix{Float64}      # Constraints matrix
     b::AbstractVector{Float64}      # Right-hand side of equality constraints
@@ -69,31 +69,31 @@ mutable struct Model
         m.env = env
 
         # Dimension check
-        n_constr = size(A, 1)
-        n_var = size(A, 2)
-        n_constr == size(b, 1) || throw(DimensionMismatch(
+        num_constr = size(A, 1)
+        num_var = size(A, 2)
+        num_constr == size(b, 1) || throw(DimensionMismatch(
             "A has size $(size(A)) but b has size $(size(b))"
         ))
-        n_var == size(c, 1) || throw(DimensionMismatch(
+        num_var == size(c, 1) || throw(DimensionMismatch(
             "A has size $(size(A)) but c has size $(size(c))"
         ))
         n_var_ub = size(uind, 1)
         n_var_ub == size(uval, 1) || throw(DimensionMismatch(
             "uind has size $(size(uind)) but uval has size $(size(uval))"
         ))
-        n_var_ub <= n_var || throw(DimensionMismatch(
+        n_var_ub <= num_var || throw(DimensionMismatch(
             "Too many upper bounds were specified"
         ))
         if n_var_ub > 0
-            uind[end] <= n_var || throw(DimensionMismatch(
-                "Got upper bound for var $(uind[end])>$(n_var)"
+            uind[end] <= num_var || throw(DimensionMismatch(
+                "Got upper bound for var $(uind[end])>$(num_var)"
             ))
         end
 
         # Copy problem data
-        m.n_var = n_var
+        m.num_var = num_var
         m.n_var_ub = n_var_ub
-        m.n_constr = n_constr
+        m.num_constr = num_constr
         m.A = copy(A)
         m.b = copy(b)
         m.c = copy(c)
@@ -101,20 +101,20 @@ mutable struct Model
         m.uval = copy(uval)
 
         # Allocate memory for optimization algo
-        m.x = Vector{Float64}(n_var)
+        m.x = Vector{Float64}(num_var)
         m.w = Vector{Float64}(n_var_ub)
-        m.y = Vector{Float64}(n_constr)
-        m.s = Vector{Float64}(n_var)
+        m.y = Vector{Float64}(num_constr)
+        m.s = Vector{Float64}(num_var)
         m.z = Vector{Float64}(n_var_ub)
         m.t = Ref(1.0)
         m.k = Ref(1.0)
         m.μ = Ref(1.0)
 
-        m.rp = Vector{Float64}(n_constr)
-        m.rd = Vector{Float64}(n_var)
+        m.rp = Vector{Float64}(num_constr)
+        m.rd = Vector{Float64}(num_var)
         m.ru = Vector{Float64}(n_var_ub)
         m.rg = Ref(1.0)
-        m.rxs = Vector{Float64}(n_var)
+        m.rxs = Vector{Float64}(num_var)
         m.rwz = Vector{Float64}(n_var_ub)
         m.rtk = Ref(1.0)
 
@@ -164,7 +164,7 @@ Return number of variables in the model. This number does not include artificial
 slack variables that are used in the formulation (e.g. related to variable
 bounds)
 """
-getnumvar(m::Model) = m.n_var
+getnumvar(m::Model) = m.num_var
 
 """
     getnumconstr(m::Model)
@@ -172,7 +172,7 @@ getnumvar(m::Model) = m.n_var
 Return the number of constraints in the model. This number does not include
     explicit bounds on the variables.
 """
-getnumconstr(m::Model) = m.n_constr
+getnumconstr(m::Model) = m.num_constr
 
 """
     getobjectivecoeffs(m::Model)
@@ -189,8 +189,8 @@ Set new objective coefficients.
 function setobjectivecoeffs!(m::Model, c::AbstractVector{T}) where T<:Real
 
     # Dimension check
-    size(c, 1) == m.n_var || throw(DimensionMismatch(
-        "c has $(size(c, 1)) coeffs but model has $(m.n_var) variables"
+    size(c, 1) == m.num_var || throw(DimensionMismatch(
+        "c has $(size(c, 1)) coeffs but model has $(m.num_var) variables"
     ))
 
     m.c = copy(c)
@@ -202,7 +202,7 @@ end
 
 Return lower bounds on the variables.
 """
-getvarlowerbounds(m::Model) = zeros(m.n_var)
+getvarlowerbounds(m::Model) = zeros(m.num_var)
 
 """
     getvarupperbounds(m::Model)
@@ -211,7 +211,7 @@ Return upper bounds on the variables. If a given variable has no explicit upper
     bound, the returned value is `Inf`.
 """
 function getvarupperbounds(m::Model)
-    ub = fill(Inf, m.n_var)
+    ub = fill(Inf, m.num_var)
     ub[m.uind] = m.uval
     return ub
 end
@@ -227,8 +227,8 @@ function setvarupperbounds!(m::Model, ub)
 end
 function setvarupperbounds!(m::Model, ub::SparseVector{Tv, Ti}) where{Tv<:Real, Ti<:Integer}
     # Dimension check
-    size(ub, 1) == m.n_var || throw(DimensionMismatch(
-        "ub has size $(size(c, 1)) but model has $(m.n_var) variables"
+    size(ub, 1) == m.num_var || throw(DimensionMismatch(
+        "ub has size $(size(c, 1)) but model has $(m.num_var) variables"
     ))
     minimum(ub) >= zero(Tv) || error("Upper bounds must be non-negative")
 
@@ -239,13 +239,13 @@ function setvarupperbounds!(m::Model, ub::SparseVector{Tv, Ti}) where{Tv<:Real, 
 end
 function setvarupperbounds!(m::Model, ub::AbstractArray{Tv}) where{Tv<:Real}
     # Dimension check
-    size(ub, 1) == m.n_var || throw(DimensionMismatch(
-        "ub has size $(size(c, 1)) but model has $(m.n_var) variables"
+    size(ub, 1) == m.num_var || throw(DimensionMismatch(
+        "ub has size $(size(c, 1)) but model has $(m.num_var) variables"
     ))
     minimum(ub) >= zero(Tv) || error("Upper bounds must be non-negative")
 
     u_ = ub .< Inf
-    m.uind = collect(1:m.n_var)[u_]
+    m.uind = collect(1:m.num_var)[u_]
     m.uval = ub[u_]
     m.n_var_ub = sum(u_)
 
@@ -273,20 +273,20 @@ function addvar!(
 ) where Tv<:Real
 
     # Dimension check
-    m.n_constr == size(colvals, 1) || throw(DimensionMismatch(
-        "Column has $(size(col, 1)) coeffs but model has $(m.n_constr) constraints"
+    m.num_constr == size(colvals, 1) || throw(DimensionMismatch(
+        "Column has $(size(col, 1)) coeffs but model has $(m.num_constr) constraints"
     ))
     l <= u || error("Upper-bound must be greater than lower bound")
 
     if l == -Inf && u == Inf
         # free variable: add positive and negative parts
         m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, colvals)
-        m.n_var += 1
+        m.num_var += 1
 
         insert!(m.c, k, objcoef)
 
         m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, -colvals)
-        m.n_var += 1
+        m.num_var += 1
 
         insert!(m.c, k, -objcoef)
 
@@ -295,7 +295,7 @@ function addvar!(
         # upperbounded, no lower bound
         m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, -colvals)
         # insert!(m.x, k, 1.0)
-        m.n_var += 1
+        m.num_var += 1
 
         # Update objective
         insert!(m.c, k, -objval)
@@ -307,7 +307,7 @@ function addvar!(
         # lower- and upper-bounded
         m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, colvals)
         # insert!(m.x, k, 1.0)
-        m.n_var += 1
+        m.num_var += 1
 
         # Update objective
         insert!(m.c, k, objcoef)
@@ -324,7 +324,7 @@ function addvar!(
         # lower-bounded
         # Add column
         m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, colvals)
-        m.n_var += 1
+        m.num_var += 1
 
         # Update objective
         insert!(m.c, k, objcoef)
@@ -337,7 +337,7 @@ function addvar!(
 
     return nothing
 end
-addvar!(m::Model, constridx, constrcoef, l, u, objcoef) = addvar!(m, sparsevec(constridx, constrcoef, m.n_constr), l, u, objcoef)
+addvar!(m::Model, constridx, constrcoef, l, u, objcoef) = addvar!(m, sparsevec(constridx, constrcoef, m.num_constr), l, u, objcoef)
 addvar!(m::Model, col::AbstractVector{Tv}, objcoef::Real) where Tv<:Real = addvar!(m, col, 0.0, Inf, objcoef)
 
 """
@@ -365,21 +365,21 @@ function addconstr!(m::Model, row::AbstractVector, rhs::Real)
     # length(row) == length(rhs) || throw(DimensionMismatch(
     #     "Adding $(length(row)) constraints but rhs has $(length(rhs)) elements"
     # ))
-    m.n_var == length(row) || throw(DimensionMismatch(
-        "Row has $(length(row)) coefs but model has $(m.n_var) variables"
+    m.num_var == length(row) || throw(DimensionMismatch(
+        "Row has $(length(row)) coefs but model has $(m.num_var) variables"
     ))
     min, max = extrema(rhs)
     -Inf < min <= max < Inf || error("Right-hand side must have finite value")
 
     # Add constraint
-    m.n_constr += 1
+    m.num_constr += 1
     m.b = vcat(m.b, rhs)
     m.A = vcat(m.A, row')
 
     return nothing
 end
 
-addconstr!(m, varidx, rowval, rhs) = addconstr!(m, sparsevec(varidx, rowval, m.n_var), rhs)
+addconstr!(m, varidx, rowval, rhs) = addconstr!(m, sparsevec(varidx, rowval, m.num_var), rhs)
 
 
 

@@ -32,18 +32,18 @@ function solve_hsd!(model::Model)
 
     # Starting point
     # TODO: enable warm-start
-    model.x = ones(model.n_var)
+    model.x = ones(model.num_var)
     model.w = ones(model.n_var_ub)
-    model.y = zeros(model.n_constr)
-    model.s = ones(model.n_var)
+    model.y = zeros(model.num_constr)
+    model.s = ones(model.num_var)
     model.z = ones(model.n_var_ub)
     model.t = Ref(1.0)
     model.k = Ref(1.0)
     model.μ = Ref(1.0)
 
-    model.rp = Inf*ones(model.n_constr)
+    model.rp = Inf*ones(model.num_constr)
     model.ru = Inf*ones(model.n_var_ub)
-    model.rd = Inf*ones(model.n_var)
+    model.rd = Inf*ones(model.num_var)
     model.rg = Ref(Inf)
 
     # IPM log
@@ -59,7 +59,7 @@ function solve_hsd!(model::Model)
         # I.A - Compute residuals
         model.μ.x = (
             (dot(model.x, model.s) + dot(model.w, model.z) + model.t.x * model.k.x)
-            / (model.n_var + model.n_var_ub + 1)
+            / (model.num_var + model.n_var_ub + 1)
         )
         model.primal_bound = dot(model.c, model.x)
         model.dual_bound = dot(model.b, model.y) - dot(model.uval, model.z)
@@ -158,10 +158,10 @@ function solve_mpc!(model::Model)
     # Initialize iterates
     F = symbolic_cholesky(model.A)  # Symbolic factorization
     θ = zeros(model.x)
-    model.x = Vector{Float64}(model.n_var)
+    model.x = Vector{Float64}(model.num_var)
     model.w = Vector{Float64}(model.n_var_ub)
-    model.y = Vector{Float64}(model.n_constr)
-    model.s = Vector{Float64}(model.n_var)
+    model.y = Vector{Float64}(model.num_constr)
+    model.s = Vector{Float64}(model.num_var)
     model.z = Vector{Float64}(model.n_var_ub)
 
     # compute starting point
@@ -263,7 +263,7 @@ function solve_mpc!(model::Model)
             print(@sprintf("%9.2e", norm(rd, Inf)))  # dual infeas
             print(@sprintf("%9.2e", norm(ru, Inf)))  # upper bound infeas
             # μ
-            print(@sprintf("  %8.2e", abs(obj_primal - obj_dual) / (model.n_var + model.n_var_ub)))
+            print(@sprintf("  %8.2e", abs(obj_primal - obj_dual) / (model.num_var + model.n_var_ub)))
             print(@sprintf("  %.2f", model.time_total))
             print("\n")
         end
@@ -328,7 +328,7 @@ function compute_direction_hsd(
         dot(x+a*dx_a, s+a*ds_a)
         + dot(w + a * dw_a, z + a*dz_a)
         + (t.x+a*dt_a)*(k.x+a*dk_a)
-    ) / (model.n_var + model.n_var_ub + 1)
+    ) / (model.num_var + model.n_var_ub + 1)
 
     γ = (1-a)^2 * min(1-a, 0.1)  # TODO: replace 0.1 by parameter β1
     η = 1.0 - γ
@@ -339,7 +339,7 @@ function compute_direction_hsd(
         θ, θ_wz,
         x, w, y, s, z, t, k,
         η*rp, η*ru, η*rd, η * rg.x,
-        -x .* s - dx_a .* ds_a + γ * μ.x * ones(model.n_var),
+        -x .* s - dx_a .* ds_a + γ * μ.x * ones(model.num_var),
         -w .* z - dw_a .* dz_a + γ * μ.x * ones(model.n_var_ub),
         -(t.x * k.x) - dt_a * dk_a + γ * μ.x
     )
@@ -488,7 +488,7 @@ function compute_next_iterate!(
     uind::StridedVector{Ti},
     uval::StridedVector{Tv}
 ) where{Tv<:Real, Ti<:Integer}
-    (m, n, p) = model.n_constr, model.n_var, model.n_var_ub
+    (m, n, p) = model.num_constr, model.num_var, model.n_var_ub
 
     # Affine-scaling direction
     daff_x = copy(x)
