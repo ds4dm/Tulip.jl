@@ -1,6 +1,8 @@
 module Tulip
 
-export Model, readmps
+import Base: RefValue
+
+export readmps
 
 # Cholesky module
     include("LinearAlgebra/LinearAlgebra.jl")

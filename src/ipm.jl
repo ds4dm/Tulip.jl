@@ -37,13 +37,14 @@ function solve_hsd!(model::Model)
     model.y = zeros(model.n_constr)
     model.s = ones(model.n_var)
     model.z = ones(model.n_var_ub)
-    model.t = ones(1)
-    model.k = ones(1)
+    model.t = Ref(1.0)
+    model.k = Ref(1.0)
+    model.μ = Ref(1.0)
 
     model.rp = Inf*ones(model.n_constr)
     model.ru = Inf*ones(model.n_var_ub)
     model.rd = Inf*ones(model.n_var)
-    model.rg = Inf
+    model.rg = Ref(Inf)
 
     # IPM log
     if model.env[Val{:verbose}] == 1
@@ -56,15 +57,15 @@ function solve_hsd!(model::Model)
         && model.time_total < model.env[Val{:time_limit}]
     )
         # I.A - Compute residuals
-        model.μ = (
-            (dot(model.x, model.s) + dot(model.w, model.z) + model.t[1] * model.k[1])
+        model.μ.x = (
+            (dot(model.x, model.s) + dot(model.w, model.z) + model.t.x * model.k.x)
             / (model.n_var + model.n_var_ub + 1)
         )
         model.primal_bound = dot(model.c, model.x)
         model.dual_bound = dot(model.b, model.y) - dot(model.uval, model.z)
         compute_residuals_hsd!(
             model, model.A, model.b, model.c, model.uind, model.uval,
-            model.x, model.w, model.y, model.s, model.z, model.t[1], model.k[1],
+            model.x, model.w, model.y, model.s, model.z, model.t, model.k,
             model.rp, model.ru, model.rd, model.rg
         )
         
@@ -74,24 +75,24 @@ function solve_hsd!(model::Model)
             # Iteration count
             @printf("%4d", model.num_bar_iter)
             # Primal and Dual objectives
-            @printf("%+18.7e", model.primal_bound / model.t[1])
-            @printf("%+16.7e", model.dual_bound / model.t[1])
+            @printf("%+18.7e", model.primal_bound / model.t.x)
+            @printf("%+16.7e", model.dual_bound / model.t.x)
             # Infeasibilities
             @printf("%10.2e", max(norm(model.rp, Inf), norm(model.ru, Inf)))  # primal infeas
             @printf("%9.2e", norm(model.rd, Inf))  # dual infeas
-            @printf("%9.2e", norm(model.rg, Inf))  # optimality gap
+            @printf("%9.2e", norm(model.rg.x, Inf))  # optimality gap
             # μ
-            @printf("  %7.1e", model.μ)
+            @printf("  %7.1e", model.μ.x)
             @printf("  %.2f", model.time_total)
             print("\n")
         end
 
         # I.C - Stopping criteria
         if (
-            (norm(model.rp, Inf) / (model.t[1] + norm(model.b, Inf)) < model.env[Val{:barrier_tol_feas}])
-            && (norm(model.ru, Inf) / (model.t[1] + norm(model.uval, Inf)) < model.env[Val{:barrier_tol_feas}])
-            && (((norm(model.rd, Inf)) / (model.t[1] + norm(model.c, Inf))) < model.env[Val{:barrier_tol_opt}]) 
-            && ((abs(model.primal_bound - model.dual_bound) / (model.t[1] + abs(model.dual_bound))) < model.env[Val{:barrier_tol_conv}])
+            (norm(model.rp, Inf) / (model.t.x + norm(model.b, Inf)) < model.env[Val{:barrier_tol_feas}])
+            && (norm(model.ru, Inf) / (model.t.x + norm(model.uval, Inf)) < model.env[Val{:barrier_tol_feas}])
+            && (((norm(model.rd, Inf)) / (model.t.x + norm(model.c, Inf))) < model.env[Val{:barrier_tol_opt}]) 
+            && ((abs(model.primal_bound - model.dual_bound) / (model.t.x + abs(model.dual_bound))) < model.env[Val{:barrier_tol_conv}])
         )
             # optimal solution found
             if model.env[Val{:verbose}] == 1
@@ -101,7 +102,7 @@ function solve_hsd!(model::Model)
             return Success
         end
         
-        if (model.μ < model.env[Val{:barrier_tol_feas}]) && ((model.t[1] / model.k[1]) < model.env[Val{:barrier_tol_feas}])
+        if (model.μ.x < model.env[Val{:barrier_tol_feas}]) && ((model.t.x / model.k.x) < model.env[Val{:barrier_tol_feas}])
             # infeasibility detected
             if model.env[Val{:verbose}] == 1
                 println("\nInfeasibility detected.")
@@ -122,14 +123,14 @@ function solve_hsd!(model::Model)
         dx, dw, dy, ds, dz, dt, dk = compute_direction_hsd(
             model, model.A, F, model.b, model.c, model.uval, model.uind,
             θ, θ_wz, model.μ,
-            model.x, model.w, model.y, model.s, model.z, model.t[1], model.k[1],
+            model.x, model.w, model.y, model.s, model.z, model.t, model.k,
             model.rp, model.ru, model.rd, model.rg
         )
 
         # II.C - Make step
         make_step_hsd!(
             model,
-            model.x, model.w, model.y, model.s, model.z, model.t[1], model.k[1],
+            model.x, model.w, model.y, model.s, model.z, model.t, model.k,
             dx, dw, dy, ds, dz, dt, dk
         )
 
@@ -282,22 +283,22 @@ Compute residuals at the current point
 """
 function compute_residuals_hsd!(
     model, A, b, c, uind, uval,
-    x, w, y, s, z, t, k,
-    rp, ru, rd, rg
+    x, w, y, s, z, t::RefValue, k::RefValue,
+    rp, ru, rd, rg::RefValue
 )
     # primal residual
-    rp .= b*t - A*x
+    rp .= b*t.x - A*x
 
     # upper-bound residual
-    ru .= uval * t - w
+    ru .= uval * t.x - w
     aUxpy!(-1.0, x, uind, ru)
 
     # dual residual
-    rd .= c*t - At_mul_B(A, y) - s
+    rd .= c*t.x - At_mul_B(A, y) - s
     aUtxpy!(1.0, uind, z, rd)
 
     # gap residual
-    model.rg = model.primal_bound - model.dual_bound + k
+    model.rg.x = model.primal_bound - model.dual_bound + k.x
 
     return nothing
     
@@ -306,7 +307,7 @@ end
 function compute_direction_hsd(
     model, A, F, b, c, uval, uind,
     θ, θ_wz, μ,
-    x, w, y, s, z, t, k,
+    x, w, y, s, z, t::RefValue, k::RefValue,
     rp, ru, rd, rg
 )
     # compute predictor direction
@@ -314,7 +315,7 @@ function compute_direction_hsd(
         A, F, b, c, uval, uind,
         θ, θ_wz,
         x, w, y, s, z, t, k,
-        rp, ru, rd, rg, -x .* s, -w .* z, -t*k
+        rp, ru, rd, rg.x, -x .* s, -w .* z, -t.x*k.x
     )
 
     
@@ -326,7 +327,7 @@ function compute_direction_hsd(
     μ_a = (
         dot(x+a*dx_a, s+a*ds_a)
         + dot(w + a * dw_a, z + a*dz_a)
-        + (t+a*dt_a)*(k+a*dk_a)
+        + (t.x+a*dt_a)*(k.x+a*dk_a)
     ) / (model.n_var + model.n_var_ub + 1)
 
     γ = (1-a)^2 * min(1-a, 0.1)  # TODO: replace 0.1 by parameter β1
@@ -337,10 +338,10 @@ function compute_direction_hsd(
         A, F, b, c, uval, uind,
         θ, θ_wz,
         x, w, y, s, z, t, k,
-        η*rp, η*ru, η*rd, η*rg,
-        -x .* s - dx_a .* ds_a + γ * μ * ones(model.n_var),
-        -w .* z - dw_a .* dz_a + γ * μ * ones(model.n_var_ub),
-        -t*k - dt_a * dk_a + γ*μ
+        η*rp, η*ru, η*rd, η * rg.x,
+        -x .* s - dx_a .* ds_a + γ * μ.x * ones(model.n_var),
+        -w .* z - dw_a .* dz_a + γ * μ.x * ones(model.n_var_ub),
+        -(t.x * k.x) - dt_a * dk_a + γ * μ.x
     )
 
     return dx, dw, dy, ds, dz, dt, dk
@@ -666,8 +667,8 @@ end
 function solve_newton_hsd(
     A, F, b, c, uval, uind,
     θ, θ_wz,
-    x, w, y, s, z, t, k,
-    rp, ru, rd, rg, rxs, rwz, rtk
+    x, w, y, s, z, t::RefValue, k::RefValue,
+    rp, ru, rd, rg::Float64, rxs, rwz, rtk
 )
     # Compute γ1, γ2, γ3
     γ_x, γ_y, γ_z = solve_augmented_system_hsd(A, F, θ, θ_wz, uind, b, c, uval)
@@ -677,8 +678,8 @@ function solve_newton_hsd(
     
     # Compute Δτ
     dt = (
-        (rg + (rtk / t) + dot(c, δ_x) - dot(b, δ_y) + dot(uval, δ_z) ) 
-        / ((k / t) - dot(c, γ_x) + dot(b, γ_y) - dot(uval, γ_z))
+        (rg + (rtk / t.x) + dot(c, δ_x) - dot(b, δ_y) + dot(uval, δ_z) ) 
+        / ((k.x / t.x) - dot(c, γ_x) + dot(b, γ_y) - dot(uval, γ_z))
     )
     
     # Compute Δx, Δy
@@ -689,7 +690,7 @@ function solve_newton_hsd(
     # Compute Δs, Δκ, Δw
     dw = (rwz - w .* dz) ./ z
     ds = (rxs - s .* dx) ./ x
-    dk = (rtk - k * dt) / t
+    dk = (rtk - k.x * dt) / t.x
 
     return dx, dw, dy, ds, dz, dt, dk
 end
@@ -742,8 +743,8 @@ function compute_max_step_size(x, w, y, s, z, t, k, dx, dw, dy, ds, dz, dt, dk)
     as = elementary_step_size(s, ds)
     az = elementary_step_size(z, dz)
     
-    at = dt < 0.0 ? (-t / dt) : 1.0
-    ak = dk < 0.0 ? (-k / dk) : 1.0
+    at = dt < 0.0 ? (-t.x / dt) : 1.0
+    ak = dk < 0.0 ? (-k.x / dk) : 1.0
     
     a = min(1.0, ax, aw, as, az, at, ak)
     
@@ -758,8 +759,8 @@ function compute_step_size_hsd(x, w, y, s, z, t, k, dx, dw, dy, ds, dz, dt, dk)
     as = elementary_step_size(s, ds)
     az = elementary_step_size(z, dz)
     
-    at = dt < 0.0 ? (-t / dt) : Inf
-    ak = dk < 0.0 ? (-k / dk) : Inf
+    at = dt < 0.0 ? (-t.x / dt) : Inf
+    ak = dk < 0.0 ? (-k.x / dk) : Inf
     
     ap = 0.99995 * min(1.0, ax, aw, at, ak)
     ad = 0.99995 * min(1.0, as, az, at, ak)
@@ -787,7 +788,7 @@ function compute_stepsize(
 end
 
 function make_step_hsd!(
-    model, x, w, y, s, z, t, k,
+    model, x, w, y, s, z, t::RefValue{Float64}, k::RefValue{Float64},
     dx, dw, dy, ds, dz, dt, dk
 )
 
@@ -798,8 +799,8 @@ function make_step_hsd!(
     y .+= a * dy
     s .+= a * ds
     z .+= a * dz
-    model.t[1] += a * dt
-    model.k[1] += a * dk
+    t.x += a * dt
+    k.x += a * dk
 
     return nothing
 end

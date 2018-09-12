@@ -36,22 +36,22 @@ mutable struct Model
     #=======================================================
         Book-keeping
     =======================================================#
-    x::Vector{Float64}   # Vector of primal variables (original variables)
-    w::Vector{Float64}   # Vector of primal variables (upper bound slack)
-    y::Vector{Float64}   # Vector of dual variables (equality constraints)
-    s::Vector{Float64}   # Vector of reduced costs of `x`
-    z::Vector{Float64}   # Vector of reduced costs of `w`
-    t::Vector{Float64}   # Artificial homogeneous variable
-    k::Vector{Float64}   # Artificial homogeneous variable
-    μ::Float64           # Current barrier parameter
+    x::Vector{Float64}      # Vector of primal variables (original variables)
+    w::Vector{Float64}      # Vector of primal variables (upper bound slack)
+    y::Vector{Float64}      # Vector of dual variables (equality constraints)
+    s::Vector{Float64}      # Vector of reduced costs of `x`
+    z::Vector{Float64}      # Vector of reduced costs of `w`
+    t::Base.RefValue{Float64}    # Artificial homogeneous variable
+    k::Base.RefValue{Float64}    # Artificial homogeneous variable
+    μ::Base.RefValue{Float64}    # Current barrier parameter
 
-    rp::Vector{Float64}  # Vector of primal residuals `Ax - b`
-    rd::Vector{Float64}  # Vector of dual residuals `A'y + s - c`
-    ru::Vector{Float64}  # Vector of primal residuals 'x + w - u`
-    rg::Float64          # Residual for optimality gap
-    rxs::Vector{Float64} # Right-hand side for complimentarity product `x*s`
-    rwz::Vector{Float64} # Right-hand side for complimentarity product `w*z`
-    rtk::Float64         # Right-hand side for complimentarity product `t*k`
+    rp::Vector{Float64}     # Vector of primal residuals `Ax - b`
+    rd::Vector{Float64}     # Vector of dual residuals `A'y + s - c`
+    ru::Vector{Float64}     # Vector of primal residuals 'x + w - u`
+    rg::Base.RefValue{Float64}   # Residual for optimality gap
+    rxs::Vector{Float64}    # Right-hand side for complimentarity product `x*s`
+    rwz::Vector{Float64}    # Right-hand side for complimentarity product `w*z`
+    rtk::Base.RefValue{Float64}  # Right-hand side for complimentarity product `t*k`
 
     #=======================================================
         Model constructor
@@ -106,17 +106,17 @@ mutable struct Model
         m.y = Vector{Float64}(n_constr)
         m.s = Vector{Float64}(n_var)
         m.z = Vector{Float64}(n_var_ub)
-        m.t = ones(1)
-        m.k = ones(1)
-        m.μ = 1.0
+        m.t = Ref(1.0)
+        m.k = Ref(1.0)
+        m.μ = Ref(1.0)
 
         m.rp = Vector{Float64}(n_constr)
         m.rd = Vector{Float64}(n_var)
         m.ru = Vector{Float64}(n_var_ub)
-        m.rg = 1.0
+        m.rg = Ref(1.0)
         m.rxs = Vector{Float64}(n_var)
         m.rwz = Vector{Float64}(n_var_ub)
-        m.rtk = 1.0
+        m.rtk = Ref(1.0)
 
         # Book-keeping stuff
         m.sol_status = Unknown
@@ -381,7 +381,7 @@ Retrieve solution-related information
 
 Return objective value of the best known solution
 """
-getobjectivevalue(m::Model) = dot(m.c, m.x) / m.t[1]
+getobjectivevalue(m::Model) = dot(m.c, m.x) / m.t.x
 
 """
     getdualbound(m::Model)
@@ -389,35 +389,35 @@ getobjectivevalue(m::Model) = dot(m.c, m.x) / m.t[1]
 Return dual bound on the obective value. Returns a lower (resp. upper) bound
 if the problem is a minimization (resp. maximization).
 """
-getdualbound(m::Model) = (dot(m.b, m.y) - dot(m.uval, m.z)) / m.t[1]
+getdualbound(m::Model) = (dot(m.b, m.y) - dot(m.uval, m.z)) / m.t.x
 
 """
     getobjectivedualgap(m::Model)
 
 Return the duality gap. 
 """
-getobjectivedualgap(m::Model) = (dot(m.x, m.s) + dot(m.w, m.z)) / (m.t[1])^2
+getobjectivedualgap(m::Model) = (dot(m.x, m.s) + dot(m.w, m.z)) / (m.t.x)^2
 
 """
     getsolution(m::Model)
 
 Return best known (primal) solution to the problem.
 """
-getsolution(m::Model) = copy(m.x / m.t[1])
+getsolution(m::Model) = copy(m.x / m.t.x)
 
 """
     getconstrduals(m::Model)
 
 Return dual variables associated to linear constraints.
 """
-getconstrduals(m::Model) = copy(m.y / m.t[1])
+getconstrduals(m::Model) = copy(m.y / m.t.x)
 
 """
     getreducedcosts(m::Model)
 
 Return reduced costs of primal variables.
 """
-getreducedcosts(m::Model) = copy(m.s / m.t[1])
+getreducedcosts(m::Model) = copy(m.s / m.t.x)
 
 """
     getnumbarrieriter(m::Model)
@@ -438,11 +438,11 @@ getsolutiontime(m::Model) = m.time_total
 
 Retrieve infeasibility ray when problem is proven infeasible.
 """
-getinfeasibilityray(m::Model) = copy(m.y ./ m.t[1])
+getinfeasibilityray(m::Model) = copy(m.y ./ m.t.x)
 
 """
     getunboundedray(m::Model)
 
 Retrieve unbounded ray when model is proven unbounded.
 """
-getunboundedray(m::Model) = copy(m.x ./ m.t[1])
+getunboundedray(m::Model) = copy(m.x ./ m.t.x)
