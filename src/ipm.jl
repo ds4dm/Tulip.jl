@@ -588,7 +588,7 @@ end
 """
 function symbolic_cholesky(A::AbstractMatrix{T}) where {T<:Real}
 
-    F = LinearAlgebra.cholesky(A, ones(A.n))
+    F = LinearAlgebra.cholesky(A, ones(size(A, 2)))
     return F
 
 end
