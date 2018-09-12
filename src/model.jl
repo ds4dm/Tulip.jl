@@ -7,7 +7,7 @@ Data structure for a model.
 """
 mutable struct Model
     #=======================================================
-        Optimization environment
+        Model attributes
     =======================================================#
 
     env::TulipEnv                   # Environment
@@ -23,7 +23,7 @@ mutable struct Model
     =======================================================#
 
     num_var::Int              # Number of variables (total)
-    n_var_ub::Int           # Number of upper-bounded variables
+    n_var_ub::Int             # Number of upper-bounded variables
     num_constr::Int           # Number of constraints
 
     A::AbstractMatrix{Float64}      # Constraints matrix
@@ -99,24 +99,6 @@ mutable struct Model
         m.c = copy(c)
         m.uind = copy(uind)
         m.uval = copy(uval)
-
-        # Allocate memory for optimization algo
-        m.x = Vector{Float64}(num_var)
-        m.w = Vector{Float64}(n_var_ub)
-        m.y = Vector{Float64}(num_constr)
-        m.s = Vector{Float64}(num_var)
-        m.z = Vector{Float64}(n_var_ub)
-        m.t = Ref(1.0)
-        m.k = Ref(1.0)
-        m.μ = Ref(1.0)
-
-        m.rp = Vector{Float64}(num_constr)
-        m.rd = Vector{Float64}(num_var)
-        m.ru = Vector{Float64}(n_var_ub)
-        m.rg = Ref(1.0)
-        m.rxs = Vector{Float64}(num_var)
-        m.rwz = Vector{Float64}(n_var_ub)
-        m.rtk = Ref(1.0)
 
         # Book-keeping stuff
         m.sol_status = Unknown
