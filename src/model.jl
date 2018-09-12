@@ -145,7 +145,7 @@ Construct an empty model.
 """
 Model(A, b, c, uind, uval) = Model(TulipEnv(), A, b, c, uind, uval)
 Model(A::Ta, b, c, uind, uval) where{Tv<:Real, Ta<:Matrix{Tv}} = Model(sparse(float(A)), b, c, uind, uval)
-Model(env, A::Ta, b, c, uind, uval) where{Tv<:Real, Ta<:Matrix{Tv}} = Model(env, sparse(float(A)), b, c, uind, uval)
+# Model(env, A::Ta, b, c, uind, uval) where{Tv<:Real, Ta<:Matrix{Tv}} = Model(env, sparse(float(A)), b, c, uind, uval)
 
 Model(A, b, c) = Model(A, b, c, Vector{Int}(0,), Vector{Float64}(0,))
 
@@ -255,9 +255,22 @@ end
 """
     addvar!(m::Model, colval, l, u, objcoeff)
 
-Add a variable to the model.
+Add one variable to the model.
+
+# Arguments
+- `m`: Model
+- `colvals`: Coefficients of the column
+- `l`: lower bound on the variable
+- `u`: Upperbound on the variable
+- `objcoef`: Objective coefficient
 """
-function addvar!(m::Model, colvals::AbstractVector{Tv}, l::Real, u::Real, objcoef::Real) where Tv<:Real
+function addvar!(
+    m::Model,
+    colvals::AbstractVector{Tv},
+    l::Real,
+    u::Real,
+    objcoef::Real
+) where Tv<:Real
 
     # Dimension check
     m.n_constr == size(colvals, 1) || throw(DimensionMismatch(
@@ -346,21 +359,29 @@ getconstrupperbounds(m::Model) = copy(m.b)
 
 Add a constraint to the model.
 """
-function addconstr!(m::Model, rowvals::AbstractVector{Tv}, rhs::Real) where Tv<:Real
+function addconstr!(m::Model, row::AbstractVector, rhs::Real)
 
     # Dimension checks
-    m.n_var == size(rowvals, 1) || throw(DimensionMismatch(
-        "Row has $(size(rowals, 1)) coefs but model has $(m.n_var) variables"
+    # length(row) == length(rhs) || throw(DimensionMismatch(
+    #     "Adding $(length(row)) constraints but rhs has $(length(rhs)) elements"
+    # ))
+    m.n_var == length(row) || throw(DimensionMismatch(
+        "Row has $(length(row)) coefs but model has $(m.n_var) variables"
     ))
-    -Inf < rhs < Inf || error("Right-hand side must have finite value")
+    min, max = extrema(rhs)
+    -Inf < min <= max < Inf || error("Right-hand side must have finite value")
 
     # Add constraint
     m.n_constr += 1
     m.b = vcat(m.b, rhs)
-    m.A = vcat(m.A, rowvals)
+    m.A = vcat(m.A, row')
 
     return nothing
 end
+
+addconstr!(m, varidx, rowval, rhs) = addconstr!(m, sparsevec(varidx, rowval, m.n_var), rhs)
+
+
 
 """
     getlinearconstrcoeffs(m::Model)
