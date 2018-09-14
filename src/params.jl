@@ -1,148 +1,107 @@
-# Default parameters
-const TLP_DEFAULT_PARAM = Dict(
-    :output_level => 1,
-    :barrier_iter_max => 100,
-    :time_limit => Inf,
-    :barrier_tol_feas => 10.0^-8,
-    :barrier_tol_opt => 10.0^-8,
-    :barrier_tol_conv => 10.0^-8
-)
+"""
+    AbstractParam{T}
 
-mutable struct TulipEnv
+Abstract representation of a parameter with valuetype `T`.
+"""
+abstract type AbstractParam{T} end
 
-    #=======================================================
-        Termination criteria
-    =======================================================#
+"""
+    get_param_name(::AbstractParam)
 
-    barrier_iter_max::Int       # Maximum number of barrier iterations
-    time_limit::Float64         # Time limit (in seconds)
+Return name of parameter.
+"""
+function get_param_name end
 
+"""
+    get_param_type(::AbstractParam)
 
-    #=======================================================
-        Tolerances
-    =======================================================#
+Get parameter's value type.
+"""
+function get_param_type end
 
-    barrier_tol_feas::Float64   # Primal feasibility tolerance
-    barrier_tol_opt::Float64    # Dual feasibility tolerance
-    barrier_tol_conv::Float64   # Optimality gap tolerance
+"""
+    get_param_value(::AbstractParam)
 
+Return current value of parameter.
+"""
+function get_param_value end
 
-    #=======================================================
-        Other parameters
-    =======================================================#
+"""
+    set_param_default!(::AbstractParam{T})
 
-    output_level::Int           # 0 means no output, 1 means normal
+Set parameter to its default value.
+"""
+function set_param_default! end
+
+"""
+    set_param_value!(::AbstractParam{T}, v::T)
+
+Check if `v` is an admissible value for parameter and, if so, change parameter's
+    value to `v`.
+"""
+function set_param_value! end
+
+"""
+    test_param_value(::AbstractParam{T}, v::T)
+
+Check whether value `v` is admissible for given parameter.
+"""
+function test_param_value end
+
+"""
+    RealParam{T<:Real}
+
+Container for numerical (real-valued) parameters.
+"""
+mutable struct RealParam{T<:Real} <: AbstractParam{T}
+    name::Symbol  # Name of the parameter
+
+    val::T  # Current parameter value
+    min_val::T  # Minimum parameter value
+    max_val::T  # Maximum parameter value
+    def_val::T  # Default value
+
+    RealParam(name::Symbol, vdef::T, vmin::T, vmax::T) where{T<:Real} =
+        new{T}(name, vdef, vmin, vmax, vdef)
     
-    # create environment with default values
-    # user can over-ride these values afterwards
-    function TulipEnv()
-        env = new()
-        for (k, v) in TLP_DEFAULT_PARAM
-            Core.setfield!(env, k, v)
-        end
-        return env
-    end
-
 end
 
-function Base.copy(env::TulipEnv)
-    env_ = TulipEnv()
-
-    for (k, v) in TLP_DEFAULT_PARAM
-        Core.setfield!(env_, k, Core.getfield(env, k))
-    end
-
-    return env_
+function Base.copy(p::RealParam{T}) where{T<:Real}
+    p_ = RealParam(p.name, p.def_val, p.min_val, p.max_val)
+    p_.val = p.val
+    return p_
 end
-"""
-    getindex(env::TulipEnv, param)
 
-Retrieve parameter value. Raises an error if parameter does not exist.
+const IntParam = RealParam{Int}
+const FloatParam = RealParam{Float64}
+
+get_param_name(par::RealParam) = par.name
+
+get_param_type(par::RealParam{T}) where T = T
+
+get_param_value(par::RealParam{T}) where T = par.val
+
+set_param_default!(par::RealParam) = (par.val = par.def_val)
+
 """
-function Base.getindex(env::TulipEnv, param::Symbol)
-    if haskey(TLP_DEFAULT_PARAM, param)
-        Base.getindex(env, Val{param})
+    set_param_value!(p, v)
+
+Set value of parameter `p` to `v`. Raises an error if `v` is not an admissible value.
+"""
+function set_param_value!(p::RealParam, v::T) where{T<:Real}
+
+    if test_param_value(p, v)
+        p.val = v
     else
-        error("Parameter $param does not exist")
+        error("$(p.name) must be between $(p.min_val) and $(p.max_val).")
     end
+
+    return nothing
 end
-Base.getindex(env::TulipEnv, param::String) = Base.getindex(env, Symbol(param))
-
-
-Base.getindex(env::TulipEnv, ::Type{Val{:output_level}}) = 
-    copy(Core.getfield(env, :output_level))
-Base.getindex(env::TulipEnv, ::Type{Val{:barrier_iter_max}}) = 
-    copy(Core.getfield(env, :barrier_iter_max))
-Base.getindex(env::TulipEnv, ::Type{Val{:time_limit}}) = 
-    copy(Core.getfield(env, :time_limit))
-Base.getindex(env::TulipEnv, ::Type{Val{:barrier_tol_feas}}) = 
-    copy(Core.getfield(env, :barrier_tol_feas))
-Base.getindex(env::TulipEnv, ::Type{Val{:barrier_tol_opt}}) = 
-    copy(Core.getfield(env, :barrier_tol_opt))
-Base.getindex(env::TulipEnv, ::Type{Val{:barrier_tol_conv}}) = 
-    copy(Core.getfield(env, :barrier_tol_conv))
 
 """
-    setindex!(env, param, v)
+    test_param_value(p, v)
 
-Set value of given parameter to v. Raises an error if parameter does not exist,
-or if incorrect value.
+Return whether `v` is an admissible value for parameter `p` 
 """
-function Base.setindex!(env::TulipEnv, v, param::Symbol)
-
-    if haskey(TLP_DEFAULT_PARAM, param)
-        Base.setindex!(env, v, Val{param})
-    else
-        error("Parameter $param does not exist")
-    end
-    
-    return nothing
-end
-Base.setindex!(env::TulipEnv, v, param::String) = setindex!(env, v, Symbol(param))
-
-
-
-
-function Base.setindex!(env::TulipEnv, v, param)
-    error("Function _setparam! not implemented for $param")
-    return nothing
-end
-
-function Base.setindex!(env::TulipEnv, v::Real, ::Type{Val{:output_level}})
-
-    @assert v >= 0
-    env.output_level = floor(Int, v)
-    return nothing
-end
-
-function Base.setindex!(env::TulipEnv, v, ::Type{Val{:barrier_iter_max}})
-
-    @assert v >= 0
-    env.barrier_iter_max = floor(Int, v)
-    return nothing
-end
-
-function Base.setindex!(env::TulipEnv, v, ::Type{Val{:time_limit}})
-
-    @assert v >= 0
-    env.time_limit = Float64(v)
-    return nothing
-end
-
-function Base.setindex!(env::TulipEnv, v, ::Type{Val{:barrier_tol_feas}})
-    @assert 0.0 <= v <= 1.0
-    env.barrier_tol_feas = Float64(v)
-    return nothing
-end
-
-function Base.setindex!(env::TulipEnv, v, ::Type{Val{:barrier_tol_opt}})
-    @assert 0.0 <= v <= 1.0
-    env.barrier_tol_opt = Float64(v)
-    return nothing
-end
-
-function Base.setindex!(env::TulipEnv, v, ::Type{Val{:barrier_tol_conv}})
-    @assert 0.0 <= v <= 1.0
-    env.barrier_tol_conv = Float64(v)
-    return nothing
-end
+test_param_value(p::RealParam, v::T) where{T<:Real} = (p.min_val <= v <= p.max_val)

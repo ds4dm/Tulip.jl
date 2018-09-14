@@ -47,22 +47,23 @@ end
 
 # SparseCSC matrix
 srand(0)
-m = 4
-n = 16
+A = hcat(speye(2), speye(2))
+m = A.m
+n = A.n
 c = rand(n)
 b = rand(m)
-u = sprand(n, 0.75)
+u = sprand(n, 1.0)
 uind = u.nzind
 uval = u.nzval
 p = nnz(u)
-A = sprand(m, n, 1.0)
+
 test_linalg(A, b, c, uind, uval, zeros(n), zeros(p), zeros(m), zeros(n), zeros(p))
 
 # BlockAngular matrix
 srand(0)
-nblocks = 4
-cols = [rand(m, 4) for _ in 1:nblocks]
-B = zeros(m, 0)
+nblocks = 2
+cols = [ones(m, 1) for _ in 1:nblocks]
+B = eye(m)
 A = Tulip.LinearAlgebra.DenseBlockAngular(cols, B)
 (m, n) = size(A)
 c = rand(n)

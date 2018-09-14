@@ -2,36 +2,175 @@ import Base.LinAlg:
     A_mul_B!, At_mul_B, A_ldiv_B!
 
 """
-    optimize(model, tol, verbose)
+    optimize!(model)
 
-Solve model m using an infeasible predictor-corrector Interior-Point algorithm.
-
-# Arguments
-- `model::Model`: the optimization model
+Run the optimizer.
 """
 function optimize!(model::Model)
 
+    prepross!(model)
+
+    if model.env[Val{:algo}] == 0
+        return solve_mpc!(model)
+    else
+        return solve_hsd!(model)
+    end
+end
+
+"""
+    solve_hsd(model)
+
+Solve model using a homogeneous self-dual formulation.
+"""
+function solve_hsd!(model::Model)
+
+    # Initialization
     tstart = time()
-    model.runtime = 0.0
-    model.numbarrieriter = 0  # number of IP iterations
+    model.time_total = 0.0
+    model.num_bar_iter = 0  # number of IP iterations
 
-    # TODO: pre-optimization stuff
-    model.F = symbolic_cholesky(model.A)  # Symbolic factorization
+    # Allocate memory for Cholesky factor
+    F = symbolic_cholesky(model.A)  # Symbolic factorization
+
+    # Starting point
+    # TODO: enable warm-start
+    model.x = ones(model.num_var)
+    model.w = ones(model.n_var_ub)
+    model.y = zeros(model.num_constr)
+    model.s = ones(model.num_var)
+    model.z = ones(model.n_var_ub)
+    model.t = Ref(1.0)
+    model.k = Ref(1.0)
+    model.μ = Ref(1.0)
+
+    model.rp = Inf*ones(model.num_constr)
+    model.ru = Inf*ones(model.n_var_ub)
+    model.rd = Inf*ones(model.num_var)
+    model.rg = Ref(Inf)
+
+    # IPM log
+    if model.env[Val{:verbose}] == 1
+        println(" Itn    Primal Obj      Dual Obj        PFeas    DFeas    GFeas     Mu       Time")
+    end
+
+    # main IPM loop
+    while (
+        model.num_bar_iter < model.env[Val{:barrier_iter_max}]
+        && model.time_total < model.env[Val{:time_limit}]
+    )
+        # I.A - Compute residuals
+        model.μ.x = (
+            (dot(model.x, model.s) + dot(model.w, model.z) + model.t.x * model.k.x)
+            / (model.num_var + model.n_var_ub + 1)
+        )
+        model.primal_bound = dot(model.c, model.x)
+        model.dual_bound = dot(model.b, model.y) - dot(model.uval, model.z)
+        compute_residuals_hsd!(
+            model, model.A, model.b, model.c, model.uind, model.uval,
+            model.x, model.w, model.y, model.s, model.z, model.t, model.k,
+            model.rp, model.ru, model.rd, model.rg
+        )
+        
+        # I.B - Log
+        model.time_total = time() - tstart
+        if model.env[Val{:verbose}] == 1
+            # Iteration count
+            @printf("%4d", model.num_bar_iter)
+            # Primal and Dual objectives
+            @printf("%+18.7e", model.primal_bound / model.t.x)
+            @printf("%+16.7e", model.dual_bound / model.t.x)
+            # Infeasibilities
+            @printf("%10.2e", max(norm(model.rp, Inf), norm(model.ru, Inf)))  # primal infeas
+            @printf("%9.2e", norm(model.rd, Inf))  # dual infeas
+            @printf("%9.2e", norm(model.rg.x, Inf))  # optimality gap
+            # μ
+            @printf("  %7.1e", model.μ.x)
+            @printf("  %.2f", model.time_total)
+            print("\n")
+        end
+
+        # I.C - Stopping criteria
+        if (
+            (norm(model.rp, Inf) / (model.t.x + norm(model.b, Inf)) < model.env[Val{:barrier_tol_feas}])
+            && (norm(model.ru, Inf) / (model.t.x + norm(model.uval, Inf)) < model.env[Val{:barrier_tol_feas}])
+            && (((norm(model.rd, Inf)) / (model.t.x + norm(model.c, Inf))) < model.env[Val{:barrier_tol_opt}]) 
+            && ((abs(model.primal_bound - model.dual_bound) / (model.t.x + abs(model.dual_bound))) < model.env[Val{:barrier_tol_conv}])
+        )
+            # optimal solution found
+            if model.env[Val{:verbose}] == 1
+                println("\nOptimal solution found.")
+            end
+            model.sln_status = Sln_Optimal
+            return Trm_Success
+        end
+        
+        if (model.μ.x < model.env[Val{:barrier_tol_feas}]) && ((model.t.x / model.k.x) < model.env[Val{:barrier_tol_feas}])
+            # infeasibility detected
+            if model.env[Val{:verbose}] == 1
+                println("\nInfeasibility detected.")
+            end
+            model.sln_status = Sln_PrimalInfeasible
+            return Trm_Success
+        end
+
+        # II.
+        # II.A - Compute Cholesky factorization
+        θ_wz = model.z ./ model.w
+        θ = model.s ./ model.x
+        aUtxpy!(1.0, model.uind, θ_wz, θ)
+        θ .\= 1.0
+        LinearAlgebra.cholesky!(model.A, θ, F)
+
+        # II.B - Compute search direction
+        dx, dw, dy, ds, dz, dt, dk = compute_direction_hsd(
+            model, model.A, F, model.b, model.c, model.uval, model.uind,
+            θ, θ_wz, model.μ,
+            model.x, model.w, model.y, model.s, model.z, model.t, model.k,
+            model.rp, model.ru, model.rd, model.rg
+        )
+
+        # II.C - Make step
+        make_step_hsd!(
+            model,
+            model.x, model.w, model.y, model.s, model.z, model.t, model.k,
+            dx, dw, dy, ds, dz, dt, dk
+        )
+
+        model.num_bar_iter += 1
+
+    end
+
+    # END
+    return model.sln_status
+    
+end
+
+"""
+    solve_mpc(model)
+
+Solve model using Mehrothra's predictor-corrector algorithm.
+"""
+function solve_mpc!(model::Model)
+
+    # Initialization
+    tstart = time()
+    model.time_total = 0.0
+    model.num_bar_iter = 0  # number of IP iterations
+
+    # Initialize iterates
+    F = symbolic_cholesky(model.A)  # Symbolic factorization
     θ = zeros(model.x)
-    model.x = Vector{Float64}(model.n_var)
+    model.x = Vector{Float64}(model.num_var)
     model.w = Vector{Float64}(model.n_var_ub)
-    model.y = Vector{Float64}(model.n_con)
-    model.s = Vector{Float64}(model.n_var)
+    model.y = Vector{Float64}(model.num_constr)
+    model.s = Vector{Float64}(model.num_var)
     model.z = Vector{Float64}(model.n_var_ub)
-
-    # X = Array{PrimalDualPoint, 1}()
-    # TODO: check stopping criterion for possible early termination
 
     # compute starting point
     # TODO: decide which starting point
     compute_starting_point!(
         model.A,
-        model.F,
+        F,
         model.x,
         model.w,
         model.y,
@@ -44,17 +183,17 @@ function optimize!(model::Model)
     )
 
     # IPM log
-    if model.env[:output_level] == 1
+    if model.env[Val{:verbose}] == 1
         println(" Itn    Primal Obj      Dual Obj        Prim Inf Dual Inf UBnd Inf")
     end
 
     # main IPM loop
     while (
-        model.numbarrieriter < model.env[:barrier_iter_max]
-        && model.status != :Optimal
-        && model.runtime < model.env[:time_limit]
+        model.num_bar_iter < model.env[Val{:barrier_iter_max}]
+        && model.sln_status != Sln_Optimal
+        && model.time_total < model.env[Val{:time_limit}]
     )
-        
+
         # I. Form and factor Newton System
         compute_newton!(
             model.A,
@@ -64,14 +203,14 @@ function optimize!(model::Model)
             model.z,
             model.uind,
             θ,
-            model.F
+            F
         )
 
         # II. Compute and take step
         compute_next_iterate!(
             model,
             model.A,
-            model.F,
+            F,
             model.x,
             model.w,
             model.y,
@@ -85,59 +224,130 @@ function optimize!(model::Model)
 
         # III. Book-keeping + display log
         # compute residuals
-        rb = model.A * model.x - model.b
-        rc = At_mul_B(model.A, model.y) + model.s - model.c
-        spxpay!(-1.0, rc, model.uind, model.z)
+        rp = model.A * model.x - model.b
+        rd = At_mul_B(model.A, model.y) + model.s - model.c
+        aUtxpy!(-1.0, model.uind, model.z, rd)
 
         ru = model.x[model.uind] + model.w - model.uval
 
         obj_primal = dot(model.x, model.c)
         obj_dual = dot(model.b, model.y) - dot(model.uval, model.z)
 
-        model.numbarrieriter += 1
+        model.num_bar_iter += 1
 
-        eps_p = (norm(rb)) / (1.0 + norm(model.b))
-        eps_d = (norm(rc)) / (1.0 + norm(model.c))
+        eps_p = (norm(rp)) / (1.0 + norm(model.b))
+        eps_d = (norm(rd)) / (1.0 + norm(model.c))
         eps_u = (norm(ru)) / (1.0 + norm(model.uval))
         eps_g = abs(obj_primal - obj_dual) / (1.0 + abs(obj_primal))
 
 
         # check stopping criterion
         if (
-            (eps_p < model.env[:barrier_tol_feas])
-            && (eps_u < model.env[:barrier_tol_feas])
-            && (eps_d < model.env[:barrier_tol_opt])
-            && (eps_g < model.env[:barrier_tol_conv])
+            (eps_p < model.env[Val{:barrier_tol_feas}])
+            && (eps_u < model.env[Val{:barrier_tol_feas}])
+            && (eps_d < model.env[Val{:barrier_tol_opt}])
+            && (eps_g < model.env[Val{:barrier_tol_conv}])
         )
-            model.status = :Optimal
+            model.sln_status = Sln_Optimal
         end
 
         # Log
-        model.runtime = time() - tstart
+        model.time_total = time() - tstart
 
-        if model.env[:output_level] == 1
+        if model.env[Val{:verbose}] == 1
             # Iteration count
-            print(@sprintf("%4d", model.numbarrieriter))
+            @printf("%4d", model.num_bar_iter)
             # Primal and Dual objectives
-            print(@sprintf("%+18.7e", obj_primal))
-            print(@sprintf("%+16.7e", obj_dual))
+            @printf("%+18.7e", obj_primal)
+            @printf("%+16.7e", obj_dual)
             # Infeasibilities
-            print(@sprintf("%10.2e", norm(rb, Inf)))  # primal infeas
-            print(@sprintf("%9.2e", norm(rc, Inf)))  # dual infeas
-            print(@sprintf("%9.2e", norm(ru, Inf)))  # upper bound infeas
+            @printf("%10.2e", norm(rp, Inf))  # primal infeas
+            @printf("%9.2e", norm(rd, Inf))  # dual infeas
+            @printf("%9.2e", norm(ru, Inf))  # upper bound infeas
             # μ
-            print(@sprintf("  %8.2e", abs(obj_primal - obj_dual) / (model.n_var + model.n_var_ub)))
-            print(@sprintf("  %.2f", model.runtime))
+            @printf("  %8.2e", abs(obj_primal - obj_dual) / (model.num_var + model.n_var_ub))
+            @printf("  %.2f", model.time_total)
             print("\n")
         end
 
     end
 
     # END
-    return model.status
+    return model.sln_status
     
 end
 
+
+"""
+    compute_residuals_hsd!
+
+Compute residuals at the current point
+"""
+function compute_residuals_hsd!(
+    model, A, b, c, uind, uval,
+    x, w, y, s, z, t::RefValue, k::RefValue,
+    rp, ru, rd, rg::RefValue
+)
+    # primal residual
+    rp .= b*t.x - A*x
+
+    # upper-bound residual
+    ru .= uval * t.x - w
+    aUxpy!(-1.0, x, uind, ru)
+
+    # dual residual
+    rd .= c*t.x - At_mul_B(A, y) - s
+    aUtxpy!(1.0, uind, z, rd)
+
+    # gap residual
+    model.rg.x = model.primal_bound - model.dual_bound + k.x
+
+    return nothing
+    
+end
+
+function compute_direction_hsd(
+    model, A, F, b, c, uval, uind,
+    θ, θ_wz, μ,
+    x, w, y, s, z, t::RefValue, k::RefValue,
+    rp, ru, rd, rg
+)
+    # compute predictor direction
+    dx_a, dw_a, dy_a, ds_a, dz_a, dt_a, dk_a = solve_newton_hsd(
+        A, F, b, c, uval, uind,
+        θ, θ_wz,
+        x, w, y, s, z, t, k,
+        rp, ru, rd, rg.x, -x .* s, -w .* z, -t.x*k.x
+    )
+
+    
+    a = compute_max_step_size(
+        x, w, y, s, z, t, k,
+        dx_a, dw_a, dy_a, ds_a, dz_a, dt_a, dk_a
+    )
+    
+    μ_a = (
+        dot(x+a*dx_a, s+a*ds_a)
+        + dot(w + a * dw_a, z + a*dz_a)
+        + (t.x+a*dt_a)*(k.x+a*dk_a)
+    ) / (model.num_var + model.n_var_ub + 1)
+
+    γ = (1-a)^2 * min(1-a, 0.1)  # TODO: replace 0.1 by parameter β1
+    η = 1.0 - γ
+
+    # compute corrector
+    dx, dw, dy, ds, dz, dt, dk = solve_newton_hsd(
+        A, F, b, c, uval, uind,
+        θ, θ_wz,
+        x, w, y, s, z, t, k,
+        η*rp, η*ru, η*rd, η * rg.x,
+        -x .* s - dx_a .* ds_a + γ * μ.x * ones(model.num_var),
+        -w .* z - dw_a .* dz_a + γ * μ.x * ones(model.n_var_ub),
+        -(t.x * k.x) - dt_a * dk_a + γ * μ.x
+    )
+
+    return dx, dw, dy, ds, dz, dt, dk
+end
 
 """
     compute_starting_point!
@@ -168,7 +378,7 @@ function compute_starting_point!(
 
     rhs = - 2 * b
     u_ = zeros(n)
-    spxpay!(1.0, u_, uind, uval)
+    aUtxpy!(1.0, uind, uval, u_)
     rhs += A* u_
 
 
@@ -180,7 +390,7 @@ function compute_starting_point!(
     v = F \ rhs
 
     copy!(x, -0.5 * At_mul_B(A, v))
-    spxpay!(0.5, x, uind, uval)
+    aUtxpy!(0.5, uind, uval, x)
 
     # Compute w0
     @inbounds for i in 1:p
@@ -280,7 +490,7 @@ function compute_next_iterate!(
     uind::StridedVector{Ti},
     uval::StridedVector{Tv}
 ) where{Tv<:Real, Ti<:Integer}
-    (m, n, p) = model.n_con, model.n_var, model.n_var_ub
+    (m, n, p) = model.num_constr, model.num_var, model.n_var_ub
 
     # Affine-scaling direction
     daff_x = copy(x)
@@ -299,9 +509,9 @@ function compute_next_iterate!(
     # compute residuals
     μ = (dot(x, s) + dot(w, z)) / (n + p)
 
-    rb = (A * x) - b
-    rc = At_mul_B(A, y) + s - c
-    spxpay!(-1.0, rc, uind, z)
+    rp = (A * x) - b
+    rd = At_mul_B(A, y) + s - c
+    aUtxpy!(-1.0, uind, z, rd)
 
     ru = x[uind] + w - uval
     rxs = x .* s
@@ -318,8 +528,8 @@ function compute_next_iterate!(
         x, w, y, s, z,
         daff_x, daff_w, daff_y, daff_s, daff_z,
         uind,
-        -rb,
-        -rc,
+        -rp,
+        -rd,
         -ru,
         -rxs,
         -rwz
@@ -380,7 +590,7 @@ end
 """
 function symbolic_cholesky(A::AbstractMatrix{T}) where {T<:Real}
 
-    F = LinearAlgebra.cholesky(A, ones(A.n))
+    F = LinearAlgebra.cholesky(A, ones(size(A, 2)))
     return F
 
 end
@@ -456,64 +666,145 @@ function solve_newton!(
     return nothing
 end
 
+function solve_newton_hsd(
+    A, F, b, c, uval, uind,
+    θ, θ_wz,
+    x, w, y, s, z, t::RefValue, k::RefValue,
+    rp, ru, rd, rg::Float64, rxs, rwz, rtk
+)
+    # Compute γ1, γ2, γ3
+    γ_x, γ_y, γ_z = solve_augmented_system_hsd(A, F, θ, θ_wz, uind, b, c, uval)
+    
+    # Compute δ1, δ2, δ3
+    δ_x, δ_y, δ_z = solve_augmented_system_hsd(A, F, θ, θ_wz, uind, rp, rd - rxs ./ x, ru - rwz ./ z)
+    
+    # Compute Δτ
+    dt = (
+        (rg + (rtk / t.x) + dot(c, δ_x) - dot(b, δ_y) + dot(uval, δ_z) ) 
+        / ((k.x / t.x) - dot(c, γ_x) + dot(b, γ_y) - dot(uval, γ_z))
+    )
+    
+    # Compute Δx, Δy
+    dx = δ_x + dt * γ_x
+    dy = δ_y + dt * γ_y
+    dz = δ_z + dt * γ_z
+    
+    # Compute Δs, Δκ, Δw
+    dw = (rwz - w .* dz) ./ z
+    ds = (rxs - s .* dx) ./ x
+    dk = (rtk - k.x * dt) / t.x
+
+    return dx, dw, dy, ds, dz, dt, dk
+end
+
+function solve_augmented_system_hsd(A, F, θ, θ_wz, uind, rp, rd, ru)
+    # right-hand side
+    ru_ = ru .* θ_wz  # (W^{-1}*Z)*ru
+    
+    rp_ = copy(rd)
+    aUtxpy!(-1.0, uind, ru_, rp_)
+    rp_ .*= θ
+    rhs_y = rp + A * rp_
+    
+    # compute y
+    y = F \ rhs_y
+    x = At_mul_B(A, y) - rd
+    aUtxpy!(1.0, uind, ru_, x)
+    x .*= θ
+    
+    z = copy(-ru)
+    aUxpy!(1.0, x, uind, z)
+    z .*= θ_wz
+    
+    return x, y, z
+end
+
+"""
+    elementary_step_size(x, dx)
+
+Compute maximum step size `0 <= a` such that `x + a*dx >= 0`
+"""
+function elementary_step_size(x, dx)
+    n = size(x, 1)
+    n == size(dx, 1) || throw(DimensionMismatch())
+    a = Inf
+    @inbounds for i in 1:n
+        if dx[i] < 0
+            if (-x[i] / dx[i]) < a
+                a = (-x[i] / dx[i])
+            end
+        end
+    end
+    return a
+end
+
+function compute_max_step_size(x, w, y, s, z, t, k, dx, dw, dy, ds, dz, dt, dk)
+    
+    ax = elementary_step_size(x, dx)
+    aw = elementary_step_size(w, dw)
+    as = elementary_step_size(s, ds)
+    az = elementary_step_size(z, dz)
+    
+    at = dt < 0.0 ? (-t.x / dt) : 1.0
+    ak = dk < 0.0 ? (-k.x / dk) : 1.0
+    
+    a = min(1.0, ax, aw, as, az, at, ak)
+    
+    return a
+
+end
+
+function compute_step_size_hsd(x, w, y, s, z, t, k, dx, dw, dy, ds, dz, dt, dk)
+    
+    ax = elementary_step_size(x, dx)
+    aw = elementary_step_size(w, dw)
+    as = elementary_step_size(s, ds)
+    az = elementary_step_size(z, dz)
+    
+    at = dt < 0.0 ? (-t.x / dt) : Inf
+    ak = dk < 0.0 ? (-k.x / dk) : Inf
+    
+    ap = 0.99995 * min(1.0, ax, aw, at, ak)
+    ad = 0.99995 * min(1.0, as, az, at, ak)
+    
+    return ap, ad
+
+end
 
 function compute_stepsize(
-    tx::AbstractVector{T}, tw::AbstractVector{T}, ts::AbstractVector{T}, tz::AbstractVector{T},
+    x::AbstractVector{T}, w::AbstractVector{T}, s::AbstractVector{T}, z::AbstractVector{T},
     dx::AbstractVector{T}, dw::AbstractVector{T}, ds::AbstractVector{T}, dz::AbstractVector{T};
     damp=1.0
 ) where T<:Real
-
-    n = size(tx, 1)
-    p = size(tw, 1)
-    n == size(ts, 1) || throw(DimensionMismatch("t.s is wrong size"))
-    p == size(tz, 1) || throw(DimensionMismatch("t.z is wrong size"))
     
-    n == size(dx, 1) || throw(DimensionMismatch("d.x is wrong size"))
-    n == size(ds, 1) || throw(DimensionMismatch("d.s is wrong size"))
-    p == size(dw, 1) || throw(DimensionMismatch("d.w is wrong size"))
-    p == size(dz, 1) || throw(DimensionMismatch("d.z is wrong size"))
+    ax = elementary_step_size(x, dx)
+    aw = elementary_step_size(w, dw)
+    as = elementary_step_size(s, ds)
+    az = elementary_step_size(z, dz)
     
-    ap = ad = -1.0
-    
-    @inbounds for i in 1:n
-        if dx[i] < 0.0
-            if (tx[i] / dx[i]) > ap
-                ap = (tx[i] / dx[i])
-            end
-        end
-    end
-    
-    @inbounds for i in 1:n
-        if ds[i] < 0.0
-            if (ts[i] / ds[i]) > ad
-                ad = (ts[i] / ds[i])
-            end
-        end
-    end
-    
-    @inbounds for j in 1:p
-        if dw[j] < 0.0
-            if (tw[j] / dw[j]) > ap
-                ap = (tw[j] / dw[j])
-            end
-        end
-    end
-    
-    @inbounds for j in 1:p
-        if dz[j] < 0.0
-            if (tz[j] / dz[j]) > ad
-                ad = (tz[j] / dz[j])
-            end
-        end
-    end
-    
-    ap = - damp * ap
-    ad = - damp * ad
-
-    # println("\t(ap, ad) = ", (ap, ad))
+    ap = damp * min(ax, aw, 1.0)
+    ad = damp * min(as, az, 1.0)
     
     return (ap, ad)
 
+end
+
+function make_step_hsd!(
+    model, x, w, y, s, z, t::RefValue{Float64}, k::RefValue{Float64},
+    dx, dw, dy, ds, dz, dt, dk
+)
+
+    ap, ad = compute_step_size_hsd(x, w, y, s, z, t, k, dx, dw, dy, ds, dz, dt, dk)
+    a = min(ap, ad)
+    x .+= a * dx
+    w .+= a * dw
+    y .+= a * dy
+    s .+= a * ds
+    z .+= a * dz
+    t.x += a * dt
+    k.x += a * dk
+
+    return nothing
 end
 
 function update_theta!(θ, x, s, z, w, colind)
@@ -525,15 +816,65 @@ function update_theta!(θ, x, s, z, w, colind)
 end
 
 """
-    spxpay!(α, x, y_ind, y_val)
+    aUtxpy!(a, xval, xind, y)
 
-In-place computation of x += α * y, where y = sparse(y_ind, y_val)
-
-# Arguments
+Lift `x` to a `n`-dimensional space, and add the scaled result to `y`.
+Equivalent to writing `y[xind] .+= a * xval`.
 """
-function spxpay!(α::Tv, x::AbstractVector{Tv}, y_ind::AbstractVector{Ti}, y_val::AbstractVector{Tv}) where{Ti<:Integer, Tv<:Real}
-    for i in 1:size(y_ind, 1)
-        j = y_ind[i]
-        x[j] = x[j] + α * y_val[i]
+function aUtxpy!(a, xind, xval, y)
+    
+    n = size(y, 1)
+    p = size(xind, 1)
+    p == size(xval, 1) || throw(DimensionMismatch("xind has size $p, but xval has size $(size(xval))"))
+    if p == 0 || a == zero(a)
+        # early return
+        return y
     end
+    n >= xind[end] || throw(DimensionMismatch("Too many indices: $(xind[end]) > $n"))
+    
+    
+    
+    if a == oneunit(a)
+        @inbounds for (j, i) in enumerate(xind)
+            y[i] += xval[j]  # i = xind[j]
+        end
+    else
+        @inbounds for (j, i) in enumerate(xind)
+            y[i] += a * xval[j]  # i = xind[j]
+        end
+    end
+    return y
+end
+
+"""
+    aUxpy!(a, x, yind, yval)
+
+Project `x` down to a lower-dimensional space, and add the scaled result to `y`.
+Equivalent to writing `yval .+= a * x[yind]`
+"""
+function aUxpy!(a, x, yind, yval)
+    
+    n = size(x, 1)
+    p = size(yind, 1)
+    p == size(yval, 1) || throw(DimensionMismatch())
+    if p==0 || a == zero(a)
+        # early return
+        return yval
+    end
+
+    n >= yind[end] || throw(DimensionMismatch())
+
+    
+    
+    if a == oneunit(a)
+        @inbounds for (j, i) in enumerate(yind)
+            yval[j] += x[i]  # i = xind[j]
+        end
+    else
+        @inbounds for (j, i) in enumerate(yind)
+            yval[j] += a * x[i]  # i = xind[j]
+        end
+    end
+    
+    return yval
 end

@@ -1,195 +1,191 @@
 """
     Model
-    Data structure for a model
+    
+Data structure for a model.
 
 # Attributes
--`n_var::Int`: Number of variables
--`n_con::Int`: Number of constraints
--`A::AbstractMatrix{T1<:Real}`: Constraint matrix
--`b::AbstractVector{T2<:Real}`: Right-hand side of the equality constraints
--`c::AbstractVector{T3<:Real}`: Objective coefficient
--`uind::AbstractVector{Ti<:Integer}`: Indices of upper-bounded variables
--`uval::AbstractVector{T4<:Real}`: Upper bounds on the variables. Only finite
-    upper bounds are stored.
--`sol::PrimalDualPoint`: Current solution to the problem (may be infeasible at
-    the beginning of the optimization)
--`status::Symbol`: Optimization status
 """
-mutable struct Model{Ta<:AbstractMatrix{Float64}}
+mutable struct Model
     #=======================================================
-        Optimization environment
+        Model attributes
     =======================================================#
 
-    env::TulipEnv           # Environment
-    status::Symbol          # Optimization status
-    numbarrieriter::Int     # Number of barrier iterations
-    runtime::Float64      # Elapsed solution time, in seconds
-
+    env::TulipEnv                   # Environment
+    sln_status::SolutionStatus      # Solution status
+    
+    time_total::Float64     # Total time spent by the optimization
+    num_bar_iter::Int       # Total number of Interior-Point iterations
+    primal_bound::Float64   # Best known primal bound
+    dual_bound::Float64     # Best known dual bound
 
     #=======================================================
         Problem data
     =======================================================#
 
-    n_var::Int              # Number of variables (total)
-    n_var_ub::Int           # Number of upper-bounded variables
-    n_con::Int              # Number of constraints
+    num_var::Int              # Number of variables (total)
+    n_var_ub::Int             # Number of upper-bounded variables
+    num_constr::Int           # Number of constraints
 
-    A::Ta                   # Constraints matrix
-    b::AbstractVector{Float64}   # Right-hand side of equality constraints
-    c::AbstractVector{Float64}   # Objective vector
-    uind::AbstractVector{Int}  # Indices of upper-bounded variables
+    A::AbstractMatrix{Float64}      # Constraints matrix
+    obj::AbstractVector{Float64}    # Objective coefficients
+    var_lb::Vector{Float64}         # Lower bounds on `x` variables
+    var_ub::Vector{Float64}         # Upper bounds on `x` variables
+    constr_lb::Vector{Float64}      # Lower bounds on linear constraints
+    constr_ub::Vector{Float64}      # Upper bounds on linear constraints
+
+    b::AbstractVector{Float64}      # Right-hand side of equality constraints
+    c::AbstractVector{Float64}      # Objective vector
+    uind::AbstractVector{Int}       # Indices of upper-bounded variables
     uval::AbstractVector{Float64}   # Values of upper bounds
 
 
     #=======================================================
-        Book-keeping
+        Working memory
     =======================================================#
+    x::Vector{Float64}      # Vector of primal variables (original variables)
+    w::Vector{Float64}      # Vector of primal variables (upper bound slack)
+    y::Vector{Float64}      # Vector of dual variables (equality constraints)
+    s::Vector{Float64}      # Vector of reduced costs of `x`
+    z::Vector{Float64}      # Vector of reduced costs of `w`
+    t::Base.RefValue{Float64}    # Artificial homogeneous primal variable
+    k::Base.RefValue{Float64}    # Artificial homogeneous dual variable
+    μ::Base.RefValue{Float64}    # Current barrier parameter
 
-    F::Factorization{Float64}    # Factorization object
-
-    x::AbstractVector{Float64}   # Vector of original primal variables
-    w::AbstractVector{Float64}   # Vector of primal upper bound slack variables
-    y::AbstractVector{Float64}   # Vector of dual variables for equality constraints
-    s::AbstractVector{Float64}   # Vector of reduced costs of `x`
-    z::AbstractVector{Float64}   # Vector of reduced costs of `w`
-
-    rb::AbstractVector{Float64}  # Vector of primal residuals `Ax - b`
-    rc::AbstractVector{Float64}  # Vector of dual residuals `A'y + s - c`
-    ru::AbstractVector{Float64}  # Vector of primal residuals 'x + w - u``
-    rxs::AbstractVector{Float64} # Right-hand side for omplimentarity product `x*s`
-    rwz::AbstractVector{Float64} # Right-hand side for omplimentarity product `w*z`
-
+    rp::Vector{Float64}     # Vector of primal residuals `Ax - b`
+    rd::Vector{Float64}     # Vector of dual residuals `A'y + s - c`
+    ru::Vector{Float64}     # Vector of primal residuals 'x + w - u`
+    rg::Base.RefValue{Float64}   # Residual for optimality gap
+    rxs::Vector{Float64}    # Right-hand side for complimentarity product `x*s`
+    rwz::Vector{Float64}    # Right-hand side for complimentarity product `w*z`
+    rtk::Base.RefValue{Float64}  # Right-hand side for complimentarity product `t*k`
 
     #=======================================================
         Model constructor
     =======================================================#  
     function Model(
-        env::TulipEnv,
-        A::Ta,
-        b::AbstractVector,
-        c::AbstractVector,
-        uind::AbstractVector{Int},
-        uval::AbstractVector,
-        x::AbstractVector,
-        w::AbstractVector,
-        y::AbstractVector,
-        s::AbstractVector,
-        z::AbstractVector,
-        rb::AbstractVector,
-        rc::AbstractVector,
-        ru::AbstractVector,
-        rxs::AbstractVector,
-        rwz::AbstractVector
-    ) where{Ta<:AbstractMatrix{Float64}}
-        m = new{Ta}()
-
+        env::TulipEnv
+    )
+        m = new()
         m.env = env
+        
+        # Initialize data memory
+        m.num_var = 0
+        m.num_constr = 0
+        m.A = spzeros(0, 0)
+        m.obj = Vector{Float64}(0)
+        m.var_lb = Vector{Float64}(0)
+        m.var_ub = Vector{Float64}(0)
+        m.constr_lb = Vector{Float64}(0)
+        m.constr_ub = Vector{Float64}(0)
 
-        # Dimension check
-        n_con = size(A, 1)
-        n_var = size(A, 2)
-        n_con == size(b, 1) || throw(DimensionMismatch(
-            "A has size $(size(A)) but b has size $(size(b))"
-        ))
-        n_var == size(c, 1) || throw(DimensionMismatch(
-            "A has size $(size(A)) but c has size $(size(c))"
-        ))
-        n_var_ub = size(uind, 1)
-        n_var_ub == size(uval, 1) || throw(DimensionMismatch(
-            "uind has size $(size(uind)) but uval has size $(size(uval))"
-        ))
-        n_var_ub <= n_var || throw(DimensionMismatch(
-            "Too many upper bounds were specified"
-        ))
-        if n_var_ub > 0
-            uind[end] <= n_var || throw(DimensionMismatch(
-                "Got upper bound for var $(uind[end])>$(n_var)"
-            ))
-        end
+        # Initialize working memory
+        m.x = Vector{Float64}(0)
+        m.w = Vector{Float64}(0)
+        m.y = Vector{Float64}(0)
+        m.s = Vector{Float64}(0)
+        m.z = Vector{Float64}(0)
+        m.t = Ref(1.0)
+        m.k = Ref(1.0)
+        m.μ = Ref(1.0)
 
-        m.n_var = n_var
-        m.n_var_ub = n_var_ub
-        m.n_con = n_con
-        m.A = copy(A)
-        m.b = copy(b)
-        m.c = copy(c)
-        m.uind = copy(uind)
-        m.uval = copy(uval)
+        m.rp = Vector{Float64}(0)
+        m.ru = Vector{Float64}(0)
+        m.rd = Vector{Float64}(0)
+        m.rg = Ref(Inf)
+        m.rxs = Vector{Float64}(0)
+        m.rwz = Vector{Float64}(0)
+        m.rtk = Ref(Inf)
 
-        m.x = copy(x)
-        m.w = copy(w)
-        m.y = copy(y)
-        m.s = copy(s)
-        m.z = copy(z)
-
-        m.rb = copy(rb)
-        m.rc = copy(rc)
-        m.ru = copy(ru)
-        m.rxs = copy(rxs)
-        m.rwz = copy(rwz)
-
-        m.status = :Built
-        m.numbarrieriter = 0
-        m.runtime = 0.0
+        # Book-keeping stuff
+        m.sln_status = Sln_Unknown
 
         return m
     end
 end
 
-#=======================================================
-    Constructors
-=======================================================#
-
 """
-    Model(A, b, c, uind, uval)
+    loadmodel!()
 
-Construct a model with upper bounds on the specified variables.
-
-    Model()
-
-Construct an empty model.
-
-    Model(A, b, c)
-
-Construct a model with no upper bounds.
+Load data into existing model.
 """
-function Model(
-    env::TulipEnv,
-    A::Ta,
-    b::AbstractVector{T2},
-    c::AbstractVector{T3},
-    uind::AbstractVector{Ti},
-    uval::AbstractVector{T4}
-) where{T1<:Real, Ta<:AbstractMatrix{T1}, T2<:Real, T3<:Real, T4<:Real, Ti<:Integer}
+function loadmodel!(
+    m::Model,
+    num_var::Int,
+    num_constr::Int,
+    A::AbstractMatrix,
+    obj::AbstractVector,
+    var_lb::AbstractVector,
+    var_ub::AbstractVector,
+    constr_lb::AbstractVector,
+    constr_ub::AbstractVector
+)
+    # Dimension checks
+    num_var >= 0 || error("Number of variables must be non-negative.")
+    num_constr >= 0 || error("Number of constraints must be non-negative.")
+    num_var == length(obj) || throw(DimensionMismatch(
+        "Wrong number of elements in obj."
+    ))
+    num_var == length(var_lb) || throw(DimensionMismatch(
+        "Wrong number of elements in var_lb."
+    ))
+    num_var == length(var_ub) || throw(DimensionMismatch(
+        "Wrong number of elements in var_ub."
+    ))
+    num_var == size(A, 2) || throw(DimensionMismatch(
+        "Wrong number of columns in A."
+    ))
+    num_constr == size(A, 1) || throw(DimensionMismatch(
+        "Wrong number of rows in A."
+    ))
+    num_constr == length(constr_lb) || throw(DimensionMismatch(
+        "Wrong number of coefficients in constr_lb"
+    ))
+    num_constr == length(constr_ub) || throw(DimensionMismatch(
+        "Wrong number of coefficients in constr_ub"
+    ))
+
+    # Import data
+    m.num_var = num_var
+    m.num_constr = num_constr
+    m.A = copy(A)
+    m.obj = copy(obj)
+    m.var_lb = copy(var_lb)
+    m.var_ub = copy(var_ub)
+    m.constr_lb = copy(constr_lb)
+    m.constr_ub = copy(constr_ub)
+
+    # De-allocate existing working memory
+    m.x = Vector{Float64}(0)
+    m.w = Vector{Float64}(0)
+    m.y = Vector{Float64}(0)
+    m.s = Vector{Float64}(0)
+    m.z = Vector{Float64}(0)
+    m.t = Ref(1.0)
+    m.k = Ref(1.0)
+    m.μ = Ref(1.0)
+
+    m.rp = Vector{Float64}(0)
+    m.ru = Vector{Float64}(0)
+    m.rd = Vector{Float64}(0)
+    m.rg = Ref(Inf)
+    m.rxs = Vector{Float64}(0)
+    m.rwz = Vector{Float64}(0)
+    m.rtk = Ref(Inf)
     
-    (m, n) = size(A)
-    p = size(uind, 1)
-
-    model = Model(
-        env,
-        float(A), b, c, uind, uval,
-        # initial solution
-        ones(n),  # x
-        ones(p),  # w
-        zeros(m), # y
-        ones(n),  # s
-        ones(p),  # w
-        # residuals
-        fill(Inf, m),  # rb
-        fill(Inf, n),  # rc
-        fill(Inf, p),  # ru
-        ones(n),  # rxs
-        ones(p)   # rwz
-    )
-    return model
+    return true
 end
 
+"""
+    loadmodel!(m, A, rhs, obj)
 
-Model(A, b, c, uind, uval) = Model(TulipEnv(), A, b, c, uind, uval)
-Model(A::Ta, b, c, uind, uval) where{Tv<:Real, Ta<:Matrix{Tv}} = Model(sparse(float(A)), b, c, uind, uval)
-Model(env, A::Ta, b, c, uind, uval) where{Tv<:Real, Ta<:Matrix{Tv}} = Model(env, sparse(float(A)), b, c, uind, uval)
-Model() = Model(spzeros(0, 0), Vector{Float64}(0,), Vector{Float64}(0,))
-Model(A, b, c) = Model(A, b, c, Vector{Int}(0,), Vector{Float64}(0,))
+Load model in standard form.
+"""
+loadmodel!(m, A, rhs, obj) = loadmodel!(
+    m, size(A, 2), size(A, 1),
+    A, obj,
+    zeros(size(A, 2)), fill(Inf, size(A, 2)),
+    rhs, rhs
+)
 
 
 #=======================================================
@@ -205,7 +201,7 @@ Return number of variables in the model. This number does not include artificial
 slack variables that are used in the formulation (e.g. related to variable
 bounds)
 """
-getnumvar(m::Model) = m.n_var
+getnumvar(m::Model) = m.num_var
 
 """
     getnumconstr(m::Model)
@@ -213,14 +209,14 @@ getnumvar(m::Model) = m.n_var
 Return the number of constraints in the model. This number does not include
     explicit bounds on the variables.
 """
-getnumconstr(m::Model) = m.n_con
+getnumconstr(m::Model) = m.num_constr
 
 """
     getobjectivecoeffs(m::Model)
 
 Return the objective coefficients.
 """
-getobjectivecoeffs(m::Model) = copy(m.c)
+getobjectivecoeffs(m::Model) = copy(m.obj)
 
 """
     setobjectivecoeffs!(m::Model, c)
@@ -230,8 +226,8 @@ Set new objective coefficients.
 function setobjectivecoeffs!(m::Model, c::AbstractVector{T}) where T<:Real
 
     # Dimension check
-    size(c, 1) == m.n_var || throw(DimensionMismatch(
-        "c has $(size(c, 1)) coeffs but model has $(m.n_var) variables"
+    size(c, 1) == m.num_var || throw(DimensionMismatch(
+        "c has $(size(c, 1)) coeffs but model has $(m.num_var) variables"
     ))
 
     m.c = copy(c)
@@ -239,11 +235,47 @@ function setobjectivecoeffs!(m::Model, c::AbstractVector{T}) where T<:Real
 end
 
 """
-    getvarlowerbounds(m::Model)
+    getvarlowerbound(m, i)
 
-Return lower bounds on the variables.
+Return lower bound on variable `x[i]`.
 """
-getvarlowerbounds(m::Model) = zeros(m.n_var)
+getvarlowerbound(m::Model, i::Int) = m.var_lb[i]
+
+"""
+    getvarupperbound(m, i)
+
+Return upper bound on variable `x[i]`.
+"""
+getvarupperbound(m::Model, i::Int) = m.var_ub[i]
+
+"""
+    getvarlowerbounds(m)
+
+Return lower bounds on all variables.
+
+    getvarlowerbounds(m, idx)
+
+Return lower bounds on specified variables.
+
+    getvarlowerbounds!(m, l)
+
+Overwrite `l` with the lower bounds on variables.
+
+    getvarlowerbounds!(m, idx, l)
+
+Overwrite `l` with the lower bounds on specified variables.
+"""
+getvarlowerbounds(m::Model) = copy(m.var_lb)
+
+getvarlowerbounds(m::Model, idx::AbstractVector{Int}) = copy(m.var_lb[idx])
+
+getvarlowerbounds!(m::Model, l::Vector) = copy!(l, m.var_lb)
+
+getvarlowerbounds!(
+    m::Model,
+    l::Vector,
+    idx::AbstractVector{Int}
+) = copy!(l, m.var_lb[idx])
 
 """
     getvarupperbounds(m::Model)
@@ -251,25 +283,18 @@ getvarlowerbounds(m::Model) = zeros(m.n_var)
 Return upper bounds on the variables. If a given variable has no explicit upper
     bound, the returned value is `Inf`.
 """
-function getvarupperbounds(m::Model)
-    ub = fill(Inf, m.n_var)
-    ub[m.uind] = m.uval
-    return ub
-end
+getvarupperbounds(m::Model) = copy(m.var_ub)
+getvarupperbounds!(m::Model, u::Vector) = copy!(u, m.var_ub)
 
 """
     setvarupperbounds!(m::Model, ub)
 
 Set upperbounds on the variables
 """
-function setvarupperbounds!(m::Model, ub)
-    error("Wrong argument type: ub must be a real-valued vector")
-    return nothing
-end
 function setvarupperbounds!(m::Model, ub::SparseVector{Tv, Ti}) where{Tv<:Real, Ti<:Integer}
     # Dimension check
-    size(ub, 1) == m.n_var || throw(DimensionMismatch(
-        "ub has size $(size(c, 1)) but model has $(m.n_var) variables"
+    size(ub, 1) == m.num_var || throw(DimensionMismatch(
+        "ub has size $(size(c, 1)) but model has $(m.num_var) variables"
     ))
     minimum(ub) >= zero(Tv) || error("Upper bounds must be non-negative")
 
@@ -278,15 +303,16 @@ function setvarupperbounds!(m::Model, ub::SparseVector{Tv, Ti}) where{Tv<:Real, 
     m.n_var_ub = nnz(ub)
     return nothing
 end
+
 function setvarupperbounds!(m::Model, ub::AbstractArray{Tv}) where{Tv<:Real}
     # Dimension check
-    size(ub, 1) == m.n_var || throw(DimensionMismatch(
-        "ub has size $(size(c, 1)) but model has $(m.n_var) variables"
+    size(ub, 1) == m.num_var || throw(DimensionMismatch(
+        "ub has size $(size(c, 1)) but model has $(m.num_var) variables"
     ))
     minimum(ub) >= zero(Tv) || error("Upper bounds must be non-negative")
 
     u_ = ub .< Inf
-    m.uind = collect(1:m.n_var)[u_]
+    m.uind = collect(1:m.num_var)[u_]
     m.uval = ub[u_]
     m.n_var_ub = sum(u_)
 
@@ -296,75 +322,47 @@ end
 """
     addvar!(m::Model, colval, l, u, objcoeff)
 
-Add a variable to the model.
+Add one variable to the model.
+
+# Arguments
+- `m`: Model
+- `colvals`: Coefficients of the column
+- `l`: lower bound on the variable
+- `u`: Upperbound on the variable
+- `objcoef`: Objective coefficient
 """
-function addvar!(m::Model, colvals::AbstractVector{Tv}, l::Real, u::Real, objcoef::Real) where Tv<:Real
+function addvar!(
+    m::Model,
+    col::AbstractVector,
+    lb::Real,
+    ub::Real,
+    objcoef::Real
+)
 
-    # Dimension check
-    m.n_con == size(colvals, 1) || throw(DimensionMismatch(
-        "Column has $(size(col, 1)) coeffs but model has $(m.n_con) constraints"
+    # Check dimensions
+    m.num_constr == length(col) || throw(DimensionMismatch(
+        "Column has $(length(col)) coeffs but model has $(m.num_constr) constraints."
     ))
-    l <= u || error("Upper-bound must be greater than lower bound")
 
-    if l == -Inf && u == Inf
-        # free variable: add positive and negative parts
-        m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, colvals)
-        m.n_var += 1
-
-        insert!(m.c, k, objcoef)
-
-        m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, -colvals)
-        m.n_var += 1
-
-        insert!(m.c, k, -objcoef)
-
-
-    elseif l == -Inf && u < Inf
-        # upperbounded, no lower bound
-        m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, -colvals)
-        m.n_var += 1
-
-        # Update objective
-        insert!(m.c, k, -objval)
-
-        # Update right-hand side
-        m.b .+= u * colvals
-
-    elseif -Inf < l && u < Inf
-        # lower- and upper-bounded
-        m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, colvals)
-        m.n_var += 1
-
-        # Update objective
-        insert!(m.c, k, objcoef)
-
-        # Update right-hand side
-        m.b .-= l * colvals
-
-        # Update upper bounds
-        insert!(m.uind, k, k)
-        insert!(m.uind, k, u-l)
-        m.n_var_ub += 1
-
-    else
-        # lower-bounded
-        # Add column
-        m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, colvals)
-        m.n_var += 1
-
-        # Update objective
-        insert!(m.c, k, objcoef)
-
-        # Update right-hand side
-        m.b .-= l * colvals
+    # Check numerical values
+    lb <= ub || error("Upper-bound must be greater than lower bound.")
+    if m.num_constr > 0
+        (min, max) = extrema(col)
+        (-Inf < min) && (max < Inf) || error("Coef magnitude if too large.")
     end
+    -Inf < objcoef < Inf || error("Obj magnitude is too large.")
 
-    m.status = :Built
+    # Update model
+    m.A, k = Tulip.LinearAlgebra.addcolumn!(m.A, col)
+    insert!(m.obj, k, objcoef)
+    insert!(m.var_lb, k, lb)
+    insert!(m.var_ub, k, ub)
+    m.num_var += 1
 
-    return nothing
+    return k
 end
-addvar!(m::Model, constridx, constrcoef, l, u, objcoef) = addvar!(m, sparsevec(constridx, constrcoef, m.n_con), l, u, objcoef)
-addvar!(m::Model, col::AbstractVector{Tv}, objcoef::Real) where Tv<:Real = addvar!(m, col, 0.0, Inf, objcoef)
+addvar!(m::Model, constridx, constrcoef, l, u, objcoef) = addvar!(m, sparsevec(constridx, constrcoef, m.num_constr), l, u, objcoef)
+addvar!(m::Model, col::AbstractVector, objcoef) = addvar!(m, col, 0.0, Inf, objcoef)
 
 """
     getconstrlowerbound
@@ -385,21 +383,37 @@ getconstrupperbounds(m::Model) = copy(m.b)
 
 Add a constraint to the model.
 """
-function addconstr!(m::Model, rowvals::AbstractVector{Tv}, rhs::Real) where Tv<:Real
+function addconstr!(
+    m::Model,
+    row::AbstractVector,
+    lb::Real,
+    ub::Real
+)
 
-    # Dimension checks
-    m.n_var == size(rowvals, 1) || throw(DimensionMismatch(
-        "Row has $(size(rowals, 1)) coefs but model has $(m.n_var) variables"
+    # CHeck dimensions
+    m.num_var == length(row) || throw(DimensionMismatch(
+        "Row has $(length(row)) coefs but model has $(m.num_var) variables."
     ))
-    -Inf < rhs < Inf || error("Right-hand side must have finite value")
 
-    # Add constraint
-    m.n_con += 1
-    m.b = vcat(m.b, rhs)
-    m.A = vcat(m.A, rowvals)
+    # Check numerical values
+    lb <= ub || error("Upper-bound must be greater than lower bound.")
+    if m.num_constr > 0
+        (min, max) = extrema(row)
+        (-Inf < min) && (max < Inf) || error("Coef magnitude if too large.")
+    end
+
+    # Update model
+    m.A, k = Tulip.LinearAlgebra.addrow!(m.A, row)
+    insert!(m.constr_lb, k, lb)
+    insert!(m.constr_ub, k, ub)
+    m.num_constr += 1
 
     return nothing
 end
+
+addconstr!(m, varidx, rowval, rhs) = addconstr!(m, sparsevec(varidx, rowval, m.num_var), rhs)
+
+
 
 """
     getlinearconstrcoeffs(m::Model)
@@ -420,7 +434,7 @@ Retrieve solution-related information
 
 Return objective value of the best known solution
 """
-getobjectivevalue(m::Model) = dot(m.c, m.x)
+getobjectivevalue(m::Model) = dot(m.c, m.x) / m.t.x
 
 """
     getdualbound(m::Model)
@@ -428,46 +442,60 @@ getobjectivevalue(m::Model) = dot(m.c, m.x)
 Return dual bound on the obective value. Returns a lower (resp. upper) bound
 if the problem is a minimization (resp. maximization).
 """
-getdualbound(m::Model) = dot(m.b, m.y) - dot(m.uval, m.z)
+getdualbound(m::Model) = (dot(m.b, m.y) - dot(m.uval, m.z)) / m.t.x
 
 """
     getobjectivedualgap(m::Model)
 
 Return the duality gap. 
 """
-getobjectivedualgap(m::Model) = dot(m.x, m.s) + dot(m.w, m.z)
+getobjectivedualgap(m::Model) = (dot(m.x, m.s) + dot(m.w, m.z)) / (m.t.x)^2
 
 """
     getsolution(m::Model)
 
 Return best known (primal) solution to the problem.
 """
-getsolution(m::Model) = copy(m.x)
+getsolution(m::Model) = copy(m.x / m.t.x)
 
 """
     getconstrduals(m::Model)
 
 Return dual variables associated to linear constraints.
 """
-getconstrduals(m::Model) = copy(m.y)
+getconstrduals(m::Model) = copy(m.y / m.t.x)
 
 """
     getreducedcosts(m::Model)
 
 Return reduced costs of primal variables.
 """
-getreducedcosts(m::Model) = copy(m.s)
+getreducedcosts(m::Model) = copy(m.s / m.t.x)
 
 """
     getnumbarrieriter(m::Model)
 
 Return number of barrier iterations.
 """
-getnumbarrieriter(m::Model) = m.numbarrieriter
+getnumbarrieriter(m::Model) = m.num_bar_iter
 
 """
     getsolutiontime(m::Model)
 
 Return runtime of the optimizer.
 """
-getsolutiontime(m::Model) = m.runtime
+getsolutiontime(m::Model) = m.time_total
+
+"""
+    getinfeasibilityray(m::Model)
+
+Retrieve infeasibility ray when problem is proven infeasible.
+"""
+getinfeasibilityray(m::Model) = copy(m.y ./ m.t.x)
+
+"""
+    getunboundedray(m::Model)
+
+Retrieve unbounded ray when model is proven unbounded.
+"""
+getunboundedray(m::Model) = copy(m.x ./ m.t.x)

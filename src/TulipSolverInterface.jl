@@ -55,7 +55,7 @@ MPB.getobjgap(m::TulipMathProgModel) = getobjectivedualgap(m.inner)
 
 MPB.getrawsolver(m::TulipMathProgModel) = m.inner
 
-MPB.getsolvetime(m::TulipMathProgModel) = m.inner.runtime
+MPB.getsolvetime(m::TulipMathProgModel) = m.inner.time_total
 
 MPB.getsense(m::TulipMathProgModel) = :Min
 
@@ -80,13 +80,13 @@ function MPB.loadproblem!(
     A, l, u, c, lb, ub, sense
 )
     
-    n_var = size(A, 2)
+    num_var = size(A, 2)
     n_con = size(A, 1)
 
     # Dimension check
-    n_var == size(c, 1) || throw(DimensionMismatch("c has size $(size(c))"))
-    n_var == size(l, 1) || throw(DimensionMismatch("l has size $(size(c))"))
-    n_var == size(u, 1) || throw(DimensionMismatch("u has size $(size(c))"))
+    num_var == size(c, 1) || throw(DimensionMismatch("c has size $(size(c))"))
+    num_var == size(l, 1) || throw(DimensionMismatch("l has size $(size(c))"))
+    num_var == size(u, 1) || throw(DimensionMismatch("u has size $(size(c))"))
     n_con == size(lb, 1) || throw(DimensionMismatch("lb has size $(size(c))"))
     n_con == size(ub, 1) || throw(DimensionMismatch("ub has size $(size(c))"))
 
@@ -103,7 +103,7 @@ function MPB.loadproblem!(
     uind = Vector{Int}(0,)
     uval = Vector{Float64}(0,)
     n_var_ub = 0
-    for i in 1:n_var
+    for i in 1:num_var
         if u[i] < Inf
             n_var_ub += 1
             push!(uind, i)
@@ -178,9 +178,8 @@ MPB.getreducedcosts(m::TulipMathProgModel) = getreducedcosts(m.inner)
 
 MPB.getconstrduals(m::TulipMathProgModel) = getconstrduals(m.inner)
 
-function MPB.getinfeasibilityray(m::TulipMathProgModel)
-    warn("MPB.getinfeasibilityray! currently not implemented. Function call ignored.")
-    return Vector{Float64}(0,)
-end
+MPB.getinfeasibilityray(m::TulipMathProgModel) = getinfeasibilityray(m.inner)
+
+MPB.getunboundedray(m::TulipMathProgModel) = getunboundedray(m.inner)
 
 MPB.getbarrieriter(m::TulipMathProgModel) = getnumbarrieriter(m.inner)
