@@ -190,7 +190,7 @@ function solve_mpc!(model::Model)
     # main IPM loop
     while (
         model.num_bar_iter < model.env[Val{:barrier_iter_max}]
-        && model.sln_status != :Optimal
+        && model.sln_status != Sln_Optimal
         && model.time_total < model.env[Val{:time_limit}]
     )
 
@@ -248,7 +248,7 @@ function solve_mpc!(model::Model)
             && (eps_d < model.env[Val{:barrier_tol_opt}])
             && (eps_g < model.env[Val{:barrier_tol_conv}])
         )
-            model.sln_status = :Optimal
+            model.sln_status = Sln_Optimal
         end
 
         # Log

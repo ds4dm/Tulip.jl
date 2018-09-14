@@ -1,7 +1,5 @@
 module LinearAlgebra
 
-export DenseBlockAngular, FactorBlockAngular
-
 """
     addcolumn!(A, c)
 
