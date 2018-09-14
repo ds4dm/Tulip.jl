@@ -256,17 +256,17 @@ function solve_mpc!(model::Model)
 
         if model.env[Val{:verbose}] == 1
             # Iteration count
-            print(@sprintf("%4d", model.num_bar_iter))
+            @printf("%4d", model.num_bar_iter)
             # Primal and Dual objectives
-            print(@sprintf("%+18.7e", obj_primal))
-            print(@sprintf("%+16.7e", obj_dual))
+            @printf("%+18.7e", obj_primal)
+            @printf("%+16.7e", obj_dual)
             # Infeasibilities
-            print(@sprintf("%10.2e", norm(rp, Inf)))  # primal infeas
-            print(@sprintf("%9.2e", norm(rd, Inf)))  # dual infeas
-            print(@sprintf("%9.2e", norm(ru, Inf)))  # upper bound infeas
+            @printf("%10.2e", norm(rp, Inf))  # primal infeas
+            @printf("%9.2e", norm(rd, Inf))  # dual infeas
+            @printf("%9.2e", norm(ru, Inf))  # upper bound infeas
             # μ
-            print(@sprintf("  %8.2e", abs(obj_primal - obj_dual) / (model.num_var + model.n_var_ub)))
-            print(@sprintf("  %.2f", model.time_total))
+            @printf("  %8.2e", abs(obj_primal - obj_dual) / (model.num_var + model.n_var_ub))
+            @printf("  %.2f", model.time_total)
             print("\n")
         end
 
