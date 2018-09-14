@@ -52,8 +52,11 @@ Solution Status code
 """
     ModelStatus
 
+Model status codes.
+- `Mdl_Unknown`: Status of the model is unknown.
+- `Mdl_StandardForm`: Model is in standard form.
 """
 @enum(ModelStatus,
     Mdl_Unknown,
-    Mdl_Built
+    Mdl_StandardForm
 )
