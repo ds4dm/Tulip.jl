@@ -1,3 +1,6 @@
+env = Tulip.TulipEnv()
+model = Tulip.Model(env)
+
 #= Create and solve the following model:
     min  x1 + 2*x2
     s.t. x1 + x2 = 2
@@ -11,29 +14,33 @@ The solution to this problem is:
     w2 = 1.0
     z2 = 0.0
 =#
-A = sparse([1.0 1.0])
-c = [1.0, 2.0]
-b = [2.0]
-u = sparse([0.0, 1.0])
 
-m = 1
-p = nnz(u)
-n = 2
+Tulip.addvar!(model, [], 0.0, Inf, 1.0)
+Tulip.addvar!(model, [], 0.0, 1.0, 2.0)
+Tulip.addconstr!(model, [1.0, 1.0], 2.0, 2.0)
 
-# Create random instance and run checks
-model = Tulip.Model(A, b, c, u.nzind, u.nzval)
+# Tulip.prepross!(model)
+
+A_ = sparse([[1.0 1.0];])
+
+@test model.A == A_
+@test model.var_lb == [0.0, 0.0]
+@test model.var_ub == [Inf, 1.0]
+@test model.constr_lb == [2.0]
+@test model.constr_ub == [2.0]
+
 model.env[:verbose] = 1
 Tulip.optimize!(model)
 
 # Low-level interface
-@test n == Tulip.getnumvar(model)
-@test m == Tulip.getnumconstr(model)
-@test [0.0, 0.0] == Tulip.getvarlowerbounds(model)
-@test [Inf, 1.0] == Tulip.getvarupperbounds(model)
-@test [2.0] == Tulip.getconstrlowerbounds(model)
-@test [2.0] == Tulip.getconstrupperbounds(model)
-@test [1.0, 2.0] == Tulip.getobjectivecoeffs(model)
-@test A == Tulip.getlinearconstrcoeffs(model)
+@test Tulip.getnumvar(model) == 2
+@test Tulip.getnumconstr(model) == 1
+@test Tulip.getvarlowerbounds(model) == [0.0, 0.0]
+@test Tulip.getvarupperbounds(model) == [Inf, 1.0]
+@test Tulip.getconstrlowerbounds(model) == [2.0]
+@test Tulip.getconstrupperbounds(model) == [2.0]
+@test Tulip.getobjectivecoeffs(model) == [1.0, 2.0]
+@test Tulip.getlinearconstrcoeffs(model) == A_
 @test abs(2.0 - Tulip.getobjectivevalue(model)) <= 10.0^-8
 @test abs(2.0 - Tulip.getdualbound(model)) <= 10.0^-8
 @test Tulip.getobjectivedualgap(model) <= 10.0^-8

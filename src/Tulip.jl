@@ -11,8 +11,9 @@ export readmps
 include("env.jl")
 include("status.jl")
 include("model.jl")
+include("prepross.jl")
 include("ipm.jl")
 include("readmps.jl")
 include("TulipSolverInterface.jl")
-    
+
 end # module

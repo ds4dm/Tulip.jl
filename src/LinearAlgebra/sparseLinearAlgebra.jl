@@ -26,4 +26,3 @@ modified.
 - `objcoeff::Tv`: objective coefficient of the new variable
 - `u::Tv`: upper bound of the new variable (non-negative)
 """
-addcolumn!(A::SparseMatrixCSC{Tv, Ti},a::AbstractVector{Tv}) where{Tv<:Real, Ti<:Integer} = (hcat(A, a), size(A, 2) + 1)

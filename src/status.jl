@@ -13,13 +13,13 @@ but no result (e.g. certificate of infeasibility) is available.
     Cholesky decomposition.
 """
 @enum(TerminationStatus,
-    Success,
-    PrimalInfeasibleNoResult,
-    DualInfeasibleNoResult,
-    IterationLimit,
-    TimeLimit,
-    MemoryLimit,
-    NumericalProblem
+    Trm_Success,
+    Trm_PrimalInfeasibleNoResult,
+    Trm_DualInfeasibleNoResult,
+    Trm_IterationLimit,
+    Trm_TimeLimit,
+    Trm_MemoryLimit,
+    Trm_NumericalProblem
 )
 
 """
@@ -39,13 +39,21 @@ Solution Status code
     certificate are available.
 """
 @enum(SolutionStatus,
-    Unknown,
-    Optimal,
-    PrimalFeasible,
-    DualFeasible,
-    PrimalDualFeasible,
-    PrimalInfeasible,
-    DualInfeasible,
-    PrimalDualInfeasible
+    Sln_Unknown,
+    Sln_Optimal,
+    Sln_PrimalFeasible,
+    Sln_DualFeasible,
+    Sln_PrimalDualFeasible,
+    Sln_PrimalInfeasible,
+    Sln_DualInfeasible,
+    Sln_PrimalDualInfeasible
 )
 
+"""
+    ModelStatus
+
+"""
+@enum(ModelStatus,
+    Mdl_Unknown,
+    Mdl_Built
+)

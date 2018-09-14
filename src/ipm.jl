@@ -8,6 +8,8 @@ Run the optimizer.
 """
 function optimize!(model::Model)
 
+    prepross!(model)
+
     if model.env[Val{:algo}] == 0
         return solve_mpc!(model)
     else
@@ -98,8 +100,8 @@ function solve_hsd!(model::Model)
             if model.env[Val{:verbose}] == 1
                 println("\nOptimal solution found.")
             end
-            model.sol_status = Optimal
-            return Success
+            model.sln_status = Sln_Optimal
+            return Trm_Success
         end
         
         if (model.μ.x < model.env[Val{:barrier_tol_feas}]) && ((model.t.x / model.k.x) < model.env[Val{:barrier_tol_feas}])
@@ -107,8 +109,8 @@ function solve_hsd!(model::Model)
             if model.env[Val{:verbose}] == 1
                 println("\nInfeasibility detected.")
             end
-            model.sol_status = PrimalInfeasible
-            return Success
+            model.sln_status = Sln_PrimalInfeasible
+            return Trm_Success
         end
 
         # II.
@@ -139,7 +141,7 @@ function solve_hsd!(model::Model)
     end
 
     # END
-    return model.sol_status
+    return model.sln_status
     
 end
 
@@ -188,7 +190,7 @@ function solve_mpc!(model::Model)
     # main IPM loop
     while (
         model.num_bar_iter < model.env[Val{:barrier_iter_max}]
-        && model.sol_status != :Optimal
+        && model.sln_status != :Optimal
         && model.time_total < model.env[Val{:time_limit}]
     )
 
@@ -246,7 +248,7 @@ function solve_mpc!(model::Model)
             && (eps_d < model.env[Val{:barrier_tol_opt}])
             && (eps_g < model.env[Val{:barrier_tol_conv}])
         )
-            model.sol_status = :Optimal
+            model.sln_status = :Optimal
         end
 
         # Log
@@ -271,7 +273,7 @@ function solve_mpc!(model::Model)
     end
 
     # END
-    return model.sol_status
+    return model.sln_status
     
 end
 
