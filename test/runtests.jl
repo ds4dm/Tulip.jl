@@ -10,11 +10,11 @@ const testdir = dirname(@__FILE__)
 
 const test_files = [
     # include test file name here (without .jl extension)
-    "params",
-    "env",
+    # "params",
+    # "env",
     "LinearAlgebra/denseBlockAngular",
     "LinearAlgebra/linearAlgebra",
-    "model",
+    # "model",
     # "mathprogbase",
 ]
 
