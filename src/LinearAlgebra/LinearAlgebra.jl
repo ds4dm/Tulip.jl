@@ -2,6 +2,8 @@ module TLPLinearAlgebra
 
 using LinearAlgebra
 
+export factor_normaleq
+
 """
     factor_normal_eqn(A, d)
 
