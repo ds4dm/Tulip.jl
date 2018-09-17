@@ -1,8 +1,9 @@
 # Base Interface
 import Base:
     size, getindex, copy
-import Base.LinAlg:
-    A_mul_B!, At_mul_B, A_ldiv_B!
+
+import LinearAlgebra:
+    mul!, ldiv!
 
 # TODO: make sure this implementation is stable
 
@@ -37,7 +38,8 @@ end
 """
     DenseBlockAngular(blocks, C)
 
-Construct a dense block-angular matrix from a list of blocks and linking columns `C`.
+Construct a dense block-angular matrix, given the list of lower blocks, 
+and columns `C`.
 """
 function DenseBlockAngular(blocks, C::AbstractMatrix{T}) where T<:Real
 
@@ -46,19 +48,21 @@ function DenseBlockAngular(blocks, C::AbstractMatrix{T}) where T<:Real
         # No blocks, early return
         return DenseBlockAngular(
             size(C, 1), size(C, 2), 0,
-            Vector{Int}(0),
+            Vector{Int}(),
             Vector{Matrix{T}}(),
             C
         )
     end
 
     m = size(C, 1)
-    colptr = Vector{Int}(R+2)
+    colptr = Vector{Int}(undef, R+2)
     colptr[1] = 1
 
     # Dimension check
     for r in Base.OneTo(R)
-        m == size(blocks[r], 1) || throw(DimensionMismatch("Block 1 has dimensions $(size(col_list[1])) but block $(r) has dimensions $(size(col_list[r]))"))
+        m == size(blocks[r], 1) || throw(DimensionMismatch(
+            "Blocks 1 and $r have inconsistent dimensions."
+        ))
         colptr[r+1] = colptr[r] + size(blocks[r], 2)
     end
     colptr[R+2] = colptr[R+1] + size(C, 2)
@@ -77,7 +81,7 @@ function DenseBlockAngular(blocks::Vector{Matrix{T}}) where T<:Real
     if length(blocks) == 0
         return DenseBlockAngular(
             0, 0, 0,
-            Vector{Int}(0),
+            Vector{Int}(),
             Vector{Matrix{T}}(),
             Matrix{T}(0, 0)
         )
@@ -87,7 +91,7 @@ function DenseBlockAngular(blocks::Vector{Matrix{T}}) where T<:Real
 end
 
 size(M::DenseBlockAngular) = (M.m+M.R, M.n)
-function getindex(M::DenseBlockAngular{Tv}, i::Integer, j::Integer) where {Tv<:Real}
+function getindex(M::DenseBlockAngular{Tv}, i::Integer, j::Integer) where Tv
     if !(1 <= i <= (M.m+M.R) && 1 <= j <= (M.n)); throw(BoundsError()); end
     
     if i > M.R
@@ -116,14 +120,18 @@ copy(M::DenseBlockAngular) = DenseBlockAngular(
 )
 
 # Matrix-vector Multiplication
-function A_mul_B!(y::AbstractVector{Tv}, A::DenseBlockAngular{Tv}, x::AbstractVector{Tv}) where{Tv<:Real}
-    
+function mul!(
+    y::AbstractVector{Tv},
+    A::DenseBlockAngular{Tv},
+    x::AbstractVector{Tv}
+) where{Tv<:Real}
+
     m, n = size(A)
-    n == size(x, 1) || throw(DimensionMismatch(
-        "A has dimensions $(size(A)) but x has dimension $(size(x))")
+    n == length(x) || throw(DimensionMismatch(
+        "A has dimensions $(size(A)) but x has dimension $(length(x))")
     )
-    m == size(y, 1) || throw(DimensionMismatch(
-        "A has dimensions $(size(A)) but y has dimension $(size(y))")
+    m == length(y) || throw(DimensionMismatch(
+        "A has dimensions $(size(A)) but y has dimension $(length(y))")
     )
     
     y_ = view(y, (A.R+1):(A.R+A.m))
@@ -132,29 +140,42 @@ function A_mul_B!(y::AbstractVector{Tv}, A::DenseBlockAngular{Tv}, x::AbstractVe
     for r in 1:A.R
         x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
         y[r] = sum(x_)
-        Base.BLAS.gemv!('N', 1.0, A.blocks[r], x_, 1.0, y_)
+        BLAS.gemv!('N', 1.0, A.blocks[r], x_, 1.0, y_)
     end
-    @views Base.BLAS.gemv!('N', 1.0, A.colslink, x[A.colptr[A.R+1]:end], 1.0, y_)
+    @views BLAS.gemv!('N', 1.0, A.colslink, x[A.colptr[A.R+1]:end], 1.0, y_)
     
     return y
 end
 
-function At_mul_B(A::DenseBlockAngular{Tv}, y::AbstractVector{Tv}) where{Tv<:Real}
+"""
+    mul!(x, At, y)
+
+Compute Matrix-vector product `A'*y` and overwrites the result in `x`.
+"""
+function mul!(
+    x::AbstractVector{Tv},
+    At::LinearAlgebra.Transpose{Tv, DenseBlockAngular{Tv}},
+    y::AbstractVector{Tv}
+) where{Tv<:Real}
     
+    A = At.parent
+
     m, n = size(A)
-    m == size(y, 1) || throw(DimensionMismatch(
-        "A has dimension $(size(A)) but y has dimension $(size(y))")
+    n == length(x) || throw(DimensionMismatch(
+        "A has dimensions $(size(A)) but x has dimension $(length(x))")
+    )
+    m == length(y) || throw(DimensionMismatch(
+        "A has dimensions $(size(A)) but y has dimension $(length(y))")
     )
     
-    x = zeros(n)
     y_ = y[(A.R+1):end]
     
     @inbounds for r in 1:A.R
         x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
         x_ .= y[r]
-        Base.BLAS.gemv!('T', 1.0, A.blocks[r], y_, 1.0, x_)
+        BLAS.gemv!('T', 1.0, A.blocks[r], y_, 1.0, x_)
     end
-    @views Base.BLAS.gemv!('T', 1.0, A.colslink, y_, 1.0, x[A.colptr[A.R+1]:end])
+    @views BLAS.gemv!('T', 1.0, A.colslink, y_, 0.0, x[A.colptr[A.R+1]:end])
     
     return x
 end
@@ -185,12 +206,12 @@ mutable struct FactorBlockAngular{Tv<:Real} <: Factorization{Tv}
     d::Vector{Tv}
     η::Matrix{Tv}
     
-    Fc::Base.LinAlg.Cholesky{Tv, Matrix{Tv}}
+    Fc::LinearAlgebra.Cholesky{Tv, Matrix{Tv}}
 
     FactorBlockAngular(
         m::Ti, n::Ti, R::Ti,
         colptr::Vector{Ti}, d::Vector{Tv}, η::Matrix{Tv},
-        Fc::Base.LinAlg.Cholesky{Tv, Matrix{Tv}}
+        Fc
     ) where{Tv<:Real, Ti<:Integer} = new{Tv}(m, n, R, colptr, d, η, Fc)
 end
 
@@ -198,53 +219,74 @@ size(F::FactorBlockAngular) = (F.m+F.R, F.n)
 
 
 """
-    A_ldiv_B!
+    ldiv!(F, b)
 
+In-place computation of `F \\ b`, overwriting `b` with the result. 
 """
-function A_ldiv_B!(F::FactorBlockAngular{Tv}, b::AbstractVector{Tv}) where{Tv<:Real}
+function ldiv!(F::FactorBlockAngular{Tv}, b::AbstractVector{Tv}) where{Tv<:Real}
     
     # Dimension check
-    (F.m + F.R) == size(b, 1) || throw(DimensionMismatch("F has dimensions $(size(F)) but b has dimensions $(size(b))"))
+    (F.m + F.R) == length(b) || throw(DimensionMismatch(
+        "F has dimensions $(size(F)) but b has dimensions $(length(b))"
+    ))
     
     @views b[1:F.R] .*= F.d
     
     # right-hand side for global solve (b0)
-    @views Base.BLAS.gemv!('N', -1.0, F.η, b[1:F.R], 1.0, b[(F.R+1):end])
+    @views BLAS.gemv!('N', -1.0, F.η, b[1:F.R], 1.0, b[(F.R+1):end])
     
     # global solve
-    @views Base.LinAlg.A_ldiv_B!(F.Fc, b[(F.R+1):end])
+    @views ldiv!(F.Fc, b[(F.R+1):end])
     
     # local backward pass
     @views b[1:F.R] ./= F.d
-    @views Base.BLAS.gemv!('T', -1.0, F.η, b[(F.R+1):end], 1.0, b[1:F.R])
+    @views BLAS.gemv!('T', -1.0, F.η, b[(F.R+1):end], 1.0, b[1:F.R])
     @views b[1:F.R] .*= F.d
     
     return b
 end
 
-function A_ldiv_B!(y::AbstractVector{Tv}, F::FactorBlockAngular{Tv}, b::AbstractVector{Tv}) where{Tv<:Real}
+"""
+    ldiv!(y, F, b)
+
+Compute `F \\ b` and overwrite `y` with the result. `F`, `b` are not modified.
+"""
+function ldiv!(
+    y::AbstractVector{Tv},
+    F::FactorBlockAngular{Tv},
+    b::AbstractVector{Tv}
+) where{Tv<:Real}
     
     # Dimension check
-    (F.m + F.R) == size(b, 1) || throw(DimensionMismatch("F has dimensions $(size(F)) but b has dimensions $(size(b))"))
-    (F.m + F.R) == size(y, 1) || throw(DimensionMismatch("F has dimensions $(size(F)) but y has dimensions $(size(y))"))
+    (F.m + F.R) == length(b) || throw(DimensionMismatch(
+        "F has dimensions $(size(F)) but b has dimensions $(length(b))"
+    ))
+    (F.m + F.R) == length(y) || throw(DimensionMismatch(
+        "F has dimensions $(size(F)) but y has dimensions $(length(y))"
+    ))
     
     # over-write y with b
-    copy!(y, b)
-    @views y[1:F.R] .*= F.d
-    
-    # right-hand side for global solve
-    @views Base.BLAS.gemv!('N', -1.0, F.η, y[1:F.R], 0.0, y[(F.R+1):end])
-    @views Base.BLAS.axpy!(1.0, b[(F.R+1):end], y[(F.R+1):end])
-    
-    # global solve
-    @views Base.LinAlg.A_ldiv_B!(F.Fc, y[(F.R+1):end])
-    
-    # local backward pass
-    @views Base.BLAS.gemv!('T', -1.0, F.η, y[(F.R+1):end], 0.0, y[1:F.R])
-    @views Base.BLAS.axpy!(1.0, b[1:F.R], y[1:F.R])
-    @views y[1:F.R] .*= F.d
-    
+    y .= b
+
+    ldiv!(F, y)
     return y
+
+    # copy!(y, b)
+    # @views y[1:F.R] .*= F.d
+    
+    # # right-hand side for global solve
+    # @views BLAS.gemv!('N', -1.0, F.η, y[1:F.R], 0.0, y[(F.R+1):end])
+    # @views BLAS.axpy!(1.0, b[(F.R+1):end], y[(F.R+1):end])
+    
+    # # global solve
+    # @views ldiv!(F.Fc, y[(F.R+1):end])
+    
+    # # local backward pass
+    # @views BLAS.gemv!('T', -1.0, F.η, y[(F.R+1):end], 0.0, y[1:F.R])
+    # @views BLAS.axpy!(1.0, b[1:F.R], y[1:F.R])
+    # @views y[1:F.R] .*= F.d
+    
+    # return y
 end
 
 
@@ -270,19 +312,19 @@ function CpBDBt!(C::StridedMatrix, B::StridedMatrix, d::StridedVector)
     
     # Dimension checks
     (m, k) = size(B)
-    (m, m) == size(C) || throw(DimensionMismatch("C has dimensions $(size(C)) but B has dimensions $(size(B))"))
-    k == size(d, 1) || throw(DimensionMismatch("d has dimensions $(size(d)) but B has dimensions $(size(B))"))
+    (m, m) == size(C) || throw(DimensionMismatch(
+        "C has dimensions $(size(C)) but B has dimensions $(size(B))"
+    ))
+    k == length(d) || throw(DimensionMismatch(
+        "d has dimensions $(length(d)) but B has dimensions $(size(B))"
+    ))
 
     # Linear scaling + BLAS call
     B_ = B * Diagonal(sqrt.(d))
-    Base.BLAS.syrk!('U', 'N', 1.0, B_, 1.0, C)
+    BLAS.syrk!('U', 'N', 1.0, B_, 1.0, C)
     
     return C
 end
-
-# TODO: blocked version
-# Compare to BLAS `syrk!`, there is a performance factor of ~2-3 to be gained 
-
 
 function cholesky!(
     A::DenseBlockAngular{Tv},
@@ -294,7 +336,7 @@ function cholesky!(
     C = zeros(Tv, A.m, A.m)
     
     for r in 1:A.R
-        # copying ararys uses more memory, but is faster
+        # copying arrays uses more memory, but is faster
         θ_ = view(θ, A.colptr[r]:(A.colptr[r+1]-1))
         # A_ = A.blocks[:, A.colptr[r]:(A.colptr[r+1]-1)]
         η_ = view(F.η, :, r)
@@ -306,7 +348,7 @@ function cholesky!(
     @views CpBDBt!(C, A.colslink, θ[A.colptr[(A.R+1)]:end])
 
     # Cholesky factorization of (dense) Schur complement
-    F.Fc = cholfact(Symmetric(C))
+    F.Fc = LinearAlgebra.cholesky(Symmetric(C), Val(false))
     
     return F
 end
@@ -332,7 +374,8 @@ function cholesky(
     @views CpBDBt!(C, A.colslink, θ[A.colptr[(A.R+1)]:end])
     
     # Cholesky factorization of (dense) Schur complement
-    Fc = cholfact(Symmetric(C))
+    S = Symmetric(C)
+    Fc = LinearAlgebra.cholesky(S, Val(false))
     
     F = FactorBlockAngular(A.m, A.n, A.R, A.colptr, d,η, Fc)
 end
@@ -344,12 +387,18 @@ Add column `a` to PrimalBlockAngular matrix `A`.
 The index of the block is defined as the index of the first non-zero
 element of `a[1:A.R]`.
 """
-function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}) where Tv<:Real
+function addcolumn!(
+    A::DenseBlockAngular{Tv},
+    a::AbstractVector{Tv}
+) where Tv<:Real
 
     # Dimension check
-    (A.m + A.R) == length(a) || throw(DimensionMismatch("A has $(A.m + A.R) rows but a has dimension $(length(a))"))
+    (A.m + A.R) == length(a) || throw(DimensionMismatch(
+        "A has $(A.m + A.R) rows but a has dimension $(length(a))"
+    ))
 
-    # Find index of block to which column pertains, i.e. the smallest index 1 <= i <= A.R such that `a[i]` is non-zero.
+    # Find index of block to which column pertains,
+    # i.e. the smallest index 1 <= i <= A.R such that `a[i]` is non-zero.
     # If no such index is found, the column is added as a linking column.
     blockidx = A.R+1
     for r in Base.OneTo(A.R)
@@ -367,10 +416,14 @@ end
 
 Add column `a` to block `i` of matrix `A`.
 """
-function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}, i::Int) where Tv<:Real
+function addcolumn!(
+    A::DenseBlockAngular{Tv},
+    a::AbstractVector{Tv},
+    i::Int
+) where Tv<:Real
 
     # Dimension check
-    A.m == size(a, 1) || throw(DimensionMismatch(""))
+    A.m == length(a) || throw(DimensionMismatch(""))
 
     if 1 <= i <= A.R
         # add column
@@ -381,7 +434,9 @@ function addcolumn!(A::DenseBlockAngular{Tv}, a::AbstractVector{Tv}, i::Int) whe
         A.colslink = hcat(A.colslink, a)
         k = A.n + 1
     else
-        throw(DimensionMismatch("Attempting to add column to block $(i) while A has $(A.R) blocks"))
+        throw(DimensionMismatch(
+            "Attempting to add column to block $(i) while A has $(A.R) blocks"
+        ))
     end
         
     # book-keeping
@@ -402,9 +457,9 @@ function block_update!(
 ) where Tv<:Real
     
     d_ = oneunit(Tv) / sum(θ)
-    Base.BLAS.gemv!('N', 1.0, A, θ, 0.0, η)
+    BLAS.gemv!('N', 1.0, A, θ, 0.0, η)
     CpBDBt!(C, A, θ)
-    Base.BLAS.syr!('U', -d_, η, C)
+    BLAS.syr!('U', -d_, η, C)
 
     d[r] = d_
 

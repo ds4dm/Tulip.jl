@@ -1,4 +1,5 @@
-module LinearAlgebra
+module TLPLinearAlgebra
+using LinearAlgebra
 
 """
     addcolumn!(A, c)

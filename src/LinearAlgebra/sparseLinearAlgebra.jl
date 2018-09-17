@@ -1,10 +1,12 @@
-function cholesky(A::SparseMatrixCSC{Ta, Int64}, d::AbstractVector{Td}) where{Ta<:Real, Td<:Real}
-    F = cholfact(Symmetric(A*spdiagm(d)*A'))
+using SparseArrays
+
+function cholesky(A::AbstractSparseMatrix, d::AbstractVector) where{Ta<:Real}
+    F = LinearAlgebra.cholesky(Symmetric(A*sparse(Diagonal(d))*A'))
     return F
 end
 
-function cholesky!(A::SparseMatrixCSC{Ta, Int64}, d::AbstractVector{Td}, F::Base.SparseArrays.CHOLMOD.Factor{Ta}) where{Ta<:Real, Td<:Real}
+function cholesky!(A::AbstractSparseMatrix, d::AbstractVector, F) where{Ta<:Real}
     # update Cholesky factor
-    F = cholfact!(F, Symmetric(A*spdiagm(d)*A'))
+    F = LinearAlgebra.cholesky!(F, Symmetric(A*sparse(Diagonal(d))*A'))
     return F
 end
