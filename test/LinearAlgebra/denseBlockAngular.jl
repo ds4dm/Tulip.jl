@@ -64,7 +64,7 @@ mul!(x, transpose(A), y)
 @test x == x_
 
 # Factorization tests
-F = Tulip.TLPLinearAlgebra.cholesky(A, ones(A.n))
+F = Tulip.TLPLinearAlgebra.factor_normaleq(A, ones(A.n))
 @test m == F.m
 @test R == F.R
 @test (n*R+m) == F.n
@@ -73,7 +73,7 @@ F = Tulip.TLPLinearAlgebra.cholesky(A, ones(A.n))
 
 # factor update
 θ = rand(A.n)
-Tulip.TLPLinearAlgebra.cholesky!(A, θ, F)
+Tulip.TLPLinearAlgebra.factor_normaleq!(A, θ, F)
 
 
 

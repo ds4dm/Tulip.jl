@@ -326,7 +326,7 @@ function CpBDBt!(C::StridedMatrix, B::StridedMatrix, d::StridedVector)
     return C
 end
 
-function cholesky!(
+function factor_normaleq!(
     A::DenseBlockAngular{Tv},
     θ::AbstractVector{Tv},
     F::FactorBlockAngular{Tv}
@@ -353,7 +353,7 @@ function cholesky!(
     return F
 end
 
-function cholesky(
+function factor_normaleq(
     A::DenseBlockAngular{Tv},
     θ::AbstractVector{Tv}
     ) where{Tv<:Real}

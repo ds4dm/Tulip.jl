@@ -34,7 +34,7 @@ function test_linalg(
 
     # Cholesky factorization
     d = 1.0 .+ rand(n)
-    F = Tulip.TLPLinearAlgebra.cholesky(A, d)  # in-place update
+    F = Tulip.TLPLinearAlgebra.factor_normaleq(A, d)  # in-place update
 
     # solve linear system
     y = F \ b
