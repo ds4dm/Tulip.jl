@@ -1,8 +1,10 @@
 module Tulip
 
+using LinearAlgebra
+
 import Base: RefValue
 
-export readmps
+# export readmps
 
 # Cholesky module
     include("LinearAlgebra/LinearAlgebra.jl")
