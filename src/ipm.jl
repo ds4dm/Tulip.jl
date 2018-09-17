@@ -1,5 +1,5 @@
 import Base.LinAlg:
-    A_mul_B!, At_mul_B, A_ldiv_B!
+    mul!, At_mul_B, ldiv!
 
 """
     optimize!(model)
@@ -119,7 +119,7 @@ function solve_hsd!(model::Model)
         θ = model.s ./ model.x
         aUtxpy!(1.0, model.uind, θ_wz, θ)
         θ .\= 1.0
-        LinearAlgebra.cholesky!(model.A, θ, F)
+        factor_normaleq!(model.A, θ, F)
 
         # II.B - Compute search direction
         dx, dw, dy, ds, dz, dt, dk = compute_direction_hsd(
@@ -590,7 +590,7 @@ end
 """
 function symbolic_cholesky(A::AbstractMatrix{T}) where {T<:Real}
 
-    F = LinearAlgebra.cholesky(A, ones(size(A, 2)))
+    F = factor_normaleq(A, ones(size(A, 2)))
     return F
 
 end
@@ -619,7 +619,7 @@ function compute_newton!(
     end
 
     # Form the normal equations matrix and compute its factorization
-    LinearAlgebra.cholesky!(A, θ, F)
+    factor_normaleq!(A, θ, F)
 
     return θ
 end
