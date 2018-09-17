@@ -57,7 +57,7 @@ Copy environmenment.
 """
 function copy(env::TulipEnv)
     env_ = TulipEnv()
-    for s in fieldnames(env)
+    for s in fieldnames(TulipEnv)
         p = copy(Core.getfield(env, s))
         Core.setfield!(env_, s, p)
     end
@@ -118,7 +118,7 @@ end
 Reset all parameters' values to default
 """
 function reset!(env::TulipEnv)
-    for p in fieldnames(env)
+    for p in fieldnames(TulipEnv)
         set_param_default!(Core.getfield(env, p))
     end
     return nothing
