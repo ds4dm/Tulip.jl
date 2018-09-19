@@ -18,7 +18,7 @@ import LinearAlgebra:
     block `r` are columns `colptr[k] ... colptr[k+1]-1`.
 -`cols`: List of R blocks of columns
 """
-mutable struct DenseBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
+struct DenseBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
     m::Int
     n::Int
     R::Int
@@ -26,13 +26,15 @@ mutable struct DenseBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
     colptr::Vector{Int}
     blocks::Vector{Matrix{Tv}}
     colslink::Matrix{Tv}
+    B::Matrix{Tv}
 
     DenseBlockAngular(
         m::Ti, n::Ti, R::Ti,
         colptr::Vector{Ti},
         blocks::Vector{Matrix{Tv}},
-        colslink::Matrix{Tv}
-    ) where {Tv<:Real, Ti<:Integer} = new{Tv}(m, n, R, colptr, blocks, colslink)
+        colslink::Matrix{Tv},
+        B::Matrix{Tv}
+    ) where {Tv<:Real, Ti<:Integer} = new{Tv}(m, n, R, colptr, blocks, colslink, B)
 end
 
 """
@@ -48,8 +50,9 @@ function DenseBlockAngular(blocks, C::AbstractMatrix{T}) where T<:Real
         # No blocks, early return
         return DenseBlockAngular(
             size(C, 1), size(C, 2), 0,
-            Vector{Int}(),
-            Vector{Matrix{T}}(),
+            Vector{Int}(undef, 0),
+            Vector{Matrix{T}}(undef, 0),
+            C,
             C
         )
     end
@@ -67,10 +70,10 @@ function DenseBlockAngular(blocks, C::AbstractMatrix{T}) where T<:Real
     end
     colptr[R+2] = colptr[R+1] + size(C, 2)
 
-    cols = deepcopy(blocks)
-    B = deepcopy(C)
+    blocks_ = deepcopy(blocks)
+    C_ = deepcopy(C)
 
-    return DenseBlockAngular(m, colptr[end]-1, R, colptr, cols, B)
+    return DenseBlockAngular(m, colptr[end]-1, R, colptr, blocks_, C_, hcat(blocks_..., C_))
 end
 
 """
@@ -83,7 +86,8 @@ function DenseBlockAngular(blocks::Vector{Matrix{T}}) where T<:Real
             0, 0, 0,
             Vector{Int}(),
             Vector{Matrix{T}}(),
-            Matrix{T}(0, 0)
+            Matrix{T}(0, 0),
+            Matrix{T}(undef, 0, 0)
         )
     else
         return DenseBlockAngular(blocks, zeros(T, size(blocks[1], 1), 0))
@@ -116,7 +120,8 @@ copy(M::DenseBlockAngular) = DenseBlockAngular(
     M.m, M.n, M.R,
     deepcopy(M.colptr),
     deepcopy(M.blocks),
-    deepcopy(M.colslink)
+    deepcopy(M.colslink),
+    deepcopy(M.B)
 )
 
 # Matrix-vector Multiplication
@@ -134,18 +139,46 @@ function mul!(
         "A has dimensions $(size(A)) but y has dimension $(length(y))")
     )
     
-    y_ = view(y, (A.R+1):(A.R+A.m))
-    y_ .= zero(Tv)
-
-    for r in 1:A.R
-        x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
-        y[r] = sum(x_)
-        BLAS.gemv!('N', 1.0, A.blocks[r], x_, 1.0, y_)
+    r = 0
+    for i in Base.OneTo(n)
+        @inbounds if i > (A.colptr[r+1]-1)
+            r += 1
+            y[r] = 0.0
+        end
+        @inbounds y[r] += x[i]
     end
-    @views BLAS.gemv!('N', 1.0, A.colslink, x[A.colptr[A.R+1]:end], 1.0, y_)
     
+    # Lower part of `y` is a matrix-vector product
+    @views mul!(y[(A.R+1):end], A.B, x)
     return y
 end
+
+# function mul!(
+#     y::AbstractVector{Tv},
+#     A::DenseBlockAngular{Tv},
+#     x::AbstractVector{Tv}
+# ) where{Tv<:Real}
+
+#     m, n = size(A)
+#     n == length(x) || throw(DimensionMismatch(
+#         "A has dimensions $(size(A)) but x has dimension $(length(x))")
+#     )
+#     m == length(y) || throw(DimensionMismatch(
+#         "A has dimensions $(size(A)) but y has dimension $(length(y))")
+#     )
+    
+#     y_ = view(y, (A.R+1):(A.R+A.m))
+#     y_ .= zero(Tv)
+
+#     for r in 1:A.R
+#         x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
+#         y[r] = sum(x_)
+#         BLAS.gemv!('N', 1.0, A.blocks[r], x_, 1.0, y_)
+#     end
+#     @views BLAS.gemv!('N', 1.0, A.colslink, x[A.colptr[A.R+1]:end], 1.0, y_)
+    
+#     return y
+# end
 
 """
     mul!(x, At, y)
