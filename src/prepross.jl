@@ -1,7 +1,7 @@
 function prepross!(m::Model)
 
     # Right-hand side
-    m.b = zeros(m.constr_lb)
+    m.b = zeros(m.num_constr)
 
     # Process constraints
     for i in Base.OneTo(m.num_constr)
@@ -46,7 +46,7 @@ function prepross!(m::Model)
 
     # Process variables
     m.c = zeros(m.num_var)
-    m.uind = Vector{Int}(0)
+    m.uind = Vector{Int}(undef, 0)
     m.uval = zeros(0)
 
     for i in Base.OneTo(m.num_var)
@@ -71,7 +71,7 @@ function prepross!(m::Model)
                 # New variable is non-negative
             else
                 # Offset right-hand side
-                Base.LinAlg.axpy!(u, m.A[:, i], m.b)
+                axpy!(u, m.A[:, i], m.b)
             end
 
         elseif l > -Inf && u == Inf
@@ -80,7 +80,7 @@ function prepross!(m::Model)
             # Lower-bounded variable, no upper bound
             if l != 0.0
                 # Offset right-hand side
-                Base.LinAlg.axpy!(-l, m.A[:, i], m.b)
+                axpy!(-l, m.A[:, i], m.b)
             end
         else 
             m.c[i] = m.obj[i]
@@ -91,7 +91,7 @@ function prepross!(m::Model)
             # Offset right-hand side
             if l != 0.0
                 # Offset right-hand side
-                Base.LinAlg.axpy!(-l, m.A[:, i], m.b)
+                axpy!(-l, m.A[:, i], m.b)
             end
         end
         

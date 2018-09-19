@@ -31,13 +31,14 @@ end
 function MPB.LinearQuadraticModel(s::TulipSolver)
     
     # create an empty model
-    m = Tulip.Model()
-
+    env = TulipEnv()
     # set user-defined parameters
     for (name, val) in s.options
-        m.env[name] = val
+        env[name] = val
     end
 
+    # Instanciate model
+    m = Tulip.Model(env)
     TulipMathProgModel(m)
 end
 
@@ -79,41 +80,9 @@ function MPB.loadproblem!(
     m::TulipMathProgModel,
     A, l, u, c, lb, ub, sense
 )
+    sense == :Min || error("Only minimization is supported.")
     
-    num_var = size(A, 2)
-    n_con = size(A, 1)
-
-    # Dimension check
-    num_var == size(c, 1) || throw(DimensionMismatch("c has size $(size(c))"))
-    num_var == size(l, 1) || throw(DimensionMismatch("l has size $(size(c))"))
-    num_var == size(u, 1) || throw(DimensionMismatch("u has size $(size(c))"))
-    n_con == size(lb, 1) || throw(DimensionMismatch("lb has size $(size(c))"))
-    n_con == size(ub, 1) || throw(DimensionMismatch("ub has size $(size(c))"))
-
-    # Verify if problem is in standard form
-    # TODO: handle conversion to standard form in model constructor
-    if lb != ub
-        warn("Only equality constraints are supported.")
-    end
-    if sense != :Min
-        warn("Only minimization is supported.")
-    end
-
-    # extract upper bounds
-    uind = Vector{Int}(0,)
-    uval = Vector{Float64}(0,)
-    n_var_ub = 0
-    for i in 1:num_var
-        if u[i] < Inf
-            n_var_ub += 1
-            push!(uind, i)
-            push!(uval, u[i])
-        end
-    end
-
-    m.inner = Model(copy(m.inner.env), A, ub, c, uind, uval)
-
-    return nothing
+    loadmodel!(m.inner, size(A, 2), size(A, 1), A, c, l, u, lb, ub)
 end
 
 MPB.getvarLB(m::TulipMathProgModel) = getvarlowerbounds(m.inner)

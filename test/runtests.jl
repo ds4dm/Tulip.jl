@@ -1,9 +1,5 @@
 using Tulip
-@static if VERSION < v"0.7.0-DEV.2005"
-    using Base.Test
-else
-    using Test
-end
+using Test
 
 # write your own tests here
 const testdir = dirname(@__FILE__)
@@ -15,7 +11,7 @@ const test_files = [
     "LinearAlgebra/denseBlockAngular",
     "LinearAlgebra/linearAlgebra",
     "model",
-    # "mathprogbase",
+    "mathprogbase",
 ]
 
 for f in test_files

@@ -1,11 +1,17 @@
 module Tulip
 
+using LinearAlgebra
+using SparseArrays
+
 import Base: RefValue
 
-export readmps
+# export readmps
 
 # Cholesky module
     include("LinearAlgebra/LinearAlgebra.jl")
+    import .TLPLinearAlgebra:
+        factor_normaleq,
+        factor_normaleq!
 
 # package code goes here
 include("env.jl")

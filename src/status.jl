@@ -19,7 +19,8 @@ but no result (e.g. certificate of infeasibility) is available.
     Trm_IterationLimit,
     Trm_TimeLimit,
     Trm_MemoryLimit,
-    Trm_NumericalProblem
+    Trm_NumericalProblem,
+    Trm_Unknown
 )
 
 """

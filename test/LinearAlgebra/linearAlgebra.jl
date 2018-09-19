@@ -29,13 +29,12 @@ function test_linalg(
 
     # matrix-vector multiplication
     A * x;
-    Base.LinAlg.At_mul_B(A, b)
-    Base.LinAlg.A_mul_B!(y, A, x)
+    transpose(A) * y;
+    mul!(y, A, x)
 
     # Cholesky factorization
-    F = Tulip.symbolic_cholesky(A)
-    d = 1.0 + rand(n)
-    Tulip.LinearAlgebra.cholesky!(A, d, F)  # in-place update
+    d = 1.0 .+ rand(n)
+    F = Tulip.TLPLinearAlgebra.factor_normaleq(A, d)  # in-place update
 
     # solve linear system
     y = F \ b
@@ -46,8 +45,10 @@ end
 
 
 # SparseCSC matrix
-srand(0)
-A = hcat(speye(2), speye(2))
+using SparseArrays
+
+Random.seed!(0)
+A = hcat(sparse(1.0I, 2, 2), sparse(1.0I, 2, 2))
 m = A.m
 n = A.n
 c = rand(n)
@@ -60,11 +61,11 @@ p = nnz(u)
 test_linalg(A, b, c, uind, uval, zeros(n), zeros(p), zeros(m), zeros(n), zeros(p))
 
 # BlockAngular matrix
-srand(0)
+Random.seed!(0)
 nblocks = 2
 cols = [ones(m, 1) for _ in 1:nblocks]
-B = eye(m)
-A = Tulip.LinearAlgebra.DenseBlockAngular(cols, B)
+B = Matrix{Float64}(I, m, m)
+A = Tulip.TLPLinearAlgebra.DenseBlockAngular(cols, B)
 (m, n) = size(A)
 c = rand(n)
 b = rand(m)
