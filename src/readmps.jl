@@ -12,23 +12,23 @@ function readmps(file_name)
 
     senses = []  # sense of rows
      
-    coeffs_row = Array{Int, 1}(0)
-    coeffs_col = Array{Int, 1}(0)
-    coeffs_val = Array{Float64, 1}(0)
+    coeffs_row = Vector{Int}(undef, 0)
+    coeffs_col = Vector{Int}(undef, 0)
+    coeffs_val = Vector{Float64}(undef, 0)
 
-    obj_col = Array{Int, 1}(0)
-    obj_val = Array{Float64, 1}(0)
+    obj_col = Vector{Int}(undef, 0)
+    obj_val = Vector{Float64}(undef, 0)
 
-    rhs_row = Array{Int, 1}(0)
-    rhs_val = Array{Float64, 1}(0)
+    rhs_row = Vector{Int}(undef, 0)
+    rhs_val = Vector{Float64}(undef, 0)
 
-    lb_col = Array{Int, 1}(0)
-    lb_val = Array{Float64, 1}(0)
-    ub_col = Array{Int, 1}(0)
-    ub_val = Array{Float64, 1}(0)
+    lb_col = Vector{Int}(undef, 0)
+    lb_val = Vector{Float64}(undef, 0)
+    ub_col = Vector{Int}(undef, 0)
+    ub_val = Vector{Float64}(undef, 0)
 
-    ranges_row = Array{Int, 1}(0)
-    ranges_val = Array{Float64, 1}(0)
+    ranges_row = Vector{Int}(undef, 0)
+    ranges_val = Vector{Float64}(undef, 0)
 
     d["nrows"] = 0
     d["ncols"] = 0
@@ -196,7 +196,7 @@ function parseline(ln)
         f_ = strip(f)  # f_ may be empty
 
         if length(f_) > 0 || length(s) > 0
-            unshift!(s, f_)
+            pushfirst!(s, f_)
         end
     end
 
