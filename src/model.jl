@@ -18,7 +18,6 @@ mutable struct Model
     primal_bound::Float64   # Best known primal bound
     dual_bound::Float64     # Best known dual bound
 
-
     #=======================================================
         Problem data
     =======================================================#
@@ -59,7 +58,6 @@ mutable struct Model
     rxs::Vector{Float64}    # Right-hand side for complimentarity product `x*s`
     rwz::Vector{Float64}    # Right-hand side for complimentarity product `w*z`
     rtk::Base.RefValue{Float64}  # Right-hand side for complimentarity product `t*k`
-
 
     #=======================================================
         Model constructor
