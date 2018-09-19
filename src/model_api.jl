@@ -303,13 +303,6 @@ end
     Others
 =======================================================#
 """
-    optimize!(model)
-
-Solve the problem.
-"""
-function optimize!(::Model) end
-
-"""
     getobjectivecoeffs(m::Model)
 
 Return the objective coefficients.

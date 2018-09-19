@@ -1,5 +1,4 @@
-import Base.LinAlg:
-    mul!, At_mul_B, ldiv!
+using Printf
 
 """
     optimize!(model)
@@ -225,7 +224,7 @@ function solve_mpc!(model::Model)
         # III. Book-keeping + display log
         # compute residuals
         rp = model.A * model.x - model.b
-        rd = At_mul_B(model.A, model.y) + model.s - model.c
+        rd = transpose(model.A) * model.y + model.s - model.c
         aUtxpy!(-1.0, model.uind, model.z, rd)
 
         ru = model.x[model.uind] + model.w - model.uval
@@ -296,7 +295,7 @@ function compute_residuals_hsd!(
     aUxpy!(-1.0, x, uind, ru)
 
     # dual residual
-    rd .= c*t.x - At_mul_B(A, y) - s
+    rd .= c*t.x - transpose(A) * y - s
     aUtxpy!(1.0, uind, z, rd)
 
     # gap residual
@@ -389,7 +388,7 @@ function compute_starting_point!(
     # Compute x0
     v = F \ rhs
 
-    copy!(x, -0.5 * At_mul_B(A, v))
+    copy!(x, -0.5 * (transpose(A) * v))
     aUtxpy!(0.5, uind, uval, x)
 
     # Compute w0
@@ -402,7 +401,7 @@ function compute_starting_point!(
     copy!(y, F \ (A*c))
 
     # Compute s0
-    copy!(s, 0.5 * (At_mul_B(A, y) - c))
+    copy!(s, 0.5 * (transpose(A) * y - c))
 
     # Compute z0
     @inbounds for i in 1:p
@@ -510,7 +509,7 @@ function compute_next_iterate!(
     μ = (dot(x, s) + dot(w, z)) / (n + p)
 
     rp = (A * x) - b
-    rd = At_mul_B(A, y) + s - c
+    rd = transpose(A) * y + s - c
     aUtxpy!(-1.0, uind, z, rd)
 
     ru = x[uind] + w - uval
@@ -657,7 +656,7 @@ function solve_newton!(
 
     dy .= F \ (ξ_b + A * (θ .* ξ_tmp))
 
-    dx .= θ .* (At_mul_B(A, dy) - ξ_tmp)
+    dx .= θ .* (transpose(A) * dy - ξ_tmp)
 
     dz .= (z .* (-ξ_u + dx[uind]) + ξ_wz) ./ w
     ds .= (ξ_xs - s .* dx) ./ x
@@ -708,7 +707,7 @@ function solve_augmented_system_hsd(A, F, θ, θ_wz, uind, rp, rd, ru)
     
     # compute y
     y = F \ rhs_y
-    x = At_mul_B(A, y) - rd
+    x = transpose(A) * y - rd
     aUtxpy!(1.0, uind, ru_, x)
     x .*= θ
     
