@@ -140,7 +140,8 @@ function mul!(
     )
     
     r = 0
-    for i in Base.OneTo(n)
+    N = A.colptr[A.R+1]-1
+    for i in Base.OneTo(N)
         @inbounds if i > (A.colptr[r+1]-1)
             r += 1
             y[r] = 0.0
@@ -153,6 +154,7 @@ function mul!(
     return y
 end
 
+# Old version, uses list of blocks
 # function mul!(
 #     y::AbstractVector{Tv},
 #     A::DenseBlockAngular{Tv},
@@ -200,18 +202,54 @@ function mul!(
     m == length(y) || throw(DimensionMismatch(
         "A has dimensions $(size(A)) but y has dimension $(length(y))")
     )
-    
-    y_ = y[(A.R+1):end]
-    
-    @inbounds for r in 1:A.R
-        x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
-        x_ .= y[r]
-        BLAS.gemv!('T', 1.0, A.blocks[r], y_, 1.0, x_)
+
+    @views mul!(x, transpose(A.B), y[(A.R+1):end])
+
+    r = 0
+    N = A.colptr[A.R+1]-1
+    for i in Base.OneTo(N)
+        @inbounds if i > (A.colptr[r+1]-1)
+            r += 1
+        end
+        @inbounds x[i] += y[r]
     end
-    @views BLAS.gemv!('T', 1.0, A.colslink, y_, 0.0, x[A.colptr[A.R+1]:end])
     
     return x
 end
+
+# Old version, uses the list of blocks
+# """
+#     mul!(x, At, y)
+
+# Compute Matrix-vector product `A'*y` and overwrites the result in `x`.
+# """
+# function mul!(
+#     x::AbstractVector{Tv},
+#     At::LinearAlgebra.Transpose{Tv, DenseBlockAngular{Tv}},
+#     y::AbstractVector{Tv}
+# ) where{Tv<:Real}
+    
+#     A = At.parent
+
+#     m, n = size(A)
+#     n == length(x) || throw(DimensionMismatch(
+#         "A has dimensions $(size(A)) but x has dimension $(length(x))")
+#     )
+#     m == length(y) || throw(DimensionMismatch(
+#         "A has dimensions $(size(A)) but y has dimension $(length(y))")
+#     )
+    
+#     y_ = y[(A.R+1):end]
+    
+#     @inbounds for r in 1:A.R
+#         x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
+#         x_ .= y[r]
+#         BLAS.gemv!('T', 1.0, A.blocks[r], y_, 1.0, x_)
+#     end
+#     @views BLAS.gemv!('T', 1.0, A.colslink, y_, 0.0, x[A.colptr[A.R+1]:end])
+    
+#     return x
+# end
 
 
 """
