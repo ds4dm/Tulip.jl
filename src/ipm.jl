@@ -158,12 +158,13 @@ function solve_mpc!(model::Model)
 
     # Initialize iterates
     F = symbolic_cholesky(model.A)  # Symbolic factorization
-    θ = zeros(model.x)
-    model.x = Vector{Float64}(model.num_var)
-    model.w = Vector{Float64}(model.n_var_ub)
-    model.y = Vector{Float64}(model.num_constr)
-    model.s = Vector{Float64}(model.num_var)
-    model.z = Vector{Float64}(model.n_var_ub)
+    
+    model.x = Vector{Float64}(undef, model.num_var)
+    model.w = Vector{Float64}(undef, model.n_var_ub)
+    model.y = Vector{Float64}(undef, model.num_constr)
+    model.s = Vector{Float64}(undef, model.num_var)
+    model.z = Vector{Float64}(undef, model.n_var_ub)
+    θ = ones(model.num_var)
 
     # compute starting point
     # TODO: decide which starting point
@@ -388,7 +389,7 @@ function compute_starting_point!(
     # Compute x0
     v = F \ rhs
 
-    copy!(x, -0.5 * (transpose(A) * v))
+    copyto!(x, -0.5 * (transpose(A) * v))
     aUtxpy!(0.5, uind, uval, x)
 
     # Compute w0
@@ -398,10 +399,10 @@ function compute_starting_point!(
     end
 
     # Compute y0
-    copy!(y, F \ (A*c))
+    y .= F \ (A*c)
 
     # Compute s0
-    copy!(s, 0.5 * (transpose(A) * y - c))
+    copyto!(s, 0.5 * (transpose(A) * y - c))
 
     # Compute z0
     @inbounds for i in 1:p
@@ -446,30 +447,34 @@ function compute_starting_point!(
         end
     end
 
-    tmp = dot(x + dp, s + dd) + dot(w + dp, z + dd)
+    tmp = dot(x .+ dp, s .+ dd) + dot(w .+ dp, z .+ dd)
 
-    dp += 0.5 * tmp / (sum(s + dd) + sum(z + dd))
-    dd += 0.5 * tmp / (sum(x + dp) + sum(w + dp))
+    dp += 0.5 * tmp / (sum(s .+ dd) + sum(z .+ dd))
+    dd += 0.5 * tmp / (sum(x .+ dp) + sum(w .+ dp))
 
     #=======================================================
         III. Apply correction
     =======================================================#
 
-    @inbounds for i in 1:n
-        x[i] += dp    
-    end
+    x .+= dp
+    s .+= dd
+    w .+= dp
+    z .+= dd
+    # @inbounds for i in 1:n
+    #     x[i] += dp    
+    # end
 
-    @inbounds for i in 1:n
-        s[i] += dd    
-    end
+    # @inbounds for i in 1:n
+    #     s[i] += dd    
+    # end
 
-    @inbounds for i in 1:p
-        w[i] += dp    
-    end
+    # @inbounds for i in 1:p
+    #     w[i] += dp    
+    # end
 
-    @inbounds for i in 1:p
-        z[i] += dd    
-    end
+    # @inbounds for i in 1:p
+    #     z[i] += dd    
+    # end
 
     # Done
     return nothing
