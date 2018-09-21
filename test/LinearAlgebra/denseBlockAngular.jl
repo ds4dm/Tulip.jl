@@ -24,7 +24,7 @@ A = Tulip.TLPLinearAlgebra.DenseBlockAngular([], B)
 @test A.m == m
 @test A.n == m
 @test length(A.blocks) == 0
-@test A.colslink == B
+@test A.B0 == B
 
 A = Tulip.TLPLinearAlgebra.DenseBlockAngular(u, B)
 @test size(A) == (n*R+m, m+R)
@@ -75,20 +75,18 @@ F = Tulip.TLPLinearAlgebra.factor_normaleq(A, ones(A.n))
 θ = rand(A.n)
 Tulip.TLPLinearAlgebra.factor_normaleq!(A, θ, F)
 
-
-
 # Left division tests
 b = ones(m+R)
 
 y = F \ b
-err = maximum(abs.(A_ * (θ .* (A_' * y)) - b))
+err = norm(A_ * (θ .* (A_' * y)) - b, Inf)
 @test err < 10.0^-10
 
 ldiv!(y, F, b)
-err = maximum(abs.(A_ * (θ .* (A_' * y)) - b))
+err = norm(A_ * (θ .* (A_' * y)) - b, Inf)
 @test err < 10.0^-10
 
 y = copy(b)
 ldiv!(F, y)
-err = maximum(abs.(A_ * (θ .* (A_' * y)) - b))
+err = norm(A_ * (θ .* (A_' * y)) - b, Inf)
 @test err < 10.0^-10
