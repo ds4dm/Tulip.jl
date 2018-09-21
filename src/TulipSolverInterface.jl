@@ -48,7 +48,7 @@ MPB.getobjval(m::TulipMathProgModel) = getobjectivevalue(m.inner)
 
 MPB.optimize!(m::TulipMathProgModel) = optimize!(m.inner)
 
-MPB.status(m::TulipMathProgModel) = m.inner.status
+MPB.status(m::TulipMathProgModel) = m.inner.sln_status
 
 MPB.getobjbound(m::TulipMathProgModel) = getdualbound(m.inner)
 

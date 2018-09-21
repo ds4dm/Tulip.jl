@@ -25,14 +25,16 @@ mutable struct DenseBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
 
     colptr::Vector{Int}
     blocks::Vector{Matrix{Tv}}
-    colslink::Matrix{Tv}
+    B0::Matrix{Tv}
+    B::Matrix{Tv}
 
     DenseBlockAngular(
         m::Ti, n::Ti, R::Ti,
         colptr::Vector{Ti},
         blocks::Vector{Matrix{Tv}},
-        colslink::Matrix{Tv}
-    ) where {Tv<:Real, Ti<:Integer} = new{Tv}(m, n, R, colptr, blocks, colslink)
+        B0::Matrix{Tv},
+        B::Matrix{Tv}
+    ) where {Tv<:Real, Ti<:Integer} = new{Tv}(m, n, R, colptr, blocks, B0, B)
 end
 
 """
@@ -48,8 +50,9 @@ function DenseBlockAngular(blocks, C::AbstractMatrix{T}) where T<:Real
         # No blocks, early return
         return DenseBlockAngular(
             size(C, 1), size(C, 2), 0,
-            Vector{Int}(),
-            Vector{Matrix{T}}(),
+            Vector{Int}(undef, 0),
+            Vector{Matrix{T}}(undef, 0),
+            C,
             C
         )
     end
@@ -67,10 +70,10 @@ function DenseBlockAngular(blocks, C::AbstractMatrix{T}) where T<:Real
     end
     colptr[R+2] = colptr[R+1] + size(C, 2)
 
-    cols = deepcopy(blocks)
-    B = deepcopy(C)
+    blocks_ = deepcopy(blocks)
+    C_ = deepcopy(C)
 
-    return DenseBlockAngular(m, colptr[end]-1, R, colptr, cols, B)
+    return DenseBlockAngular(m, colptr[end]-1, R, colptr, blocks_, C_, hcat(blocks_..., C_))
 end
 
 """
@@ -83,7 +86,8 @@ function DenseBlockAngular(blocks::Vector{Matrix{T}}) where T<:Real
             0, 0, 0,
             Vector{Int}(),
             Vector{Matrix{T}}(),
-            Matrix{T}(0, 0)
+            Matrix{T}(0, 0),
+            Matrix{T}(undef, 0, 0)
         )
     else
         return DenseBlockAngular(blocks, zeros(T, size(blocks[1], 1), 0))
@@ -98,7 +102,7 @@ function getindex(M::DenseBlockAngular{Tv}, i::Integer, j::Integer) where Tv
         # find index of block that contains column j
         blockidx = searchsortedlast(M.colptr, j)
         if blockidx == M.R+1
-            return M.colslink[i-M.R, j - M.colptr[blockidx]+1]
+            return M.B0[i-M.R, j - M.colptr[blockidx]+1]
         else
             # return corresponding coefficient
             return M.blocks[blockidx][i-M.R, j - M.colptr[blockidx]+1]
@@ -116,7 +120,8 @@ copy(M::DenseBlockAngular) = DenseBlockAngular(
     M.m, M.n, M.R,
     deepcopy(M.colptr),
     deepcopy(M.blocks),
-    deepcopy(M.colslink)
+    deepcopy(M.B0),
+    deepcopy(M.B)
 )
 
 # Matrix-vector Multiplication
@@ -133,19 +138,41 @@ function mul!(
     m == length(y) || throw(DimensionMismatch(
         "A has dimensions $(size(A)) but y has dimension $(length(y))")
     )
-    
-    y_ = view(y, (A.R+1):(A.R+A.m))
-    y_ .= zero(Tv)
 
-    for r in 1:A.R
-        x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
-        y[r] = sum(x_)
-        BLAS.gemv!('N', 1.0, A.blocks[r], x_, 1.0, y_)
-    end
-    @views BLAS.gemv!('N', 1.0, A.colslink, x[A.colptr[A.R+1]:end], 1.0, y_)
+    slicedsum!(y, A.R, A.colptr, x)
     
+    # Lower part of `y` is a matrix-vector product
+    @views mul!(y[(A.R+1):end], A.B, x)
     return y
 end
+
+# Old version, uses list of blocks
+# function mul!(
+#     y::AbstractVector{Tv},
+#     A::DenseBlockAngular{Tv},
+#     x::AbstractVector{Tv}
+# ) where{Tv<:Real}
+
+#     m, n = size(A)
+#     n == length(x) || throw(DimensionMismatch(
+#         "A has dimensions $(size(A)) but x has dimension $(length(x))")
+#     )
+#     m == length(y) || throw(DimensionMismatch(
+#         "A has dimensions $(size(A)) but y has dimension $(length(y))")
+#     )
+    
+#     y_ = view(y, (A.R+1):(A.R+A.m))
+#     y_ .= zero(Tv)
+
+#     for r in 1:A.R
+#         x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
+#         y[r] = sum(x_)
+#         BLAS.gemv!('N', 1.0, A.blocks[r], x_, 1.0, y_)
+#     end
+#     @views BLAS.gemv!('N', 1.0, A.B0, x[A.colptr[A.R+1]:end], 1.0, y_)
+    
+#     return y
+# end
 
 """
     mul!(x, At, y)
@@ -167,18 +194,54 @@ function mul!(
     m == length(y) || throw(DimensionMismatch(
         "A has dimensions $(size(A)) but y has dimension $(length(y))")
     )
-    
-    y_ = y[(A.R+1):end]
-    
-    @inbounds for r in 1:A.R
-        x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
-        x_ .= y[r]
-        BLAS.gemv!('T', 1.0, A.blocks[r], y_, 1.0, x_)
+
+    @views mul!(x, transpose(A.B), y[(A.R+1):end])
+
+    r = 0
+    N = A.colptr[A.R+1]-1
+    for i in Base.OneTo(N)
+        @inbounds if i > (A.colptr[r+1]-1)
+            r += 1
+        end
+        @inbounds x[i] += y[r]
     end
-    @views BLAS.gemv!('T', 1.0, A.colslink, y_, 0.0, x[A.colptr[A.R+1]:end])
     
     return x
 end
+
+# Old version, uses the list of blocks
+# """
+#     mul!(x, At, y)
+
+# Compute Matrix-vector product `A'*y` and overwrites the result in `x`.
+# """
+# function mul!(
+#     x::AbstractVector{Tv},
+#     At::LinearAlgebra.Transpose{Tv, DenseBlockAngular{Tv}},
+#     y::AbstractVector{Tv}
+# ) where{Tv<:Real}
+    
+#     A = At.parent
+
+#     m, n = size(A)
+#     n == length(x) || throw(DimensionMismatch(
+#         "A has dimensions $(size(A)) but x has dimension $(length(x))")
+#     )
+#     m == length(y) || throw(DimensionMismatch(
+#         "A has dimensions $(size(A)) but y has dimension $(length(y))")
+#     )
+    
+#     y_ = y[(A.R+1):end]
+    
+#     @inbounds for r in 1:A.R
+#         x_ = view(x, A.colptr[r]:(A.colptr[r+1]-1))
+#         x_ .= y[r]
+#         BLAS.gemv!('T', 1.0, A.blocks[r], y_, 1.0, x_)
+#     end
+#     @views BLAS.gemv!('T', 1.0, A.B0, y_, 0.0, x[A.colptr[A.R+1]:end])
+    
+#     return x
+# end
 
 
 """
@@ -334,18 +397,21 @@ function factor_normaleq!(
     
     # Schur complement
     C = zeros(Tv, A.m, A.m)
-    
-    for r in 1:A.R
-        # copying arrays uses more memory, but is faster
-        θ_ = view(θ, A.colptr[r]:(A.colptr[r+1]-1))
-        # A_ = A.blocks[:, A.colptr[r]:(A.colptr[r+1]-1)]
-        η_ = view(F.η, :, r)
-        
-        block_update!(r, A.blocks[r], θ_, η_, F.d, C)
+    CpBDBt!(C, A.B, θ)
+
+    # Diagonal of Cholesky factor
+    slicedsum!(F.d, A.R, A.colptr, θ)
+    F.d .\= oneunit(Tv)
+
+    # Compute lower block of Cholesky factor
+    for r in Base.OneTo(A.R)
+        @views mul!(F.η[:, r], A.blocks[r], θ[A.colptr[r]:(A.colptr[r+1]-1)])
     end
 
-    # Linking columns
-    @views CpBDBt!(C, A.colslink, θ[A.colptr[(A.R+1)]:end])
+    # low-rank update of C
+    C_ = zeros(Tv, A.m, A.m)
+    CpBDBt!(C_, F.η, F.d)
+    C .-= C_
 
     # Cholesky factorization of (dense) Schur complement
     F.Fc = LinearAlgebra.cholesky(Symmetric(C), Val(false))
@@ -363,15 +429,22 @@ function factor_normaleq(
     d = zeros(Tv, A.R)
     η = zeros(Tv, A.m, A.R)
     
-    for r in 1:A.R
-        θ_ = view(θ, A.colptr[r]:(A.colptr[r+1]-1))
-        η_ = view(η, :, r)  # use view because η is modified in-place
-        
-        block_update!(r, A.blocks[r], θ_, η_, d, C)
+    # Compute schur-complement
+    CpBDBt!(C, A.B, θ)
+
+    # Compute diagonal part
+    slicedsum!(d, A.R, A.colptr, θ)
+    d .\= oneunit(Tv)
+
+    # Compute lower block of Cholesky factor
+    for r in Base.OneTo(A.R)
+        @views mul!(η[:, r], A.blocks[r], θ[A.colptr[r]:(A.colptr[r+1]-1)])
     end
 
-    # Linking columns
-    @views CpBDBt!(C, A.colslink, θ[A.colptr[(A.R+1)]:end])
+    # low-rank update of C
+    C_ = zeros(Tv, A.m, A.m)
+    CpBDBt!(C_, η, d)
+    C .-= C_
     
     # Cholesky factorization of (dense) Schur complement
     S = Symmetric(C)
@@ -431,7 +504,7 @@ function addcolumn!(
         k = A.colptr[i+1]
 
     elseif i == (A.R+1)
-        A.colslink = hcat(A.colslink, a)
+        A.B0 = hcat(A.B0, a)
         k = A.n + 1
     else
         throw(DimensionMismatch(
@@ -457,12 +530,31 @@ function block_update!(
 ) where Tv<:Real
     
     d_ = oneunit(Tv) / sum(θ)
-    BLAS.gemv!('N', 1.0, A, θ, 0.0, η)
-    CpBDBt!(C, A, θ)
-    BLAS.syr!('U', -d_, η, C)
+    BLAS.gemv!('N', 1.0, A, θ, 0.0, η)  # η = A * θ
+    CpBDBt!(C, A, θ)    # C += 
+    BLAS.syr!('U', -d_, η, C)   # C -= 
 
     d[r] = d_
 
     return nothing
 
+end
+
+"""
+    slicedsum!(s, R, colptr, x)
+
+Compute a sliced sum of `x` and overwrite `s` with the result
+"""
+function slicedsum!(s, R, colptr, x)
+    length(s) >= R || throw(DimensionMismatch("s has wrong dimensions"))
+    length(colptr) > R || throw(DimensionMismatch("colptr wrong dim"))
+    @assert length(x) >= colptr[R+1]-1
+
+    for r in Base.OneTo(R)
+        @inbounds s[r] = zero(eltype(s))
+        for i in UnitRange(colptr[r], colptr[r+1]-1)
+            @inbounds s[r] += x[i]
+        end
+    end
+    return s
 end
