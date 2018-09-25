@@ -9,6 +9,8 @@ function optimize!(model::Model)
 
     prepross!(model)
 
+    TLPLinearAlgebra.consolidate!(model.A)
+
     if model.env[Val{:algo}] == 0
         return solve_mpc!(model)
     else

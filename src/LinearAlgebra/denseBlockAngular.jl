@@ -94,6 +94,12 @@ function DenseBlockAngular(blocks::Vector{Matrix{T}}) where T<:Real
     end
 end
 
+function consolidate!(A::DenseBlockAngular)
+    A.B = hcat(A.blocks..., A.B0)
+    return nothing
+end
+
+
 size(M::DenseBlockAngular) = (M.m+M.R, M.n)
 function getindex(M::DenseBlockAngular{Tv}, i::Integer, j::Integer) where Tv
     if !(1 <= i <= (M.m+M.R) && 1 <= j <= (M.n)); throw(BoundsError()); end
