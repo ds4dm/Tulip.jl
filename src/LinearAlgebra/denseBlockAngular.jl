@@ -389,7 +389,8 @@ function CpBDBt!(C::StridedMatrix, B::StridedMatrix, d::StridedVector)
     ))
 
     # Linear scaling + BLAS call
-    B_ = B * Diagonal(sqrt.(d))
+    B_ = copy(B)
+    rmul!(B_, Diagonal(sqrt.(d)))
     BLAS.syrk!('U', 'N', 1.0, B_, 1.0, C)
     
     return C
