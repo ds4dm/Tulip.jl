@@ -491,6 +491,26 @@ function addcolumn!(
     addcolumn!(A, a[(A.R+1):end], blockidx)
 end
 
+function addcolumn!(
+    A::DenseBlockAngular{Tv},
+    a::SparseVector{Tv}
+) where Tv<:Real
+
+    # Dimension check
+    (A.m + A.R) == length(a) || throw(DimensionMismatch(
+        "A has $(A.m + A.R) rows but a has dimension $(length(a))"
+    ))
+
+    # Find index of block to which column pertains,
+    # i.e. the smallest index 1 <= i <= A.R such that `a[i]` is non-zero.
+    # If no such index is found, the column is added as a linking column.
+    if a.nzind[1] <= A.R
+        addcolumn!(A, a[(A.R+1):end], a.nzind[1])
+    else
+        addcolumn!(A, a[(A.R+1):end], A.R+1)
+    end
+end
+
 """
     addcolumn!(A, a, i)
 

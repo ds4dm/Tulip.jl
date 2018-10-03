@@ -1,6 +1,7 @@
 module TLPLinearAlgebra
 
 using LinearAlgebra
+using SparseArrays
 
 export factor_normaleq
 
