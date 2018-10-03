@@ -87,6 +87,10 @@ function solve_hsd!(model::Model)
             # μ
             @printf("  %7.1e", model.μ.x)
             @printf("  %.2f", model.time_total)
+            # @printf("  %9.2e", norm(model.rp, Inf) / (model.t.x + norm(model.b, Inf)))
+            # @printf("  %9.2e", norm(model.ru, Inf) / (model.t.x + norm(model.uval, Inf)))
+            # @printf("  %9.2e", ((norm(model.rd, Inf)) / (model.t.x + norm(model.c, Inf))))
+            # @printf("  %9.2e", (abs(model.primal_bound - model.dual_bound) / (model.t.x + abs(model.dual_bound))))
             print("\n")
         end
 
@@ -153,6 +157,8 @@ Solve model using Mehrothra's predictor-corrector algorithm.
 """
 function solve_mpc!(model::Model)
 
+    model.sln_status = Sln_Unknown
+
     # Initialization
     tstart = time()
     model.time_total = 0.0
@@ -166,23 +172,40 @@ function solve_mpc!(model::Model)
     model.y = Vector{Float64}(undef, model.num_constr)
     model.s = Vector{Float64}(undef, model.num_var)
     model.z = Vector{Float64}(undef, model.n_var_ub)
+    model.t = Ref(1.0)
+    model.k = Ref(1.0)
+    model.μ = Ref(1.0)
+
+    model.x = ones(model.num_var)
+    model.w = ones(model.n_var_ub)
+    model.y = zeros(model.num_constr)
+    model.s = ones(model.num_var)
+    model.z = ones(model.n_var_ub)
+    model.t = Ref(1.0)
+    model.k = Ref(1.0)
+    model.μ = Ref(1.0)
+
+    model.rp = Inf*ones(model.num_constr)
+    model.ru = Inf*ones(model.n_var_ub)
+    model.rd = Inf*ones(model.num_var)
+    model.rg = Ref(Inf)
     θ = ones(model.num_var)
 
     # compute starting point
     # TODO: decide which starting point
-    compute_starting_point!(
-        model.A,
-        F,
-        model.x,
-        model.w,
-        model.y,
-        model.s,
-        model.z,
-        model.b,
-        model.c,
-        model.uind,
-        model.uval
-    )
+    # compute_starting_point!(
+    #     model.A,
+    #     F,
+    #     model.x,
+    #     model.w,
+    #     model.y,
+    #     model.s,
+    #     model.z,
+    #     model.b,
+    #     model.c,
+    #     model.uind,
+    #     model.uval
+    # )
 
     # IPM log
     if model.env[Val{:verbose}] == 1
@@ -237,9 +260,9 @@ function solve_mpc!(model::Model)
 
         model.num_bar_iter += 1
 
-        eps_p = (norm(rp)) / (1.0 + norm(model.b))
-        eps_d = (norm(rd)) / (1.0 + norm(model.c))
-        eps_u = (norm(ru)) / (1.0 + norm(model.uval))
+        eps_p = (norm(rp, Inf)) / (1.0 + norm(model.b, Inf))
+        eps_d = (norm(rd, Inf)) / (1.0 + norm(model.c, Inf))
+        eps_u = (norm(ru, Inf)) / (1.0 + norm(model.uval, Inf))
         eps_g = abs(obj_primal - obj_dual) / (1.0 + abs(obj_primal))
 
 
@@ -251,6 +274,7 @@ function solve_mpc!(model::Model)
             && (eps_g < model.env[Val{:barrier_tol_conv}])
         )
             model.sln_status = Sln_Optimal
+            break
         end
 
         # Log
