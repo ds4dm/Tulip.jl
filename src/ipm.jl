@@ -131,7 +131,11 @@ function solve_hsd!(model::Model)
             model, model.A, F, model.b, model.c, model.uval, model.uind,
             θ, θ_wz, model.μ,
             model.x, model.w, model.y, model.s, model.z, model.t, model.k,
-            model.rp, model.ru, model.rd, model.rg
+            model.rp, model.ru, model.rd, model.rg,
+            model.env.beta1.val,
+            model.env.beta2.val, 
+            model.env.beta3.val, 
+            model.env.beta4.val
         )
 
         # II.C - Make step
@@ -336,7 +340,8 @@ function compute_direction_hsd(
     model, A, F, b, c, uval, uind,
     θ, θ_wz, μ,
     x, w, y, s, z, t::RefValue, k::RefValue,
-    rp, ru, rd, rg
+    rp, ru, rd, rg,
+    beta1, beta2, beta3, beta4
 )
     # compute predictor direction
     dx_a, dw_a, dy_a, ds_a, dz_a, dt_a, dk_a = solve_newton_hsd(
@@ -351,6 +356,7 @@ function compute_direction_hsd(
         x, w, y, s, z, t, k,
         dx_a, dw_a, dy_a, ds_a, dz_a, dt_a, dk_a
     )
+    println("\tAffine-scaling ; a = $a")
     
     μ_a = (
         dot(x+a*dx_a, s+a*ds_a)
@@ -371,6 +377,63 @@ function compute_direction_hsd(
         -w .* z - dw_a .* dz_a + γ * μ.x * ones(model.n_var_ub),
         -(t.x * k.x) - dt_a * dk_a + γ * μ.x
     )
+    a = compute_max_step_size(
+        x, w, y, s, z, t, k,
+        dx, dw, dy, ds, dz, dt, dk
+    )
+    println("\t1st corrected  ; a = $a")
+
+    # compute extra-corrector
+    a_ = min(1.0, 2*a)
+
+    mu_l = beta4 * γ * μ.x
+    mu_u = γ * μ.x / beta4
+
+    target_x = zeros(model.num_var)
+    target_w = zeros(model.n_var_ub)
+    target_t = 0.0
+
+    for i in 1:model.num_var
+        target_x[i] = (
+            mu_l
+            - min((x[i] + a_ * dx[i])*(s[i]+a_*ds[i]), mu_l)
+            + mu_u
+            - max((x[i] + a_ * dx[i])*(s[i]+a_*ds[i]), mu_u)
+        )
+    end
+    for i in 1:model.n_var_ub
+        target_w[i] = (
+            mu_l
+            - min((w[i] + a_ * dw[i])*(z[i]+a_*dz[i]), mu_l)
+            + mu_u
+            - max((w[i] + a_ * dw[i])*(z[i]+a_*dz[i]), mu_u)
+        )
+    end
+    target_t = (
+        mu_l
+        - min((t.x + a_ * dt)*(k.x+a_*dk), mu_l)
+        + mu_u
+        - max((t.x + a_ * dt)*(k.x+a_*dk), mu_u)
+    )
+
+    v = dx .* ds + target_x - ((sum(target_x)+sum(target_w) + target_t) / (model.num_var + model.n_var_ub + 1)) * ones(model.num_var)
+    vu = dw .* dz + target_w - ((sum(target_x)+sum(target_w) + target_t) / (model.num_var + model.n_var_ub + 1)) * ones(model.n_var_ub)
+    v_ = dt * dk + target_t - ((sum(target_x)+sum(target_w) + target_t) / (model.num_var + model.n_var_ub + 1))
+
+    dx, dw, dy, ds, dz, dt, dk = solve_newton_hsd(
+        A, F, b, c, uval, uind,
+        θ, θ_wz,
+        x, w, y, s, z, t, k,
+        η*rp, η*ru, η*rd, η * rg.x,
+        -x .* s + γ * μ.x * ones(model.num_var) - v,
+        -w .* z + γ * μ.x * ones(model.n_var_ub) - vu,
+        -(t.x * k.x) + γ * μ.x - v_
+    )
+    a = compute_max_step_size(
+        x, w, y, s, z, t, k,
+        dx, dw, dy, ds, dz, dt, dk
+    )
+    println("\t1st corrected  ; a = $a")
 
     return dx, dw, dy, ds, dz, dt, dk
 end
@@ -907,4 +970,21 @@ function aUxpy!(a, x, yind, yval)
     end
     
     return yval
+end
+
+"""
+    compute_higher_corrector(...)
+
+Compute corrected Newton search direction.
+"""
+function compute_higher_corrector(
+    A, F, b, c, uval, uind,
+    θ, θ_wz,
+    x, w, y, s, z, t, k,
+    rp, ru, rd, rg,
+
+)
+
+
+    return dx, dw, dy, ds, dz, dt, dk
 end
