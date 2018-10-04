@@ -42,13 +42,27 @@ function MPB.LinearQuadraticModel(s::TulipSolver)
     TulipMathProgModel(m)
 end
 
-MPB.getsolution(m::TulipMathProgModel) = getsolution(m.inner)
+MPB.getsolution(m::TulipMathProgModel) = getprimalsolution(m.inner)
 
 MPB.getobjval(m::TulipMathProgModel) = getobjectivevalue(m.inner)
 
 MPB.optimize!(m::TulipMathProgModel) = optimize!(m.inner)
 
-MPB.status(m::TulipMathProgModel) = m.inner.sln_status
+function MPB.status(m::TulipMathProgModel)
+    
+    s = m.inner.sln_status
+
+    if s == Sln_Optimal
+        return :Optimal
+    elseif s == Sln_PrimalInfeasible || s == Sln_PrimalDualInfeasible
+        return :Infeasible
+    elseif s == Sln_DualInfeasible
+        return :Unbounded
+    else
+        return :Unknown
+    end
+
+end
 
 MPB.getobjbound(m::TulipMathProgModel) = getdualbound(m.inner)
 
@@ -145,7 +159,7 @@ MPB.getconstrsolution(m::TulipMathProgModel) = copy(m.inner.A * m.inner.sol.x)
 
 MPB.getreducedcosts(m::TulipMathProgModel) = getreducedcosts(m.inner)
 
-MPB.getconstrduals(m::TulipMathProgModel) = getconstrduals(m.inner)
+MPB.getconstrduals(m::TulipMathProgModel) = getdualsolution(m.inner)
 
 MPB.getinfeasibilityray(m::TulipMathProgModel) = getinfeasibilityray(m.inner)
 

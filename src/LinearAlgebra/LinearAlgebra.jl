@@ -1,6 +1,7 @@
 module TLPLinearAlgebra
 
 using LinearAlgebra
+using SparseArrays
 
 export factor_normaleq
 
@@ -31,6 +32,8 @@ function factor_normaleq!(
     F = LinearAlgebra.cholesky!(F, Symmetric(A*Diagonal(d)*A'))
     return F
 end
+
+function consolidate!(A::AbstractMatrix) end
 
 """
     addcolumn!(A, c)
