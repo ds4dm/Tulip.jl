@@ -96,9 +96,9 @@ function solve_hsd!(model::Model)
 
         # I.C - Stopping criteria
         if (
-            (norm(model.rp, Inf) / (model.t.x + norm(model.b, Inf)) < model.env[Val{:barrier_tol_feas}])
-            && (norm(model.ru, Inf) / (model.t.x + norm(model.uval, Inf)) < model.env[Val{:barrier_tol_feas}])
-            && (((norm(model.rd, Inf)) / (model.t.x + norm(model.c, Inf))) < model.env[Val{:barrier_tol_opt}]) 
+            (norm(model.rp, Inf) / (model.t.x + norm(model.b, Inf)) < model.env[Val{:barrier_tol_pfeas}])
+            && (norm(model.ru, Inf) / (model.t.x + norm(model.uval, Inf)) < model.env[Val{:barrier_tol_pfeas}])
+            && (((norm(model.rd, Inf)) / (model.t.x + norm(model.c, Inf))) < model.env[Val{:barrier_tol_dfeas}]) 
             && ((abs(model.primal_bound - model.dual_bound) / (model.t.x + abs(model.dual_bound))) < model.env[Val{:barrier_tol_conv}])
         )
             # optimal solution found
@@ -109,7 +109,7 @@ function solve_hsd!(model::Model)
             return Trm_Success
         end
         
-        if (model.μ.x < model.env[Val{:barrier_tol_feas}]) && ((model.t.x / model.k.x) < model.env[Val{:barrier_tol_feas}])
+        if (model.μ.x < model.env[Val{:barrier_tol_pfeas}]) && ((model.t.x / model.k.x) < model.env[Val{:barrier_tol_pfeas}])
             # infeasibility detected
             if model.env[Val{:verbose}] == 1
                 println("\nInfeasibility detected.")
@@ -272,9 +272,9 @@ function solve_mpc!(model::Model)
 
         # check stopping criterion
         if (
-            (eps_p < model.env[Val{:barrier_tol_feas}])
-            && (eps_u < model.env[Val{:barrier_tol_feas}])
-            && (eps_d < model.env[Val{:barrier_tol_opt}])
+            (eps_p < model.env[Val{:barrier_tol_pfeas}])
+            && (eps_u < model.env[Val{:barrier_tol_pfeas}])
+            && (eps_d < model.env[Val{:barrier_tol_dfeas}])
             && (eps_g < model.env[Val{:barrier_tol_conv}])
         )
             model.sln_status = Sln_Optimal
@@ -384,6 +384,7 @@ function compute_direction_hsd(
     println("\t1st corrected  ; a = $a")
 
     # compute extra-corrector
+    #=
     a_ = min(1.0, 2*a)
 
     mu_l = beta4 * γ * μ.x
@@ -434,7 +435,8 @@ function compute_direction_hsd(
         dx, dw, dy, ds, dz, dt, dk
     )
     println("\t1st corrected  ; a = $a")
-
+    =#
+    
     return dx, dw, dy, ds, dz, dt, dk
 end
 
