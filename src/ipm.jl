@@ -171,22 +171,13 @@ function solve_mpc!(model::Model)
     # Initialize iterates
     F = symbolic_cholesky(model.A)  # Symbolic factorization
     
-    model.x = Vector{Float64}(undef, model.num_var)
-    model.w = Vector{Float64}(undef, model.n_var_ub)
-    model.y = Vector{Float64}(undef, model.num_constr)
-    model.s = Vector{Float64}(undef, model.num_var)
-    model.z = Vector{Float64}(undef, model.n_var_ub)
-    model.t = Ref(1.0)
-    model.k = Ref(1.0)
-    model.μ = Ref(1.0)
-
     model.x = ones(model.num_var)
     model.w = ones(model.n_var_ub)
     model.y = zeros(model.num_constr)
     model.s = ones(model.num_var)
     model.z = ones(model.n_var_ub)
     model.t = Ref(1.0)
-    model.k = Ref(1.0)
+    model.k = Ref(0.0)
     model.μ = Ref(1.0)
 
     model.rp = Inf*ones(model.num_constr)
@@ -197,19 +188,19 @@ function solve_mpc!(model::Model)
 
     # compute starting point
     # TODO: decide which starting point
-    # compute_starting_point!(
-    #     model.A,
-    #     F,
-    #     model.x,
-    #     model.w,
-    #     model.y,
-    #     model.s,
-    #     model.z,
-    #     model.b,
-    #     model.c,
-    #     model.uind,
-    #     model.uval
-    # )
+    compute_starting_point!(
+        model.A,
+        F,
+        model.x,
+        model.w,
+        model.y,
+        model.s,
+        model.z,
+        model.b,
+        model.c,
+        model.uind,
+        model.uval
+    )
 
     # IPM log
     if model.env[Val{:verbose}] == 1
@@ -351,93 +342,97 @@ function compute_direction_hsd(
         rp, ru, rd, rg.x, -x .* s, -w .* z, -t.x*k.x
     )
 
-    
     a = compute_max_step_size(
         x, w, y, s, z, t, k,
         dx_a, dw_a, dy_a, ds_a, dz_a, dt_a, dk_a
     )
-    println("\tAffine-scaling ; a = $a")
-    
-    μ_a = (
-        dot(x+a*dx_a, s+a*ds_a)
-        + dot(w + a * dw_a, z + a*dz_a)
-        + (t.x+a*dt_a)*(k.x+a*dk_a)
-    ) / (model.num_var + model.n_var_ub + 1)
+    # println("\tAffine-scaling ; a = $(a)")
 
-    γ = (1-a)^2 * min(1-a, 0.1)  # TODO: replace 0.1 by parameter β1
+    γ = (1-a)^2 * min(1-a, beta1)
     η = 1.0 - γ
 
-    # compute corrector
+    # compute Mehrothra corrector
     dx, dw, dy, ds, dz, dt, dk = solve_newton_hsd(
         A, F, b, c, uval, uind,
         θ, θ_wz,
         x, w, y, s, z, t, k,
         η*rp, η*ru, η*rd, η * rg.x,
-        -x .* s - dx_a .* ds_a + γ * μ.x * ones(model.num_var),
-        -w .* z - dw_a .* dz_a + γ * μ.x * ones(model.n_var_ub),
-        -(t.x * k.x) - dt_a * dk_a + γ * μ.x
+        -x .* s         .+ γ * μ.x      - dx_a .* ds_a ,
+        -w .* z         .+ γ * μ.x      - dw_a .* dz_a ,
+        -(t.x * k.x)     + γ * μ.x      - dt_a  * dk_a 
     )
     a = compute_max_step_size(
         x, w, y, s, z, t, k,
         dx, dw, dy, ds, dz, dt, dk
     )
-    println("\t1st corrected  ; a = $a")
+    # println("\t1st corrected  ; a = $(a*η)")
 
     # compute extra-corrector
-    #=
     a_ = min(1.0, 2*a)
+    # a_ = min(1.0, a + 0.1)
 
-    mu_l = beta4 * γ * μ.x
-    mu_u = γ * μ.x / beta4
+    vx = (x   + a_*dx) .* (s   + a_*ds)
+    vw = (w   + a_*dw) .* (z   + a_*dz)
+    vt = (t.x + a_*dt)  * (k.x + a_*dk)
 
-    target_x = zeros(model.num_var)
-    target_w = zeros(model.n_var_ub)
-    target_t = 0.0
+    # clamp
+    mu_l = beta4 * μ.x
+    mu_u = μ.x / beta4
 
-    for i in 1:model.num_var
-        target_x[i] = (
-            mu_l
-            - min((x[i] + a_ * dx[i])*(s[i]+a_*ds[i]), mu_l)
-            + mu_u
-            - max((x[i] + a_ * dx[i])*(s[i]+a_*ds[i]), mu_u)
-        )
+    for i in 1:length(vx)
+        if vx[i] < mu_l
+            vx[i] = mu_l - vx[i]
+        elseif vx[i] > mu_u
+            vx[i] = mu_u - vx[i]
+        else
+            vx[i] = 0.0
+        end
     end
-    for i in 1:model.n_var_ub
-        target_w[i] = (
-            mu_l
-            - min((w[i] + a_ * dw[i])*(z[i]+a_*dz[i]), mu_l)
-            + mu_u
-            - max((w[i] + a_ * dw[i])*(z[i]+a_*dz[i]), mu_u)
-        )
+    for i in 1:length(vw)
+        if vw[i] < mu_l
+            vw[i] = mu_l - vw[i]
+        elseif vx[i] > mu_u
+            vw[i] = mu_u - vw[i]
+        else
+            vw[i] = 0.0
+        end
     end
-    target_t = (
-        mu_l
-        - min((t.x + a_ * dt)*(k.x+a_*dk), mu_l)
-        + mu_u
-        - max((t.x + a_ * dt)*(k.x+a_*dk), mu_u)
-    )
+    if vt < mu_l
+        vt = mu_l - vt
+    elseif vt > mu_u
+        vt = mu_u - vt
+    else
+        vt = 0.0
+    end
 
-    v = dx .* ds + target_x - ((sum(target_x)+sum(target_w) + target_t) / (model.num_var + model.n_var_ub + 1)) * ones(model.num_var)
-    vu = dw .* dz + target_w - ((sum(target_x)+sum(target_w) + target_t) / (model.num_var + model.n_var_ub + 1)) * ones(model.n_var_ub)
-    v_ = dt * dk + target_t - ((sum(target_x)+sum(target_w) + target_t) / (model.num_var + model.n_var_ub + 1))
+    δ = (sum(vx) + sum(vw) + vt) / (model.num_var + model.n_var_ub + 1)
+    vx .-= δ
+    vw .-= δ
+    vt -= δ
 
-    dx, dw, dy, ds, dz, dt, dk = solve_newton_hsd(
+    dxc, dwc, dyc, dsc, dzc, dtc, dkc = solve_newton_hsd(
         A, F, b, c, uval, uind,
         θ, θ_wz,
         x, w, y, s, z, t, k,
-        η*rp, η*ru, η*rd, η * rg.x,
-        -x .* s + γ * μ.x * ones(model.num_var) - v,
-        -w .* z + γ * μ.x * ones(model.n_var_ub) - vu,
-        -(t.x * k.x) + γ * μ.x - v_
+        0.0*rp, 0.0*ru, 0.0*rd, 0.0*rg.x,
+        vx,
+        vw,
+        vt
     )
-    a = compute_max_step_size(
+
+    a_ = compute_max_step_size(
         x, w, y, s, z, t, k,
-        dx, dw, dy, ds, dz, dt, dk
+        dx+dxc, dw+dwc, dy+dyc, ds+dsc, dz+dzc, dt+dtc, dk+dkc
     )
-    println("\t1st corrected  ; a = $a")
-    =#
+    # println("\t2nd corrected  ; a = $(a_*η)", ((a_>a) ? "*" : ""))
     
-    return dx, dw, dy, ds, dz, dt, dk
+    if a_ > a
+        return dx+dxc, dw+dwc, dy+dyc, ds+dsc, dz+dzc, dt+dtc, dk+dkc
+    else
+        return dx, dw, dy, ds, dz, dt, dk
+    end
+
+    
 end
 
 """
@@ -551,21 +546,6 @@ function compute_starting_point!(
     s .+= dd
     w .+= dp
     z .+= dd
-    # @inbounds for i in 1:n
-    #     x[i] += dp    
-    # end
-
-    # @inbounds for i in 1:n
-    #     s[i] += dd    
-    # end
-
-    # @inbounds for i in 1:p
-    #     w[i] += dp    
-    # end
-
-    # @inbounds for i in 1:p
-    #     z[i] += dd    
-    # end
 
     # Done
     return nothing
@@ -668,6 +648,57 @@ function compute_next_iterate!(
         dx, dw, ds, dz,
         damp=0.99995
     )
+
+    # Compute extra-corrector
+    dx_cor = copy(x)
+    dw_cor = copy(w)
+    dy_cor = copy(y)
+    ds_cor = copy(s)
+    dz_cor = copy(z)
+
+    α_p_ = min(1.0, α_p + 0.1)
+    α_d_ = min(1.0, α_d + 0.1)
+
+    vxs = (x+(α_p_)*dx) .* (s+(α_d_)*ds)
+    vxs_t = copy(vxs)
+    clamp!(vxs_t, μ*1e-3, μ*1e3)
+    vwz = (w+α_p_*dw) .* (z+α_d_*dz)
+    vwz_t = copy(vwz)
+    clamp!(vwz_t, μ*1e-3, μ*1e3)
+
+    solve_newton!(
+        A,
+        θ,
+        F,
+        x, w, y, s, z,
+        dx_cor, dw_cor, dy_cor, ds_cor, dz_cor,
+        uind,
+        zeros(m),
+        zeros(n),
+        zeros(p),
+        vxs_t - vxs,
+        vwz_t - vwz
+    )
+
+    # check step-length
+    (α_p_cor, α_d_cor) = compute_stepsize(
+        x, w, s, z,
+        dx+dx_cor, dw+dw_cor, ds+ds_cor, dz+dz_cor,
+        damp=0.99995
+    )
+ 
+    if (α_p_cor > α_p +0.01)  && (α_d_cor > α_d + 0.01)
+        # println("MPC: α = $α_p")
+        # println("Cor: α = $α_p_cor")
+        dx .+= dx_cor
+        dw .+= dw_cor
+        dy .+= dy_cor
+        ds .+= ds_cor
+        dz .+= dz_cor
+
+        α_p = α_p_cor
+        α_d = α_d_cor
+    end
 
     # take step
     x .+= α_p * dx
