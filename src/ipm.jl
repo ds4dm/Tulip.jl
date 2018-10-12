@@ -361,76 +361,100 @@ function compute_direction_hsd(
         -w .* z         .+ γ * μ.x      - dw_a .* dz_a ,
         -(t.x * k.x)     + γ * μ.x      - dt_a  * dk_a 
     )
-    a = compute_max_step_size(
+    α = compute_max_step_size(
         x, w, y, s, z, t, k,
         dx, dw, dy, ds, dz, dt, dk
     )
     # println("\t1st corrected  ; a = $(a*η)")
 
     # compute extra-corrector
-    a_ = min(1.0, 2*a)
-    # a_ = min(1.0, a + 0.1)
+    # println("\tPred   ; α = $α")
+    for i in 1:5
+        dt_ = Ref(dt)
+        dk_ = Ref(dk)
+        α_c = compute_higher_corrector_hsd!(
+            model.num_var, model.n_var_ub, model.num_constr,
+            A, F, b, c, uval, uind,
+            θ, θ_wz,
+            x, w, y, s, z, t, k,
+            rp, ru, rd, rg, μ,
+            dx, dw, dy, ds, dz, dt_, dk_, α,
+            beta1, beta2, beta3, beta4,
+        )
+        dt = dt_.x
+        dk = dk_.x
 
-    vx = (x   + a_*dx) .* (s   + a_*ds)
-    vw = (w   + a_*dw) .* (z   + a_*dz)
-    vt = (t.x + a_*dt)  * (k.x + a_*dk)
+        α_c > α || break
+        α = α_c
+        # println("\tCor. $i ; α = $α_c")
 
-    # clamp
-    mu_l = beta4 * μ.x
-    mu_u = μ.x / beta4
-
-    for i in 1:length(vx)
-        if vx[i] < mu_l
-            vx[i] = mu_l - vx[i]
-        elseif vx[i] > mu_u
-            vx[i] = mu_u - vx[i]
-        else
-            vx[i] = 0.0
-        end
-    end
-    for i in 1:length(vw)
-        if vw[i] < mu_l
-            vw[i] = mu_l - vw[i]
-        elseif vx[i] > mu_u
-            vw[i] = mu_u - vw[i]
-        else
-            vw[i] = 0.0
-        end
-    end
-    if vt < mu_l
-        vt = mu_l - vt
-    elseif vt > mu_u
-        vt = mu_u - vt
-    else
-        vt = 0.0
     end
 
-    δ = (sum(vx) + sum(vw) + vt) / (model.num_var + model.n_var_ub + 1)
-    vx .-= δ
-    vw .-= δ
-    vt -= δ
+    # a_ = min(1.0, 2*a)
+    # # a_ = min(1.0, a + 0.1)
 
-    dxc, dwc, dyc, dsc, dzc, dtc, dkc = solve_newton_hsd(
-        A, F, b, c, uval, uind,
-        θ, θ_wz,
-        x, w, y, s, z, t, k,
-        0.0*rp, 0.0*ru, 0.0*rd, 0.0*rg.x,
-        vx,
-        vw,
-        vt
-    )
+    # vx = (x   + a_*dx) .* (s   + a_*ds)
+    # vw = (w   + a_*dw) .* (z   + a_*dz)
+    # vt = (t.x + a_*dt)  * (k.x + a_*dk)
 
-    a_ = compute_max_step_size(
-        x, w, y, s, z, t, k,
-        dx+dxc, dw+dwc, dy+dyc, ds+dsc, dz+dzc, dt+dtc, dk+dkc
-    )
-    # println("\t2nd corrected  ; a = $(a_*η)", ((a_>a) ? "*" : ""))
+    # # clamp
+    # mu_l = beta4 * μ.x
+    # mu_u = μ.x / beta4
+
+    # for i in 1:length(vx)
+    #     if vx[i] < mu_l
+    #         vx[i] = mu_l - vx[i]
+    #     elseif vx[i] > mu_u
+    #         vx[i] = mu_u - vx[i]
+    #     else
+    #         vx[i] = 0.0
+    #     end
+    # end
+    # for i in 1:length(vw)
+    #     if vw[i] < mu_l
+    #         vw[i] = mu_l - vw[i]
+    #     elseif vx[i] > mu_u
+    #         vw[i] = mu_u - vw[i]
+    #     else
+    #         vw[i] = 0.0
+    #     end
+    # end
+    # if vt < mu_l
+    #     vt = mu_l - vt
+    # elseif vt > mu_u
+    #     vt = mu_u - vt
+    # else
+    #     vt = 0.0
+    # end
+
+    # δ = (sum(vx) + sum(vw) + vt) / (model.num_var + model.n_var_ub + 1)
+    # vx .-= δ
+    # vw .-= δ
+    # vt -= δ
+
+    # dxc, dwc, dyc, dsc, dzc, dtc, dkc = solve_newton_hsd(
+    #     A, F, b, c, uval, uind,
+    #     θ, θ_wz,
+    #     x, w, y, s, z, t, k,
+    #     0.0*rp, 0.0*ru, 0.0*rd, 0.0*rg.x,
+    #     vx,
+    #     vw,
+    #     vt
+    # )
+
+    # a_ = compute_max_step_size(
+    #     x, w, y, s, z, t, k,
+    #     dx+dxc, dw+dwc, dy+dyc, ds+dsc, dz+dzc, dt+dtc, dk+dkc
+    # )
+    # # println("\t2nd corrected  ; a = $(a_*η)", ((a_>a) ? "*" : ""))
     
-    if a_ > a
-        return dx+dxc, dw+dwc, dy+dyc, ds+dsc, dz+dzc, dt+dtc, dk+dkc
-    else
-        return dx, dw, dy, ds, dz, dt, dk
-    end
+    # if a_ > a
+    #     return dx+dxc, dw+dwc, dy+dyc, ds+dsc, dz+dzc, dt+dtc, dk+dkc
+    # else
+    #     return dx, dw, dy, ds, dz, dt, dk
+    # end
+
+    return dx, dw, dy, ds, dz, dt, dk
 
     
 end
@@ -1010,14 +1034,96 @@ end
 
 Compute corrected Newton search direction.
 """
-function compute_higher_corrector(
+function compute_higher_corrector_hsd!(
+    numvar::Int, numvarub::Int, numcon::Int,
     A, F, b, c, uval, uind,
     θ, θ_wz,
     x, w, y, s, z, t, k,
-    rp, ru, rd, rg,
-
+    rp, ru, rd, rg, μ,
+    dx, dw, dy, ds, dz, dt, dk, α::Float64,
+    beta1::Float64, beta2::Float64, beta3::Float64, beta4::Float64,
 )
+    # Tentative step length
+    α_ = min(1.0, 2.0*α)
 
+    # Tentative cross products
+    vx = (x   + α_*dx)   .* (s   + α_*ds)
+    vw = (w   + α_*dw)   .* (z   + α_*dz)
+    vt = (t.x + α_*dt.x)  * (k.x + α_*dk.x)
 
-    return dx, dw, dy, ds, dz, dt, dk
+    # Clamp
+    mu_l = beta4 * μ.x
+    mu_u = μ.x / beta4
+    for i in 1:length(vx)
+        if vx[i] < mu_l
+            vx[i] = mu_l - vx[i]
+        elseif vx[i] > mu_u
+            vx[i] = mu_u - vx[i]
+        else
+            vx[i] = 0.0
+        end
+    end
+    for i in 1:length(vw)
+        if vw[i] < mu_l
+            vw[i] = mu_l - vw[i]
+        elseif vx[i] > mu_u
+            vw[i] = mu_u - vw[i]
+        else
+            vw[i] = 0.0
+        end
+    end
+    if vt < mu_l
+        vt = mu_l - vt
+    elseif vt > mu_u
+        vt = mu_u - vt
+    else
+        vt = 0.0
+    end
+
+    δ = (sum(vx) + sum(vw) + vt) / (numvar + numvarub + 1)
+    vx .-= δ
+    vw .-= δ
+    vt -= δ
+
+    dxc, dwc, dyc, dsc, dzc, dtc, dkc = solve_newton_hsd(
+        A, F, b, c, uval, uind,
+        θ, θ_wz,
+        x, w, y, s, z, t, k,
+        0.0*rp, 0.0*ru, 0.0*rd, 0.0*rg.x,
+        vx,
+        vw,
+        vt
+    )
+
+    # Update corrector
+    dxc .+= dx
+    dwc .+= dw
+    dyc .+= dy
+    dsc .+= ds
+    dzc .+= dz
+    dtc  += dt.x
+    dkc  += dk.x
+
+    # Compute corrected step-length
+    α_c = compute_max_step_size(
+        x, w, y, s, z, t, k,
+        dxc, dwc, dyc, dsc, dzc, dtc, dkc
+    )
+
+    # Check for step-length
+    if α_c > α
+        # Use corrector
+        dx   .= dxc
+        dw   .= dwc
+        dy   .= dyc
+        ds   .= dsc
+        dz   .= dzc
+        dt.x  = dtc
+        dk.x  = dkc
+        return α_c
+    else
+        # Keep current direction
+        return α
+    end
+
 end
