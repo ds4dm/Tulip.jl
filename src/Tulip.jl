@@ -21,5 +21,6 @@ include("prepross.jl")
 include("ipm.jl")
 include("readmps.jl")
 include("TulipSolverInterface.jl")
+include("ipm_new.jl")
 
 end # module

@@ -14,6 +14,7 @@ const test_files = [
     "env",
     "LinearAlgebra/denseBlockAngular",
     "LinearAlgebra/linearAlgebra",
+    "hsd"
     "model",
     "mathprogbase",
 ]
