@@ -13,14 +13,14 @@ but no result (e.g. certificate of infeasibility) is available.
     Cholesky decomposition.
 """
 @enum(TerminationStatus,
+    Trm_Unknown,
     Trm_Success,
     Trm_PrimalInfeasibleNoResult,
     Trm_DualInfeasibleNoResult,
     Trm_IterationLimit,
     Trm_TimeLimit,
     Trm_MemoryLimit,
-    Trm_NumericalProblem,
-    Trm_Unknown
+    Trm_NumericalProblem
 )
 
 """

@@ -2,7 +2,7 @@ import MathProgBase
 
 const MPB = MathProgBase
 
-solver_tlp = Tulip.TulipSolver(verbose=1, time_limit=10)
+solver_tlp = Tulip.TulipSolver(verbose=1, time_limit=10, algo=1)
 
 m, n, c, b, A, collb, colub, ranges = Tulip.readmps(testdir*"/../dat/netlib/AFIRO.SIF");
 
