@@ -16,18 +16,20 @@ mutable struct TulipEnv
         Stopping criteria & tolerances
     =======================================================#
 
-    barrier_iter_max::IntParam       # Maximum number of barrier iterations
-    time_limit::FloatParam         # Time limit (in seconds)
+    barrier_iter_max::IntParam          # Maximum number of barrier iterations
+    time_limit::FloatParam              # Time limit (in seconds)
 
-    barrier_tol_pfeas::FloatParam   # Primal feasibility tolerance
-    barrier_tol_dfeas::FloatParam    # Dual feasibility tolerance
-    barrier_tol_conv::FloatParam   # Optimality gap tolerance
-    barrier_tol_infeas::FloatParam   # Infeasibility tolerance
+    barrier_tol_pfeas::FloatParam       # Primal feasibility tolerance
+    barrier_tol_dfeas::FloatParam       # Dual feasibility tolerance
+    barrier_tol_conv::FloatParam        # Optimality gap tolerance
+    barrier_tol_infeas::FloatParam      # Infeasibility tolerance
 
     beta1::FloatParam
     beta2::FloatParam
     beta3::FloatParam
     beta4::FloatParam
+
+    barrier_max_num_cor::IntParam       # Max number of centrality corrections
 
 
     #=======================================================
@@ -54,7 +56,9 @@ mutable struct TulipEnv
         env.beta1 = RealParam(:beta1, 0.1, 0.0, 1.0)
         env.beta2 = RealParam(:beta2, 10.0^-8, 0.0, 1.0)
         env.beta3 = RealParam(:beta3, 0.9999, 0.0, 1.0)
-        env.beta4 = RealParam(:beta4, 0.1, 0.0, 1.0)
+        env.beta4 = RealParam(:beta4, 1e-1, 0.0, 1.0)
+
+        env.barrier_max_num_cor = RealParam(:barrier_max_num_cor, 5, 0, typemax(Int64))
 
         return env
     end
@@ -82,7 +86,6 @@ Retrieve parameter value. Raises an error if parameter does not exist.
 
     getindex(env::TulipEnv, p::String)
 
-    getindex(env::TulipEnv, ::Type{Val{:<param>}})
 """
 getindex(env::TulipEnv, p::Symbol) = get_param_value(Core.getfield(env, p))
 getindex(env::TulipEnv, param::String) = getindex(env, Symbol(param))
@@ -96,30 +99,6 @@ getindex(env::TulipEnv, param::String) = getindex(env, Symbol(param))
 #         return p
 #     end
 # end
-
-getindex(env::TulipEnv, ::Type{Val{:algo}}) = env.algo.val
-
-getindex(env::TulipEnv, ::Type{Val{:verbose}}) = env.verbose.val
-
-getindex(env::TulipEnv, ::Type{Val{:barrier_iter_max}}) = env.barrier_iter_max.val
-
-getindex(env::TulipEnv, ::Type{Val{:time_limit}}) = env.time_limit.val
-
-getindex(env::TulipEnv, ::Type{Val{:barrier_tol_pfeas}}) = env.barrier_tol_pfeas.val
-
-getindex(env::TulipEnv, ::Type{Val{:barrier_tol_dfeas}}) = env.barrier_tol_dfeas.val
-
-getindex(env::TulipEnv, ::Type{Val{:barrier_tol_conv}}) = env.barrier_tol_conv.val
-
-getindex(env::TulipEnv, ::Type{Val{:barrier_tol_infeas}}) = env.barrier_tol_infeas.val
-
-getindex(env::TulipEnv, ::Type{Val{:beta1}}) = env.beta1.val
-
-getindex(env::TulipEnv, ::Type{Val{:beta2}}) = env.beta2.val
-
-getindex(env::TulipEnv, ::Type{Val{:beta3}}) = env.beta3.val
-
-getindex(env::TulipEnv, ::Type{Val{:beta4}}) = env.beta4.val
 
 """
     setindex!(env, v, p)

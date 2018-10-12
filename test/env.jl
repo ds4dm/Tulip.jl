@@ -8,11 +8,6 @@ v = env.verbose.val
 @test env[:verbose] == v
 @test env["verbose"] == v
 
-for s in fieldnames(Tulip.TulipEnv)
-    v_ = env[Val{s}]
-    @test v_ == Core.getfield(env, s).val
-end
-
 # Test setters
 env[:verbose] = 1
 @test env.verbose.val == 1
@@ -26,6 +21,6 @@ Tulip.set_param!(env, verbose=1, time_limit=10.0)
 # Test reset
 Tulip.reset!(env)
 for s in fieldnames(Tulip.TulipEnv)
-    v_ = env[Val{s}]
+    v_ = env[s]
     @test v_ == Core.getfield(env, s).def_val
 end

@@ -11,7 +11,7 @@ function optimize!(model::Model)
 
     TLPLinearAlgebra.consolidate!(model.A)
 
-    if model.env[Val{:algo}] == 0
+    if model.env.algo.val == 0
         return solve_mpc!(model)
     else
         return solve_hsd!(model)
@@ -50,14 +50,14 @@ function solve_hsd!(model::Model)
     model.rg = Ref(Inf)
 
     # IPM log
-    if model.env[Val{:verbose}] == 1
+    if model.env.verbose.val == 1
         println(" Itn    Primal Obj      Dual Obj        PFeas    DFeas    GFeas     Mu       Time")
     end
 
     # main IPM loop
     while (
-        model.num_bar_iter < model.env[Val{:barrier_iter_max}]
-        && model.time_total < model.env[Val{:time_limit}]
+        model.num_bar_iter < model.env.barrier_iter_max.val
+        && model.time_total < model.env.time_limit.val
     )
         # I.A - Compute residuals
         model.μ.x = (
@@ -74,7 +74,7 @@ function solve_hsd!(model::Model)
         
         # I.B - Log
         model.time_total = time() - tstart
-        if model.env[Val{:verbose}] == 1
+        if model.env.verbose.val == 1
             # Iteration count
             @printf("%4d", model.num_bar_iter)
             # Primal and Dual objectives
@@ -96,22 +96,22 @@ function solve_hsd!(model::Model)
 
         # I.C - Stopping criteria
         if (
-            (norm(model.rp, Inf) / (model.t.x + norm(model.b, Inf)) < model.env[Val{:barrier_tol_pfeas}])
-            && (norm(model.ru, Inf) / (model.t.x + norm(model.uval, Inf)) < model.env[Val{:barrier_tol_pfeas}])
-            && (((norm(model.rd, Inf)) / (model.t.x + norm(model.c, Inf))) < model.env[Val{:barrier_tol_dfeas}]) 
-            && ((abs(model.primal_bound - model.dual_bound) / (model.t.x + abs(model.dual_bound))) < model.env[Val{:barrier_tol_conv}])
+            (norm(model.rp, Inf) / (model.t.x + norm(model.b, Inf)) < model.env.barrier_tol_pfeas.val)
+            && (norm(model.ru, Inf) / (model.t.x + norm(model.uval, Inf)) < model.env.barrier_tol_pfeas.val)
+            && (((norm(model.rd, Inf)) / (model.t.x + norm(model.c, Inf))) < model.env.barrier_tol_dfeas.val) 
+            && ((abs(model.primal_bound - model.dual_bound) / (model.t.x + abs(model.dual_bound))) < model.env.barrier_tol_conv.val)
         )
             # optimal solution found
-            if model.env[Val{:verbose}] == 1
+            if model.env.verbose.val == 1
                 println("\nOptimal solution found.")
             end
             model.sln_status = Sln_Optimal
             return Trm_Success
         end
         
-        if (model.μ.x < model.env[Val{:barrier_tol_pfeas}]) && ((model.t.x / model.k.x) < model.env[Val{:barrier_tol_pfeas}])
+        if (model.μ.x < model.env.barrier_tol_pfeas.val) && ((model.t.x / model.k.x) < model.env.barrier_tol_pfeas.val)
             # infeasibility detected
-            if model.env[Val{:verbose}] == 1
+            if model.env.verbose.val == 1
                 println("\nInfeasibility detected.")
             end
             model.sln_status = Sln_PrimalInfeasible
@@ -203,15 +203,15 @@ function solve_mpc!(model::Model)
     )
 
     # IPM log
-    if model.env[Val{:verbose}] == 1
+    if model.env.verbose.val == 1
         println(" Itn    Primal Obj      Dual Obj        Prim Inf Dual Inf UBnd Inf")
     end
 
     # main IPM loop
     while (
-        model.num_bar_iter < model.env[Val{:barrier_iter_max}]
+        model.num_bar_iter < model.env.barrier_iter_max.val
         && model.sln_status != Sln_Optimal
-        && model.time_total < model.env[Val{:time_limit}]
+        && model.time_total < model.env.time_limit.val
     )
 
         # I. Form and factor Newton System
@@ -263,10 +263,10 @@ function solve_mpc!(model::Model)
 
         # check stopping criterion
         if (
-            (eps_p < model.env[Val{:barrier_tol_pfeas}])
-            && (eps_u < model.env[Val{:barrier_tol_pfeas}])
-            && (eps_d < model.env[Val{:barrier_tol_dfeas}])
-            && (eps_g < model.env[Val{:barrier_tol_conv}])
+            (eps_p < model.env.barrier_tol_pfeas.val)
+            && (eps_u < model.env.barrier_tol_pfeas.val)
+            && (eps_d < model.env.barrier_tol_dfeas.val)
+            && (eps_g < model.env.barrier_tol_conv.val)
         )
             model.sln_status = Sln_Optimal
             break
@@ -275,7 +275,7 @@ function solve_mpc!(model::Model)
         # Log
         model.time_total = time() - tstart
 
-        if model.env[Val{:verbose}] == 1
+        if model.env.verbose.val == 1
             # Iteration count
             @printf("%4d", model.num_bar_iter)
             # Primal and Dual objectives
@@ -346,7 +346,6 @@ function compute_direction_hsd(
         x, w, y, s, z, t, k,
         dx_a, dw_a, dy_a, ds_a, dz_a, dt_a, dk_a
     )
-    # println("\tAffine-scaling ; a = $(a)")
 
     γ = (1-a)^2 * min(1-a, beta1)
     η = 1.0 - γ
@@ -365,11 +364,11 @@ function compute_direction_hsd(
         x, w, y, s, z, t, k,
         dx, dw, dy, ds, dz, dt, dk
     )
-    # println("\t1st corrected  ; a = $(a*η)")
 
     # compute extra-corrector
     # println("\tPred   ; α = $α")
-    for i in 1:5
+    ncor = 0
+    while ncor < model.env.barrier_max_num_cor.val  
         dt_ = Ref(dt)
         dk_ = Ref(dk)
         α_c = compute_higher_corrector_hsd!(
@@ -384,79 +383,14 @@ function compute_direction_hsd(
         dt = dt_.x
         dk = dk_.x
 
+        # println("\tCor. $ncor ; α = $α_c")
         α_c > α || break
         α = α_c
-        # println("\tCor. $i ; α = $α_c")
-
+        ncor += 1
+        
     end
 
-    # a_ = min(1.0, 2*a)
-    # # a_ = min(1.0, a + 0.1)
-
-    # vx = (x   + a_*dx) .* (s   + a_*ds)
-    # vw = (w   + a_*dw) .* (z   + a_*dz)
-    # vt = (t.x + a_*dt)  * (k.x + a_*dk)
-
-    # # clamp
-    # mu_l = beta4 * μ.x
-    # mu_u = μ.x / beta4
-
-    # for i in 1:length(vx)
-    #     if vx[i] < mu_l
-    #         vx[i] = mu_l - vx[i]
-    #     elseif vx[i] > mu_u
-    #         vx[i] = mu_u - vx[i]
-    #     else
-    #         vx[i] = 0.0
-    #     end
-    # end
-    # for i in 1:length(vw)
-    #     if vw[i] < mu_l
-    #         vw[i] = mu_l - vw[i]
-    #     elseif vx[i] > mu_u
-    #         vw[i] = mu_u - vw[i]
-    #     else
-    #         vw[i] = 0.0
-    #     end
-    # end
-    # if vt < mu_l
-    #     vt = mu_l - vt
-    # elseif vt > mu_u
-    #     vt = mu_u - vt
-    # else
-    #     vt = 0.0
-    # end
-
-    # δ = (sum(vx) + sum(vw) + vt) / (model.num_var + model.n_var_ub + 1)
-    # vx .-= δ
-    # vw .-= δ
-    # vt -= δ
-
-    # dxc, dwc, dyc, dsc, dzc, dtc, dkc = solve_newton_hsd(
-    #     A, F, b, c, uval, uind,
-    #     θ, θ_wz,
-    #     x, w, y, s, z, t, k,
-    #     0.0*rp, 0.0*ru, 0.0*rd, 0.0*rg.x,
-    #     vx,
-    #     vw,
-    #     vt
-    # )
-
-    # a_ = compute_max_step_size(
-    #     x, w, y, s, z, t, k,
-    #     dx+dxc, dw+dwc, dy+dyc, ds+dsc, dz+dzc, dt+dtc, dk+dkc
-    # )
-    # # println("\t2nd corrected  ; a = $(a_*η)", ((a_>a) ? "*" : ""))
-    
-    # if a_ > a
-    #     return dx+dxc, dw+dwc, dy+dyc, ds+dsc, dz+dzc, dt+dtc, dk+dkc
-    # else
-    #     return dx, dw, dy, ds, dz, dt, dk
-    # end
-
     return dx, dw, dy, ds, dz, dt, dk
-
-    
 end
 
 """
