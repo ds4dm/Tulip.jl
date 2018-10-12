@@ -1,6 +1,10 @@
 using Tulip
 using Test
 
+using LinearAlgebra
+using Random
+using SparseArrays
+
 # write your own tests here
 const testdir = dirname(@__FILE__)
 
