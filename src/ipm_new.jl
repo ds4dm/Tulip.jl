@@ -5,6 +5,8 @@ function optimize_!(model::Model)
     # Convert to standard form
     prepross!(model)
 
+    TLPLinearAlgebra.consolidate!(model.A)
+
     # Solve
     solve_ipm!(model)
 
@@ -16,7 +18,7 @@ end
 Solve the optimization problem using an interior-point algorithm.
 """
 function solve_ipm!(model::Model)
-
+    model.env.verbose.val == 1 && println("Bonjour!")
     # Initialization
     # TODO: put this in a generic function
     tstart = time()
@@ -50,7 +52,9 @@ function solve_ipm!(model::Model)
 
     # Other working memory
     θ = zeros(model.num_var)
-    θwz = zeros(model.num_var_ub)
+    θwz = zeros(model.n_var_ub)
+    primbnd = Ref(Inf)
+    dualbnd = Ref(-Inf)
 
     # Main IPM loop
     # TODO (?): put this in a function (that would perform one IP iteration?)
@@ -64,14 +68,14 @@ function solve_ipm!(model::Model)
 
         # I.A - Compute basic info at current point
         compute_basic_info!(
-            model,
-            model.A,
-            model.b, model.c, model.uind, model.uval,
+            model.num_var, model.n_var_ub, model.num_constr,
+            model.A, model.b, model.c, model.uind, model.uval, θ, θwz,
             model.x, model.w, model.y, model.s, model.z, model.t, model.k,
-            θ, θwz,
             model.rp, model.ru, model.rd, model.rg, model.μ,
-            model.primbnd, model.dualbnd
+            primbnd, dualbnd
         )
+        model.primal_bound = primbnd.x
+        model.dual_bound = dualbnd.x
 
         # I.B - Log
         # TODO: generic display function
@@ -95,8 +99,9 @@ function solve_ipm!(model::Model)
         make_step!(
             Val(model.env.algo.val),    
             model, model.env,
-            model.A, model.F, model.b, model.c, model.uind, model.uval,
-            θ, θwz,
+            model.A, F, model.b, model.c, model.uind, model.uval,
+            θ, θwz, model.μ,
+            model.rp, model.ru, model.rd, model.rg,
             model.x, model.w, model.y, model.s, model.z, model.t, model.k
         )
 
@@ -131,11 +136,9 @@ Compute residuals and basic info for HSD algorithm.
 - `primbnd, dualbnd`: Primal and dual objective bounds
 """
 function compute_basic_info!(
-    numvar, numvarub, numcon,
-    A::AbstractMatrix,
-    b::AbstractVector, c::AbstractVector, uind, uval,
+    numvar::Int, numvarub::Int, numcon::Int,
+    A::AbstractMatrix, b::AbstractVector, c::AbstractVector, uind, uval, θ, θwz,
     x, w, y, s, z, t::RefValue, k::RefValue,
-    θ, θwz,
     rp, ru, rd, rg::RefValue,
     μ::RefValue,
     primbnd::RefValue, dualbnd::RefValue
@@ -157,24 +160,24 @@ function compute_basic_info!(
     primbnd.x = dot(c, x)
     dualbnd.x = dot(b, y) - dot(uval, z)
 
-    # Primal residual: rp = t*b - A*x
-    mul!(rp, A, x)                                      # rp = A*x
-    lmul!(-oneunit(eltype(rp)), rp)                     # rp = -A*x
-    axpy!(t.x, b, rp)                                   # rp = t*b - A*x
+    # Primal residual: `rp = t*b - A*x`
+    mul!(rp, A, x)                                  # rp = A*x
+    rp .*= -oneunit(eltype(rp))                     # rp = -A*x
+    rp .+= t.x .* b                                 # rp = t*b - A*x
 
-    # Upper-bound residual: ru = t*u - w - x
-    mul!(ru, uval, t.x)                                 # ru = t*u
-    axpy!(-oneunit(eltype(ru)), w, ru)                  # ru = t*u - w
-    @views axpy!(-oneunit(eltype(ru)), x[uind], ru)     # ru = t*u - w - x
+    # Upper-bound residual: `ru = t*u - w - x`
+    ru .= t.x .* uval                               # ru = t*u
+    ru .-= w                                        # ru = t*u - w
+    @views ru .-= x[uind]                           # ru = t*u - w - x
 
-    # Dual residual: rd = t*c - A'*y - s + z
+    # Dual residual: `rd = t*c - A'*y - s + z`
     mul!(rd, transpose(A), y)                       # rd = A'*y
-    lmul!(-oneunit(eltype(rd)), rd)                 # rd = -A'*y
-    axpy!(t.x, c, rd)                               # rd = t*c - A'*y
-    axpy!(oneunit(eltype(rd)), s, rd)               # rd = t*c - A'*y - s
-    @views rd[uind] .-= z                           # rd = t*c - A'*y - s - z
+    rd .*= -oneunit(eltype(rd))                     # rd = -A'*y              
+    rd .+= t.x .* c                                 # rd = t*c - A'*y
+    rd .-= s                                        # rd = t*c - A'*y - s
+    @views rd[uind] .+= z                           # rd = t*c - A'*y - s + z
 
-    # Gap residual: rg = c*x - b*y - u*z + k
+    # Gap residual: `rg = c*x - b*y - u*z + k`
     rg.x = primbnd.x - dualbnd.x + k.x
 
     return nothing
@@ -238,34 +241,51 @@ function check_stopping_criterion!(model::Model)
     dfeas = eps_d <= model.env.barrier_tol_dfeas.val
     gfeas = eps_g <= model.env.barrier_tol_conv.val
 
-    # TODO
-    if (pfeas && dfeas && gfeas)
-        # Solution is Optimal
-        model.sln_status = Sln_Optimal
+    # 
+    if pfeas
+        # SPrimal feasibility reached
+        if dfeas
+            # Primal-dual feasible
+            if gfeas
+                # Solution is optimal
+                model.sln_status = Sln_Optimal
+                model.env.verbose.val == 1 && println("\nOptimal solution found.")
+                return true
+            else
+                model.sln_status = Sln_PrimalDualFeasible
+            end
+        else
+            model.sln_status = Sln_PrimalFeasible
+        end
 
-    # elseif
-    #     # Primal-Feasible
-
-    #     # Dual-Feasible
-
-    #     # Primal-Dual Feasible
-
-    #     # Primal Infeasible
-
-    #     # Dual Infeasible
-
-    #     # Primal-Dual Infeasible
-    #     0
     else
-        model.sln_status = Sln_Unknown
+        # Primal feasibility not reached yet
+        if dfeas
+            # Dual feasible only
+            model.sln_status = Sln_DualFeasible
+        else
+            model.sln_status = Sln_Unknown
+        end
     end
 
+    # Infeasibility test
+    if (
+        model.μ.x < model.env.barrier_tol_pfeas.val
+        && (model.t.x / model.k.x) < model.env.barrier_tol_pfeas.val
+    )
+        # Certificate of infeasibility, stop optimization
+        model.sln_status = Sln_PrimalInfeasible
+        model.env.verbose.val == 1 && println("\nInfeasibility detected.")
+        return true
+    end
 
-    #================================================
-        User-defined limits
-    ================================================#
-
-
+    # Unbounded case
+    if (
+        false
+    )
+        # Certificate of unboundedness, stop optimization
+        return true
+    end
 
     return false
 end
