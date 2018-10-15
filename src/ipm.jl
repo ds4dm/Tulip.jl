@@ -18,7 +18,7 @@ end
 Solve the optimization problem using an interior-point algorithm.
 """
 function solve_ipm!(model::Model)
-    model.env.verbose.val == 1 && println("Bonjour!")
+
     # Initialization
     # TODO: put this in a generic function
     tstart = time()
