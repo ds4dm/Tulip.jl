@@ -42,15 +42,15 @@ A_ = sparse([[1.0 1.0];])
 model.env[:verbose] = 1
 Tulip.optimize!(model)
 
-# x_ = Tulip.getprimalsolution(model)
-# y_ = Tulip.getdualsolution(model)
-# s_ = Tulip.getreducedcosts(model)
+x_ = Tulip.getprimalsolution(model)
+y_ = Tulip.getdualsolution(model)
+s_ = Tulip.getreducedcosts(model)
 
-# @test abs(2.0 - Tulip.getobjectivevalue(model)) <= 10.0^-8
-# @test abs(2.0 - Tulip.getdualbound(model)) <= 10.0^-8 
-# @test Tulip.getobjectivedualgap(model) <= 10.0^-8
-# @test Tulip.getnumbarrieriter(model) <= 100
+@test abs(2.0 - Tulip.getobjectivevalue(model)) <= 10.0^-8
+@test abs(2.0 - Tulip.getdualbound(model)) <= 10.0^-8 
+@test Tulip.getobjectivedualgap(model) <= 10.0^-8
+@test Tulip.getnumbarrieriter(model) <= 100
 
-# @test norm(x_ - [2.0, 0.0], Inf) <= 10.0^-8
-# @test norm(y_ - [1.0], Inf) <= 10.0^-8
-# @test norm(s_ - [0.0, 1.0], Inf) <= 10.0^-8
+@test norm(x_ - [2.0, 0.0], Inf) <= 10.0^-8
+@test norm(y_ - [1.0], Inf) <= 10.0^-8
+@test norm(s_ - [0.0, 1.0], Inf) <= 10.0^-8

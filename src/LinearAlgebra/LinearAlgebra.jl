@@ -3,7 +3,19 @@ module TLPLinearAlgebra
 using LinearAlgebra
 using SparseArrays
 
-export factor_normaleq
+export factor_normaleq, factor_normaleq!, symbolic_cholesky
+
+"""
+    symbolic_cholesky
+    
+Compute Cholesky factorization of A*A'
+"""
+function symbolic_cholesky(A::AbstractMatrix{T}) where {T<:Real}
+
+    F = factor_normaleq(A, ones(size(A, 2)))
+    return F
+
+end
 
 """
     factor_normal_eqn(A, d)
