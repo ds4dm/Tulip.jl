@@ -291,4 +291,3 @@ function check_stopping_criterion!(model::Model)
 end
 
 include("hsd.jl")
-include("mpc.jl")
