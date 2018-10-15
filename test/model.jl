@@ -40,8 +40,6 @@ A_ = sparse([[1.0 1.0];])
 @test Tulip.getlinearconstrcoeffs(model) == A_
 
 model.env[:verbose] = 1
-model.env.barrier_iter_max.val = 5
-Tulip.optimize_!(model)
 Tulip.optimize!(model)
 
 x_ = Tulip.getprimalsolution(model)

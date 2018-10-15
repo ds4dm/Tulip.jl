@@ -11,7 +11,8 @@ import Base: RefValue
     include("LinearAlgebra/LinearAlgebra.jl")
     import .TLPLinearAlgebra:
         factor_normaleq,
-        factor_normaleq!
+        factor_normaleq!,
+        symbolic_cholesky
 
 # package code goes here
 include("env.jl")
@@ -21,6 +22,5 @@ include("prepross.jl")
 include("ipm.jl")
 include("readmps.jl")
 include("TulipSolverInterface.jl")
-include("ipm_new.jl")
 
 end # module
