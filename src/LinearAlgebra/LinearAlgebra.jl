@@ -62,5 +62,6 @@ Add row `c` to matrix `A`.
 addrow!(A::AbstractMatrix, r::AbstractVector) = (vcat(A, r'), size(A, 1) + 1)
 
 include("denseBlockAngular.jl")
+include("unitBlockAngular.jl")
 
 end  # module

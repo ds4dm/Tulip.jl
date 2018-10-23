@@ -13,6 +13,7 @@ const test_files = [
     "params",
     "env",
     "LinearAlgebra/denseBlockAngular",
+    "LinearAlgebra/unitBlockAngular",
     "LinearAlgebra/linearAlgebra",
     "hsd",
     "model",
