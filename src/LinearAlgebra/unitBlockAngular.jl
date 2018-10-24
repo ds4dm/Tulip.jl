@@ -82,7 +82,7 @@ mutable struct FactorUnitBlockAngular{Tv<:Real} <: Factorization{Tv}
     d::Vector{Tv}
     η::Matrix{Tv}
 
-    Fc::LinearAlgebra.Cholesky{Tv, Matrix{Tv}}
+    Fc::Factorization{Tv}
 
     FactorUnitBlockAngular(
         m, n0, n, R, blockidx, d::Vector{Tv}, η::Matrix{Tv}, Fc
@@ -121,6 +121,12 @@ function UnitBlockAngular(blocks::Vector{Matrix{Tv}}) where Tv<:Real
     else
         return UnitBlockAngular(blocks, zeros(Tv, size(blocks[1], 1), 0))
     end
+end
+
+function consolidate!(A::UnitBlockAngular)
+    A.B_ = copy(A.B)
+    A.B0_ = copy(A.B0)
+    return nothing
 end
 
 # Base matrix interface
@@ -173,6 +179,114 @@ function sparse(A::UnitBlockAngular{Tv}) where Tv<:Real
         )
     )
     return A_
+end
+
+# Adding columns
+"""
+    addcolumn!(A, a)
+
+Add column `a` to UnitBlockAngular matrix `A`.
+The index of the block is defined as the index of the first non-zero
+element of `a[1:A.R]`.
+"""
+function addcolumn!(
+    A::UnitBlockAngular{Tv},
+    a::AbstractVector{Tv}
+) where Tv<:Real
+
+    # Dimension check
+    A.M == length(a) || throw(DimensionMismatch(
+        "A has $(A.M) rows but a has dimension $(length(a))"
+    ))
+
+    # Find index of block to which column pertains,
+    # i.e. the smallest index 1 <= i <= A.R such that `a[i]` is non-zero.
+    # If no such index is found, the column is added as a linking column.
+    blockidx = 0
+    for r in Base.OneTo(A.R)
+        if !iszero(a[r])
+            blockidx = r
+            break
+        end
+    end
+
+    addcolumn!(A, a[(A.R+1):end], blockidx)
+end
+
+
+function addcolumn!(
+    A::UnitBlockAngular{Tv},
+    a::SparseVector{Tv}
+) where Tv<:Real
+
+    # Dimension check
+    A.M == length(a) || throw(DimensionMismatch(
+        "A has $(A.M) rows but a has dimension $(length(a))"
+    ))
+
+    # Find index of block to which column pertains,
+    # i.e. the smallest index 1 <= i <= A.R such that `a[i]` is non-zero.
+    # If no such index is found, the column is added as a linking column.
+    if a.nzind[1] <= A.R
+        addcolumn!(A, Vector(a[(A.R+1):end]), a.nzind[1])
+    else
+        addcolumn!(A, Vector(a[(A.R+1):end]), 0)
+    end
+end
+
+
+"""
+    addcolumn!(A, col, icol)
+
+Add column `col` to matrix A. 
+
+# Arguments
+- `A`: UnitBlockAngular matrix
+- `col`: The column to be appended to `A`. Its dimension must match the number
+    of linking constraints in `A`.
+- `icol`: Index of the block the columns pertains to. An index of 0 means the 
+    column is treated as a linking column.
+"""
+function addcolumn!(
+    A::UnitBlockAngular{Tv},
+    col::Vector{Tv},
+    icol::Int
+) where Tv<:Real
+
+    # Dimension check
+    A.m == length(col) || throw(DimensionMismatch(
+        "Adding column of size $(length(col)) while A has $(A.m) linking constraints"
+    ))
+    (0 <= icol <= A.R) || error("Invalid block index: $icol")
+
+    # check if column is linking variable or not
+    if icol == 0
+        # linking column
+        A.B0 = hcat(A.B0, col)
+        A.n0 += 1
+        A.N  += 1
+        return A, A.n0
+        
+    elseif 1 <= icol <= A.R
+        # regular column
+        A.B = hcat(A.B, col)
+        push!(A.blockidx, icol)
+        A.n += 1
+        A.N += 1
+        return A, A.N
+    else
+        error("Wrong block index.")
+    end
+
+end
+
+function addcolumns!(
+    A::UnitBlockAngular{Tv},
+    cols::Matrix{Tv},
+    indices::Vector{Int}
+) where Tv<:Real
+
+    return A, k_
 end
 
 
@@ -402,7 +516,7 @@ function factor_normaleq(A::UnitBlockAngular{Tv}, θ::Vector{Tv}) where Tv<:Real
 
     # Cholesky factor of Schur complement
     S = Symmetric(C)
-    Fc = cholesky(S, Val(false))
+    Fc = cholesky(S, Val(true))
 
     return FactorUnitBlockAngular(A.m, A.n0, A.n, A.R, A.blockidx, d, η, Fc)
 end
@@ -439,7 +553,7 @@ function factor_normaleq!(
 
     # Cholesky factor of Schur complement
     S = Symmetric(C)
-    F.Fc = cholesky(S, Val(false))
+    F.Fc = cholesky(S, Val(true))
 
     return F
 end
