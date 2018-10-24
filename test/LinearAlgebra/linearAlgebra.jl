@@ -65,7 +65,7 @@ Random.seed!(0)
 nblocks = 2
 cols = [ones(m, 1) for _ in 1:nblocks]
 B = Matrix{Float64}(I, m, m)
-A = Tulip.TLPLinearAlgebra.DenseBlockAngular(cols, B)
+A = Tulip.TLPLinearAlgebra.UnitBlockAngular(cols, B)
 (m, n) = size(A)
 c = rand(n)
 b = rand(m)
