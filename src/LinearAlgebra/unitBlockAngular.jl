@@ -23,6 +23,7 @@ mutable struct UnitBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
     M::Int  # Total number of constraints
     N::Int  # Total number of columns
     R::Int  # Number of blocks
+    N_alloc::Int  # Number of allocated columns
 
     B::Matrix{Tv}          # Lower blocks, concatenated
     B_::Matrix{Tv}         # Copy of `B`, not to allocate memory several times
@@ -31,34 +32,43 @@ mutable struct UnitBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
     B0_::Matrix{Tv}        # Copy of the linking block, same as `B_`
 
 
-    function UnitBlockAngular(B::Matrix{Tv}, R, blockidx::Vector{Int}, B0::AbstractMatrix{Tv}) where Tv<:Real
+    function UnitBlockAngular(
+        n::Int,
+        B::Matrix{Tv},
+        R,
+        blockidx::Vector{Int},
+        B0::AbstractMatrix{Tv}
+    ) where Tv<:Real
 
         # Sanity checks
-        m, n = size(B)
+        m_, n_ = size(B)
+        n <= n_ || error("$n columns but $n_alloc allocated")
+
         m0, n0 = size(B0)
-
-        m == m0 || throw(DimensionMismatch(
-            "B has $(m) rows, but B0 has $(m0)"
+        m_ == m0 || throw(DimensionMismatch(
+            "B has $m_ rows, but B0 has $(m0)"
+        ))
+        n_ == length(blockidx) || throw(DimensionMismatch(
+            "B has $n_ columns, but blockidx has $(length(blockidx))"
         ))
 
-        n == length(blockidx) || throw(DimensionMismatch(
-            "B has $n column, but blockidx has $(length(blockidx))"
-        ))
-
-        imin, imax = extrema(blockidx)
-        (0 <= imin <= imax <= R) || throw(DimensionMismatch(
-            "Specified $R blocks but indices are in range [$imin, $imax]"
-        ))
+        if n > 0
+            imin, imax = extrema(blockidx[1:n])
+            (0 <= imin <= imax <= R) || throw(DimensionMismatch(
+                "Specified $R blocks but indices are in range [$imin, $imax]"
+            ))
+        end
 
         A = new{Tv}()
 
         # Dimensions
-        A.m  = m
+        A.m  = m_
         A.n  = n
         A.n0 = n0
         A.R  = R
         A.M  = A.R + A.m
         A.N  = A.n0 + A.n
+        A.N_alloc = n_
     
         # Copy data to avoid modifying argument afterwards
         A.B = copy(B)
@@ -70,6 +80,30 @@ mutable struct UnitBlockAngular{Tv<:Real} <: AbstractMatrix{Tv}
     end
 
 end
+
+"""
+    reallocate!(A)
+
+Re-allocate twice as much memory
+"""
+function reallocate!(A::UnitBlockAngular{Tv}) where Tv
+
+    # save data
+    @views A.B_[:, 1:A.n] .= A.B[:, 1:A.n]
+
+    # Re-allocate memory
+    A.B = Matrix{Tv}(undef, A.m, 2*A.N_alloc)
+    @views A.B[:, 1:A.n] .= A.B_[:, 1:A.n]
+    A.B_ = copy(A.B)
+    A.N_alloc = 2*A.N_alloc
+
+    # expand blockidx
+    append!(A.blockidx, zeros(Int, A.N_alloc-A.n))
+
+    return A
+
+end
+
 
 mutable struct FactorUnitBlockAngular{Tv<:Real} <: Factorization{Tv}
     m::Int
@@ -91,6 +125,8 @@ mutable struct FactorUnitBlockAngular{Tv<:Real} <: Factorization{Tv}
 end
 
 # Useful constructors
+UnitBlockAngular(B, R, blockidx, B0) = UnitBlockAngular(size(B, 2), B, R, blockidx, B0)
+
 function UnitBlockAngular(blocks::Vector{Matrix{Tv}}, B0::AbstractMatrix{Tv}) where Tv<:Real
     R = length(blocks)
     (m, n0) = size(B0)
@@ -121,12 +157,6 @@ function UnitBlockAngular(blocks::Vector{Matrix{Tv}}) where Tv<:Real
     else
         return UnitBlockAngular(blocks, zeros(Tv, size(blocks[1], 1), 0))
     end
-end
-
-function consolidate!(A::UnitBlockAngular)
-    A.B_ = copy(A.B)
-    A.B0_ = copy(A.B0)
-    return nothing
 end
 
 # Base matrix interface
@@ -162,7 +192,7 @@ function getindex(A::UnitBlockAngular{Tv}, i::Integer, j::Integer) where Tv<:Rea
         
 end
 
-copy(A::UnitBlockAngular) = UnitBlockAngular(A.B, A.R, A.blockidx, A.B0)
+copy(A::UnitBlockAngular) = UnitBlockAngular(A.n, A.B, A.R, A.blockidx, A.B0)
 
 """
     sparse(A)
@@ -171,11 +201,11 @@ Efficient convertion to sparse matrix
 """
 function sparse(A::UnitBlockAngular{Tv}) where Tv<:Real
     
-    A_ = hcat(
+    @views A_ = hcat(
         vcat(spzeros(A.R, A.n0), A.B0),
         vcat(
-            sparse(A.blockidx, collect(1:A.n), ones(A.n), A.R, A.n),
-            A.B
+            sparse(A.blockidx[1:A.n], collect(1:A.n), ones(A.n), A.R, A.n),
+            A.B[:, 1:A.n]
         )
     )
     return A_
@@ -259,6 +289,11 @@ function addcolumn!(
     ))
     (0 <= icol <= A.R) || error("Invalid block index: $icol")
 
+    # Allocated memory check
+    if (A.n+1) >= A.N_alloc
+        reallocate!(A)
+    end
+
     # check if column is linking variable or not
     if icol == 0
         # linking column
@@ -269,8 +304,8 @@ function addcolumn!(
         
     elseif 1 <= icol <= A.R
         # regular column
-        A.B = hcat(A.B, col)
-        push!(A.blockidx, icol)
+        @views A.B[:, (A.n+1)] .= col
+        A.blockidx[A.n+1] = icol
         A.n += 1
         A.N += 1
         return A, A.N
@@ -278,15 +313,6 @@ function addcolumn!(
         error("Wrong block index.")
     end
 
-end
-
-function addcolumns!(
-    A::UnitBlockAngular{Tv},
-    cols::Matrix{Tv},
-    indices::Vector{Int}
-) where Tv<:Real
-
-    return A, k_
 end
 
 
@@ -299,7 +325,8 @@ Compute `y_{j} = sum{x_{i} | blockidx[i] == j}`
 function slicedsum_!(y, R::Int, blockidx::Vector{Int}, x)
 
     # Sanity check
-    length(blockidx) == length(x) || throw(DimensionMismatch(
+    n = length(x)
+    n <= length(blockidx) || throw(DimensionMismatch(
         "blockidx and x have different dimensions."
     ))
     length(y) == R || throw(DimensionMismatch(
@@ -307,7 +334,7 @@ function slicedsum_!(y, R::Int, blockidx::Vector{Int}, x)
     ))
     y .= zero(eltype(y))
     
-    @inbounds for i in Base.OneTo(length(x))
+    @inbounds for i in Base.OneTo(n)
         j = blockidx[i]
         y[j] += x[i]
     end
@@ -322,7 +349,7 @@ Compute `∀i, x[i] += y[blokidx[i]]`.
 function unit_lift!(y, R::Int, blockidx::Vector{Int}, x)
 
     # Sanity checks
-    length(blockidx) == length(x) || throw(DimensionMismatch(
+    length(blockidx) >= length(x) || throw(DimensionMismatch(
         "blockidx and x have different dimensions."
     ))
     length(y) == R || throw(DimensionMismatch(
@@ -349,8 +376,11 @@ function mul!(
 ) where Tv<:Real
     slicedsum_!(view(y, 1:A.R), A.R, A.blockidx, view(x, (A.n0+1):A.N))
     
-    @views BLAS.gemv!('N', 1.0, A.B, x[(1+A.n0):end], 0.0, y[(A.R+1):A.M])
-    @views BLAS.gemv!('N', 1.0, A.B0, x[1:A.n0], 1.0, y[(A.R+1):A.M])
+    @views BLAS.gemv!(
+        'N', 1.0, A.B[:, 1:A.n], x[(1+A.n0):end],
+        0.0, y[(A.R+1):A.M]
+    )
+    @views BLAS.gemv!('N', 1.0, A.B0, x[1:A.n0],1.0, y[(A.R+1):A.M])
     
     return y
 end
@@ -379,7 +409,7 @@ function mul!(
     )
 
     # `x = B' * y0`
-    @views mul!(x[(A.n0+1):end], transpose(A.B), y[(A.R+1):end])
+    @views mul!(x[(A.n0+1):end], transpose(A.B[:, 1:A.n]), y[(A.R+1):end])
     @views mul!(x[1:A.n0], transpose(A.B0), y[(A.R+1):end])
 
     # `∀i, x[i] += y[blockidx[i]]`
@@ -456,13 +486,14 @@ Compute lower block of Cholesky factor.
 """
 function lowerfactor!(
     L::Matrix{Tv},
+    n::Int,
     R::Int,
     blockidx::Vector{Int},
     B::Matrix{Tv},
     d::StridedVector
 ) where Tv<:Real
 
-    m, n = size(B)
+    m, n_ = size(B)
 
     n == length(d) || throw(DimensionMismatch(
         "B has size $(size(B)) but d has size $(size(d))"
@@ -501,15 +532,15 @@ function factor_normaleq(A::UnitBlockAngular{Tv}, θ::Vector{Tv}) where Tv<:Real
     θ_ = view(θ, (1+A.n0):A.N)
 
     # Compute Schur complement
-    rank_update!(zero(Tv), C, oneunit(Tv), A.B, A.B_, θ_)
-    rank_update!(oneunit(Tv), C, oneunit(Tv), A.B0, θ0)
+    @views rank_update!(zero(Tv), C, oneunit(Tv), A.B[:, 1:A.n], A.B_[:, 1:A.n], θ_)
+    @views rank_update!(oneunit(Tv), C, oneunit(Tv), A.B0, θ0)
 
     # Diagonal of Cholesky factor
     slicedsum_!(d, A.R, A.blockidx, θ_)
     d .\= oneunit(Tv)
 
     # Compute lower block of Cholesky factor
-    lowerfactor!(η, A.R, A.blockidx, A.B, θ_)
+    lowerfactor!(η, A.n, A.R, A.blockidx, A.B, θ_)
 
     # low-rank update of C
     rank_update!(oneunit(Tv), C, -oneunit(Tv), η, d)
@@ -538,15 +569,15 @@ function factor_normaleq!(
     C = zeros(Tv, A.m, A.m)
 
     # Compute Schur complement
-    rank_update!(zero(Tv), C, oneunit(Tv), A.B, A.B_, θ_)
-    rank_update!(oneunit(Tv), C, oneunit(Tv), A.B0, θ0)
+    @views rank_update!(zero(Tv), C, oneunit(Tv), A.B[:, 1:A.n], A.B_[:, 1:A.n], θ_)
+    @views rank_update!(oneunit(Tv), C, oneunit(Tv), A.B0, θ0)
 
     # Diagonal of Cholesky factor
     slicedsum_!(F.d, A.R, A.blockidx, θ_)
     F.d .\= oneunit(Tv)
 
     # Compute lower block of Cholesky factor
-    lowerfactor!(F.η, A.R, A.blockidx, A.B, θ_)
+    lowerfactor!(F.η, A.n, A.R, A.blockidx, A.B, θ_)
 
     # low-rank update of C
     rank_update!(oneunit(Tv), C, -oneunit(Tv), F.η, F.d)
