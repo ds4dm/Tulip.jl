@@ -45,8 +45,6 @@ function factor_normaleq!(
     return F
 end
 
-function consolidate!(A::AbstractMatrix) end
-
 """
     addcolumn!(A, c)
 
