@@ -45,8 +45,6 @@ function factor_normaleq!(
     return F
 end
 
-function consolidate!(A::AbstractMatrix) end
-
 """
     addcolumn!(A, c)
 
@@ -61,6 +59,6 @@ Add row `c` to matrix `A`.
 """
 addrow!(A::AbstractMatrix, r::AbstractVector) = (vcat(A, r'), size(A, 1) + 1)
 
-include("denseBlockAngular.jl")
+include("unitBlockAngular.jl")
 
 end  # module

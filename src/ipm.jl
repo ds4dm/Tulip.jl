@@ -5,8 +5,6 @@ function optimize!(model::Model)
     # Convert to standard form
     prepross!(model)
 
-    TLPLinearAlgebra.consolidate!(model.A)
-
     # Solve
     solve_ipm!(model)
 
