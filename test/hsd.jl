@@ -62,15 +62,18 @@ end
 
 m, n = 2, 3
 Random.seed!(0)
-A = sparse(rand(m, n))
+A = sparse([
+    [1.0 2.0 0.9];
+    [0.4 0.5 0.6]
+])
 uind = [2]
 uval = [4.0]
 
-x = rand(n)
-w = rand(1)
-y = rand(m)
-s = rand(n)
-z = rand(1)
+x = [0.2, 0.3, 0.4]
+w = [0.5]
+y = [0.9, -3.0]
+s = [1.0, 2.0, 0.1]
+z = [0.3]
 t = Ref(1.0)
 k = Ref(1.0)
 
@@ -83,21 +86,21 @@ k = Ref(1.0)
 
 F = cholesky(Symmetric(A*Diagonal(θ)*A'))
 
-ξp = rand(m)
-ξd = rand(n)
-ξu = rand(1)
-ξg = rand()
-ξxs = rand(n)
-ξwz = rand(1)
-ξtk = rand()
+ξp = [2.0, -1.0]
+ξd = [1.0, 1.1, 0.9]
+ξu = [0.1]
+ξg = 0.1
+ξxs = [0.9, 0.8, 0.5]
+ξwz = [1.1]
+ξtk = 4.0
 
 test_augmented_system(A, F, θ, θxs, θwz, uind, ξp, ξd, ξu)
 
 p = zeros(n)
 q = zeros(m)
 r = zeros(1)
-b = rand(m)
-c = rand(n)
+b = [1.1, 0.9]
+c = [9.9, 8.7, -0.4]
 
 Tulip.solve_augsys_hsd!(
     A, F, θ, θwz, uind,
