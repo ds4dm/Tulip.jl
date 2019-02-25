@@ -11,7 +11,6 @@ const test_files = [
     # include test file name here (without .jl extension)
     "params",
     "env",
-    "LinearAlgebra/unitBlockAngular",
     "LinearAlgebra/linearAlgebra",
     "hsd",
     "model",
