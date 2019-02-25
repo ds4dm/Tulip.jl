@@ -1,7 +1,3 @@
-using SparseArrays
-using LinearAlgebra
-using Random
-
 function test_augmented_system(A, F, θ, θxs, θwz, uind, ξp, ξd, ξu)
 
     dx = zeros(length(ξd))
@@ -10,15 +6,6 @@ function test_augmented_system(A, F, θ, θxs, θwz, uind, ξp, ξd, ξu)
 
     # Solve augmented system
     Tulip.solve_augsys_hsd!(A, F, θ, θwz, uind, dx, dy, dz, ξp, ξd, ξu)
-
-    # println("dx  = $dx")
-    # println("dy  = $dy")
-    # println("dz  = $dz")
-
-    # dx_, dy_, dz_ = Tulip.solve_augmented_system_hsd(A, F, θ, θwz, uind, ξp, ξd, ξu)
-    # println("dx_ = $dx_")
-    # println("dy_ = $dy_")
-    # println("dz_ = $dz_")
 
     # Compute residuals
     rp = A*dx .- ξp
@@ -61,41 +48,15 @@ function test_newton_system(
         ξp, ξu, ξd, ξg, ξxs, ξwz, ξtk
     )
 
-    # dx_, dw_, dy_, ds_, dz_, dt_, dk_ = Tulip.solve_newton_hsd(
-    #     A, F, b, c, uval, uind, θ, θwz,
-    #     x, w, y, s, z, t, k,
-    #     ξp, ξu, ξd, ξg, ξxs, ξwz, ξtk
-    # )
-
-    # println("dx  = $dx")
-    # println("dw  = $dw")
-    # println("dy  = $dy")
-    # println("ds  = $ds")
-    # println("dz  = $dz")
-    # println("dt  = $dt")
-    # println("dk  = $dk")
-
-    # println("dx_  = $dx_")
-    # println("dw_  = $dw_")
-    # println("dy_  = $dy_")
-    # println("ds_  = $ds_")
-    # println("dz_  = $dz_")
-    # println("dt_  = $dt_")
-    # println("dk_  = $dk_")
-
     return nothing
 end
 
 function test_step_length()
     @test Tulip.max_step_length([1.0], [1.0]) == Inf
     @test Tulip.max_step_length([1.0], [-2.0]) == 0.5
-    @test try
-        # This should raise a DimensionMismatch
-        Tulip.max_step_length([1.0, 1.0], [1.0])
-        false
-    catch err
-        isa(err, DimensionMismatch)
-    end
+
+    # This should raise a DimensionMismatch
+    @test_throws DimensionMismatch Tulip.max_step_length([1.0, 1.0], [1.0])
     return nothing
 end
 
