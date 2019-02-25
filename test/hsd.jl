@@ -61,7 +61,6 @@ function test_step_length()
 end
 
 m, n = 2, 3
-Random.seed!(0)
 A = sparse([
     [1.0 2.0 0.9];
     [0.4 0.5 0.6]
