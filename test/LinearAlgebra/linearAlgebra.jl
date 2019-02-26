@@ -34,7 +34,7 @@ function test_linalg(
 
     # Cholesky factorization
     d = 1.1 .* ones(n)
-    F = Tulip.TLPLinearAlgebra.factor_normaleq(A, d)  # in-place update
+    F = Tulip.TLPLinearAlgebra.factor_normaleq(A, d)
 
     # solve linear system
     y = F \ b
@@ -44,7 +44,8 @@ end
 
 @testset "LinearAlgebra" begin
 
-include("sparseMatrixCSC.jl")
-include("unitBlockAngular.jl")
+    # Test specific data structures
+    include("sparseMatrixCSC.jl")  # General sparse matrices (Julia native)
+    include("unitBlockAngular.jl") # Specialized unit block-angular
 
 end
