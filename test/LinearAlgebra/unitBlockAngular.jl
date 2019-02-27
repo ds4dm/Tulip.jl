@@ -2,6 +2,7 @@
 
 # Basic linear algebra
 nblocks = 2
+m = 2
 cols = [ones(m, 1) for _ in 1:nblocks]
 B = Matrix{Float64}(I, m, m)
 A = Tulip.TLPLinearAlgebra.UnitBlockAngular(cols, B)
