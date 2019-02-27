@@ -1,5 +1,5 @@
 codecov: true
-coveralls: true
+coveralls: false
 
 ## Documentation: http://docs.travis-ci.com/user/languages/julia/
 language: julia
