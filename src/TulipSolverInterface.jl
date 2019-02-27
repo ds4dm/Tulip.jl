@@ -75,7 +75,7 @@ MPB.getsolvetime(m::TulipMathProgModel) = m.inner.time_total
 MPB.getsense(m::TulipMathProgModel) = :Min
 
 function MPB.setsense!(m::TulipMathProgModel, sense)
-    warn("MPB.setsense! currently not implemented. Function call ignored.")
+    @warn "MPB.setsense! currently not implemented. Function call ignored."
     return nothing
 end
 
@@ -102,7 +102,7 @@ end
 MPB.getvarLB(m::TulipMathProgModel) = getvarlowerbounds(m.inner)
 
 function MPB.setvarLB!(m::TulipMathProgModel, collb)
-    warn("MPB.setvarLB! currently not implemented. Function call ignored.")
+    @warn "MPB.setvarLB! currently not implemented. Function call ignored."
     return nothing
 end
 
@@ -113,14 +113,14 @@ MPB.setvarUB!(m::TulipMathProgModel, colub) = setvarupperbounds!(m.inner, colub)
 MPB.getconstrLB(m::TulipMathProgModel) = getconstrlowerbounds(m.inner)
 
 function MPB.setconstrLB!(m::TulipMathProgModel, rowlb)
-    warn("MPB.setconstrLB! currently not implemented. Function call ignored.")
+    @warn "MPB.setconstrLB! currently not implemented. Function call ignored."
     return nothing
 end
 
 MPB.getconstrUB(m::TulipMathProgModel) = getconstrupperbounds(m.inner)
 
 function MPB.setconstrUB!(m::TulipMathProgModel, rowub)
-    warn("MPB.setconstrUB! currently not implemented. Function call ignored.")
+    @warn "MPB.setconstrUB! currently not implemented. Function call ignored."
     return nothing
 end
 
@@ -134,22 +134,22 @@ MPB.addvar!(m::TulipMathProgModel, constridx, constrcoef, l, u, objcoef) = addva
 MPB.addvar!(m::TulipMathProgModel, l, u, objcoef) = MPB.addvar!(m, [], [], l, u, objcoef)
 
 function MPB.delvars!(m::TulipMathProgModel, idxs)
-    warn("MPB.delvars! currently not implemented. Function call ignored.")
+    @warn "MPB.delvars! currently not implemented. Function call ignored."
     return nothing
 end
 
 function MPB.addconstr!(m::TulipMathProgModel, varidx, coef, lb, ub)
-    warn("MPB.addconstrs! currently not implemented. Function call ignored.")
+    @warn "MPB.addconstrs! currently not implemented. Function call ignored."
     return nothing
 end
 
 function MPB.delconstrs!(m::TulipMathProgModel, idxs)
-    warn("MPB.delconstrs! currently not implemented. Function call ignored.")
+    @warn "MPB.delconstrs! currently not implemented. Function call ignored."
     return nothing
 end
 
 function MPB.changecoeffs!(m::TulipMathProgModel, cidxs, vidxs, val)
-    warn("MPB.changecoeffs! currently not implemented. Function call ignored.")
+    @warn "MPB.changecoeffs! currently not implemented. Function call ignored."
     return nothing
 end
 

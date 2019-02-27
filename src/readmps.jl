@@ -85,7 +85,7 @@ function readmps(file_name)
             elseif section == "ENDATA"
                 # end of file
             else
-                warn("UNEXPECTED FORMAT PARSING\t$(ln)")
+                @warn "UNEXPECTED FORMAT PARSING\t$(ln)"
             end
 
         end
@@ -212,7 +212,7 @@ function parsemps_rows!(ln, fields, d, row2idx, senses)
     # current line should contain exactly 2 fields
     if length(fields) != 2
         # input error, current line is ignored
-        warn("INPUT ERROR:\t$(ln)")
+        @warn "INPUT ERROR:\t$(ln)"
         return nothing
     end
 
@@ -232,7 +232,7 @@ function parsemps_rows!(ln, fields, d, row2idx, senses)
         push!(senses, fields[1])  # sense (i.e., E, L, or G)
     else
         # input error, current line is ignored
-        warn("INPUT ERROR:\t$(ln)")
+        @warn "INPUT ERROR:\t$(ln)"
         return nothing
     end
 end
@@ -247,7 +247,7 @@ function parsemps_columns!(ln, fields, d, col2idx, row2idx,
     
     # current line should contain at least three fields
     if length(fields) < 4
-        warn("COLUMN LINE TOO SHORT|$(ln)")
+        @warn "COLUMN LINE TOO SHORT|$(ln)"
         return nothing
     end
 
@@ -263,7 +263,7 @@ function parsemps_columns!(ln, fields, d, col2idx, row2idx,
     rname = fields[3]  # row name
     if !haskey(row2idx, rname)
         # current row not in list of rows, current line ignored
-        warn("COL ERROR UNKNOWN ROW $(rname)|$(ln)")
+        @warn "COL ERROR UNKNOWN ROW $(rname)|$(ln)"
         return nothing
     end
     coeff = parse(Float64, fields[4])  # coefficient value
@@ -283,7 +283,7 @@ function parsemps_columns!(ln, fields, d, col2idx, row2idx,
         rname = fields[5]  # row name
         if !haskey(row2idx, rname)
             # current row not in list of rows, current line ignored
-            warn("COL ERROR UNKNOWN ROW $(rname)|$(ln)")
+            @warn "COL ERROR UNKNOWN ROW $(rname)|$(ln)"
             return nothing
         end
         coeff = parse(Float64, fields[6])  # coefficient value
@@ -312,7 +312,7 @@ function parsemps_rhs!(ln, fields, d, row2idx, rhs_row, rhs_val)
     # Check for too short lines
     if length(fields) < 4
         # input error, current line is ignored
-        warn("RHS LINE TOO SHORT|$(ln)")
+        @warn "RHS LINE TOO SHORT|$(ln)"
         return nothing
     end
 
@@ -332,7 +332,7 @@ function parsemps_rhs!(ln, fields, d, row2idx, rhs_row, rhs_val)
     rname = fields[3]
     if !haskey(row2idx, rname)
         # current row not in list of rows, current line ignored
-        warn("RHS ERROR UNKNOWN ROW $(rname)|$(ln)")
+        @warn "RHS ERROR UNKNOWN ROW $(rname)|$(ln)"
         return nothing
     end
     rval = parse(Float64, fields[4])
@@ -349,7 +349,7 @@ function parsemps_rhs!(ln, fields, d, row2idx, rhs_row, rhs_val)
         rname = fields[5]  # row name
         if !haskey(row2idx, rname)
             # current row not in list of rows, current line ignored
-            warn("RHS ERROR UNKNOWN ROW $(rname)|$(ln)")
+            @warn "RHS ERROR UNKNOWN ROW $(rname)|$(ln)"
             return nothing
         end
         rval = parse(Float64, fields[6])  # coefficient value
@@ -367,7 +367,7 @@ end
 function parsemps_ranges!(ln, fields, d, row2idx, ranges_row, ranges_val)
     if length(fields) < 4
         # input error, current line is ignored
-        warn("RNG LINE TOO SHORT|$(ln)")
+        @warn "RNG LINE TOO SHORT|$(ln)"
         return nothing
     end
 
@@ -384,7 +384,7 @@ function parsemps_ranges!(ln, fields, d, row2idx, ranges_row, ranges_val)
     rngval = parse(Float64, fields[4])
     if !haskey(row2idx, rname)
         # unknown row
-        warn("RNG ERROR UNKNOWN ROW $(rname)|$(ln)")
+        @warn "RNG ERROR UNKNOWN ROW $(rname)|$(ln)"
         return nothing
     end
     push!(ranges_row, row2idx[rname])
@@ -395,7 +395,7 @@ function parsemps_ranges!(ln, fields, d, row2idx, ranges_row, ranges_val)
         rngval = parse(Float64, fields[6])
         if !haskey(row2idx, rname)
             # unknown row
-            warn("RNG ERROR UNKNOWN ROW $(rname)|$(ln)")
+            @warn "RNG ERROR UNKNOWN ROW $(rname)|$(ln)"
             return nothing
         end
         push!(ranges_row, row2idx[rname])
@@ -411,7 +411,7 @@ function parsemps_bounds!(ln, fields, d, col2idx, lb_col, lb_val, ub_col, ub_val
         || ((length(fields) < 4) 
             && (fields[1] == "LO" || fields[1] == "UP" || fields[1] == "FX"))
     )
-        warn("BND ERROR LINE TOO SHORT|$(ln)")
+        @warn "BND ERROR LINE TOO SHORT|$(ln)"
         return nothing
     end
 
@@ -420,7 +420,7 @@ function parsemps_bounds!(ln, fields, d, col2idx, lb_col, lb_val, ub_col, ub_val
     bname = fields[2]
     cname = fields[3]
     if !haskey(col2idx, cname)
-        warn("BND ERROR UNKNOWN COL $(rname)|$(ln)")
+        @warn "BND ERROR UNKNOWN COL $(rname)|$(ln)"
         return nothing
     end
 
@@ -448,6 +448,6 @@ function parsemps_bounds!(ln, fields, d, col2idx, lb_col, lb_val, ub_col, ub_val
         push!(ub_val, Inf)
     else
         # error in bound type
-        warn("BND ERROR WRONG BOUND TYPE $(btype)")
+        @warn "BND ERROR WRONG BOUND TYPE $(btype)"
     end
 end
