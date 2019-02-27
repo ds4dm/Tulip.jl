@@ -34,6 +34,6 @@ matrix:
 #  - julia -e 'Pkg.clone(pwd()); Pkg.build("Tulip"); Pkg.test("Tulip"; coverage=true)'
 after_success:
   # push coverage results to Coveralls
-  - julia -e 'cd(Pkg.dir("Tulip")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
+  # - julia -e 'cd(Pkg.dir("Tulip")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
   # push coverage results to Codecov
-  - julia -e 'cd(Pkg.dir("Tulip")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+  # - julia -e 'cd(Pkg.dir("Tulip")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
