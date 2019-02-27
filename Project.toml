@@ -1,3 +1,8 @@
+authors = ["Mathieu Tanneau <mathieu.tanneau@gmail.com>"]
+name = "Tulip"
+uuid = "6dd1b50a-3aae-11e9-10b5-ef983d2400fa"
+version = "0.1.0"
+
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MathProgBase = "fdba3010-5040-5b88-9595-932c9decdf73"
