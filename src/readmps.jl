@@ -150,11 +150,11 @@ function convert_to_standard_form(
     # II. Form bounds
     lb = zeros(n)  # lower bound
     ub = Inf * ones(n)  # upper bound
-    for i in lb_col
-        lb[i] = lb_val[i] 
+    for (i, j) in enumerate(lb_col)
+        lb[j] = lb_val[i]
     end
-    for i in ub_col
-        ub[i] = ub_val[i]
+    for (i, j) in enumerate(ub_col)
+        ub[j] = ub_val[i]
     end
 
     return m, n, obj, rhs, coeffs, lb, ub
