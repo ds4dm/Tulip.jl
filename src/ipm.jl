@@ -224,9 +224,9 @@ function check_stopping_criterion!(model::Model)
     # - Current solution is optimal
     # - A primal or dual infeasibility certificate is found
     
-    eps_p = norm(model.rp, Inf) / (model.t.x + norm(model.b, Inf))   
-    eps_u = norm(model.ru, Inf) / (model.t.x + norm(model.uval, Inf))
-    eps_d = norm(model.rd, Inf) / (model.t.x + norm(model.c, Inf))
+    eps_p = norm(model.rp, Inf) / (model.t.x * (1.0 + norm(model.b, Inf)))
+    eps_u = norm(model.ru, Inf) / (model.t.x * (1.0 + norm(model.uval, Inf)))
+    eps_d = norm(model.rd, Inf) / (model.t.x * (1.0 + norm(model.c, Inf)))
     eps_g = (
         abs(model.primal_bound - model.dual_bound)
         / (model.t.x + abs(model.dual_bound))
