@@ -101,6 +101,7 @@ function make_step!(
         # TODO: Compute extra-corrector
         αc = compute_higher_corrector_hsd_!(
             model.num_var, model.n_var_ub, model.num_constr,
+            η, γ,
             A, F, b, c, uval, uind, θ, θwz,
             p, q, r, ρ,
             x, w, y, s, z, t, k,
@@ -320,6 +321,7 @@ Compute corrected Newton direction.
 """
 function compute_higher_corrector_hsd_!(
     numvar::Int, numvarub::Int, numcon::Int,
+    η, γ,
     A, F, b, c, uval, uind::Vector{Int}, θ, θwz,
     p, q, r, ρ,
     x, w, y, s, z, t, k,
@@ -337,8 +339,8 @@ function compute_higher_corrector_hsd_!(
     vt = (t.x  + α_  * dt.x)  * (k.x  + α_  * dk.x)
 
     # Compute target cross-products
-    mu_l = beta4 * μ.x
-    mu_u = μ.x / beta4
+    mu_l = beta4 * μ.x * γ
+    mu_u = γ * μ.x / beta4
     @inbounds for i in 1:length(vx)
         if vx[i] < mu_l
             vx[i] = mu_l - vx[i]
