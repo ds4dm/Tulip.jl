@@ -122,10 +122,14 @@ function make_step!(
             α = αc
         end
         
-        if (1.0 - η * αc) >= 0.9*(1.0 - η * α_)
-            # not enough improvement, step correcting
+        if αc < 1.1 * α_
             break
         end
+
+        # if (1.0 - η * αc) >= 0.9*(1.0 - η * α_)
+        #     # not enough improvement, step correcting
+        #     break
+        # end
         
     end
     # Update current iterate
