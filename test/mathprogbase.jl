@@ -26,8 +26,8 @@ MPB.optimize!(model_tlp)
 
 # # TODO: Run MathProgBase tests instead
 # solver_tlp = Tulip.TulipSolver(verbose=0, time_limit=100.0)
-# include(joinpath(Pkg.dir("MathProgBase"),"test","linprog.jl"))
+# include(joinpath(dirname(pathof(MathProgBase))[1:(end-3)],"test","linprog.jl"))
 # linprogtest(solver_tlp)
 # MathProgBase.setparameters!(solver_tlp, Silent=true, TimeLimit=100.0)
-# include(joinpath(Pkg.dir("MathProgBase"),"test","linproginterface.jl"))
+# include(joinpath(dirname(pathof(MathProgBase))[1:(end-3)],"test","linproginterface.jl"))
 # linprogsolvertest(solver_tlp)
