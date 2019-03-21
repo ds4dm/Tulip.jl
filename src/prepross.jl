@@ -60,7 +60,15 @@ function prepross!(m::Model)
         
         elseif l == -Inf && u == Inf
             # Free variable
-            error("Free variables are not supported.")
+            # error("Free variables are not supported.")
+            
+            # split variable
+            m.var_lb[i] = 0.0
+
+            # add extra variable
+            addvar!(m, -m.A[:, i], 0.0, Inf, -m.obj[i])
+            append!(m.c, -m.obj[i])
+
 
         elseif l == -Inf && u < Inf
             # Upper bounded variable, no lower bound
