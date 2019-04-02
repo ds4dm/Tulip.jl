@@ -48,15 +48,15 @@ mutable struct TulipEnv
         env.barrier_iter_max = RealParam(:barrier_iter_max, 100, 0, typemax(Int64))
         env.time_limit = RealParam(:time_limit, Inf, 0.0, Inf)
 
-        env.barrier_tol_pfeas = RealParam(:barrier_tol_pfeas, 10.0^-8, 0.0, 1.0)
-        env.barrier_tol_dfeas = RealParam(:barrier_tol_dfeas, 10.0^-8, 0.0, 1.0)
-        env.barrier_tol_conv = RealParam(:barrier_tol_conv, 10.0^-8, 0.0, 1.0)
-        env.barrier_tol_infeas = RealParam(:barrier_tol_infeas, 10.0^-8, 0.0, 1.0)
+        env.barrier_tol_pfeas  = RealParam(:barrier_tol_pfeas,  1e-8, 0.0, 1.0)
+        env.barrier_tol_dfeas  = RealParam(:barrier_tol_dfeas,  1e-8, 0.0, 1.0)
+        env.barrier_tol_conv   = RealParam(:barrier_tol_conv,   1e-8, 0.0, 1.0)
+        env.barrier_tol_infeas = RealParam(:barrier_tol_infeas, 1e-8, 0.0, 1.0)
 
-        env.beta1 = RealParam(:beta1, 0.1, 0.0, 1.0)
-        env.beta2 = RealParam(:beta2, 10.0^-8, 0.0, 1.0)
+        env.beta1 = RealParam(:beta1, 1e-1,   0.0, 1.0)
+        env.beta2 = RealParam(:beta2, 1e-8,   0.0, 1.0)
         env.beta3 = RealParam(:beta3, 0.9999, 0.0, 1.0)
-        env.beta4 = RealParam(:beta4, 1e-1, 0.0, 1.0)
+        env.beta4 = RealParam(:beta4, 1e-1,   0.0, 1.0)
 
         env.barrier_max_num_cor = RealParam(:barrier_max_num_cor, 5, 0, typemax(Int64))
 
