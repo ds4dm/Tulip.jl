@@ -146,23 +146,15 @@ function convert_to_standard_form(
     obj = Array(sparsevec(obj_col, obj_val, n))
     rhs = Array(sparsevec(rhs_row, rhs_val, m))
 
-    @info "$(extrema(ub_col))"
+
     # II. Form bounds
     lb = zeros(n)  # lower bound
     ub = Inf * ones(n)  # upper bound
     for (i, j) in enumerate(lb_col)
-        if lb_val[i] < -1e16
-            lb[j] = -Inf
-        else
-            lb[j] = lb_val[i]
-        end
+        lb[j] = lb_val[i]
     end
     for (i, j) in enumerate(ub_col)
-        if ub_val[i] > 1e16
-            ub[j] = Inf
-        else
-            ub[j] = ub_val[i]
-        end
+        ub[j] = ub_val[i]
     end
 
     return m, n, obj, rhs, coeffs, lb, ub
