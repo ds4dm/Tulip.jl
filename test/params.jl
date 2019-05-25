@@ -1,3 +1,5 @@
+@testset "Params" begin
+
 p = Tulip.RealParam(:param, 0, 0, 10)
 p.val = 1
 @test Tulip.get_param_name(p) == :param
@@ -12,3 +14,5 @@ Tulip.set_param_value!(p, 5)
 
 @test Tulip.test_param_value(p, 5)
 @test !Tulip.test_param_value(p, 100)
+
+end  # testset

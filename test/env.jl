@@ -1,3 +1,4 @@
+@testset "Env" begin
 env = Tulip.TulipEnv()
 
 env_ = copy(env)
@@ -24,3 +25,5 @@ for s in fieldnames(Tulip.TulipEnv)
     v_ = env[s]
     @test v_ == Core.getfield(env, s).def_val
 end
+
+end  # testset

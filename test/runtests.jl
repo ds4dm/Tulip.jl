@@ -2,7 +2,6 @@ using Tulip
 using Test
 
 using LinearAlgebra
-using Random
 using SparseArrays
 
 # write your own tests here
@@ -12,7 +11,6 @@ const test_files = [
     # include test file name here (without .jl extension)
     "params",
     "env",
-    "LinearAlgebra/unitBlockAngular",
     "LinearAlgebra/linearAlgebra",
     "hsd",
     "model",

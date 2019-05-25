@@ -224,9 +224,9 @@ function check_stopping_criterion!(model::Model)
     # - Current solution is optimal
     # - A primal or dual infeasibility certificate is found
     
-    eps_p = norm(model.rp, Inf) / (model.t.x + norm(model.b, Inf))   
-    eps_u = norm(model.ru, Inf) / (model.t.x + norm(model.uval, Inf))
-    eps_d = norm(model.rd, Inf) / (model.t.x + norm(model.c, Inf))
+    eps_p = norm(model.rp, Inf) / (model.t.x * (1.0 + norm(model.b, Inf)))
+    eps_u = norm(model.ru, Inf) / (model.t.x * (1.0 + norm(model.uval, Inf)))
+    eps_d = norm(model.rd, Inf) / (model.t.x * (1.0 + norm(model.c, Inf)))
     eps_g = (
         abs(model.primal_bound - model.dual_bound)
         / (model.t.x + abs(model.dual_bound))
@@ -266,15 +266,27 @@ function check_stopping_criterion!(model::Model)
         end
     end
 
-    # Infeasibility test
+    # LP is infeasible or unbounded
     if (
-        model.μ.x < model.env.barrier_tol_pfeas.val
-        && (model.t.x / model.k.x) < model.env.barrier_tol_pfeas.val
+        model.μ.x < model.env.barrier_tol_infeas.val
+        && (model.t.x / model.k.x) < model.env.barrier_tol_infeas.val
     )
-        # Certificate of infeasibility, stop optimization
-        model.sln_status = Sln_PrimalInfeasible
-        model.env.verbose.val == 1 && println("\nInfeasibility detected.")
-        return true
+
+        if dot(model.c, model.x) < -model.env.barrier_tol_infeas.val
+            # Infeasible
+            model.sln_status = Sln_DualInfeasible
+            model.env.verbose.val == 1 && println("\nUnboundedness detected.")
+            return true
+        elseif -(dot(model.b, model.y) - dot(model.uval, model.z)) < -model.env.barrier_tol_infeas.val
+            # Infeasible
+            model.sln_status = Sln_PrimalInfeasible
+            model.env.verbose.val == 1 && println("\nInfeasibility detected.")
+            return true
+        else
+            # Should never be reached
+            error()
+        end
+        
     end
 
     # Unbounded case

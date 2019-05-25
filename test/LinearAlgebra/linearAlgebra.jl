@@ -1,8 +1,8 @@
 """
     test_linalg(A, b, c, uind, uval, h)
 
-Verifies that the linear algebra operations are properly defined for the matrix
-    structure given in input.
+Verify that the linear algebra operations are properly defined for the input
+    data structures.
 """
 function test_linalg(
     A::AbstractMatrix{Tv},
@@ -33,45 +33,19 @@ function test_linalg(
     mul!(y, A, x)
 
     # Cholesky factorization
-    d = 1.0 .+ rand(n)
-    F = Tulip.TLPLinearAlgebra.factor_normaleq(A, d)  # in-place update
+    d = 1.1 .* ones(n)
+    F = Tulip.TLPLinearAlgebra.factor_normaleq(A, d)
 
     # solve linear system
     y = F \ b
 
-    return nothing
+    return true
 end
 
+@testset "LinearAlgebra" begin
 
+    # Test specific data structures
+    include("sparseMatrixCSC.jl")  # General sparse matrices (Julia native)
+    include("unitBlockAngular.jl") # Specialized unit block-angular
 
-# SparseCSC matrix
-using SparseArrays
-
-Random.seed!(0)
-A = hcat(sparse(1.0I, 2, 2), sparse(1.0I, 2, 2))
-m = A.m
-n = A.n
-c = rand(n)
-b = rand(m)
-u = sprand(n, 1.0)
-uind = u.nzind
-uval = u.nzval
-p = nnz(u)
-
-test_linalg(A, b, c, uind, uval, zeros(n), zeros(p), zeros(m), zeros(n), zeros(p))
-
-# BlockAngular matrix
-Random.seed!(0)
-nblocks = 2
-cols = [ones(m, 1) for _ in 1:nblocks]
-B = Matrix{Float64}(I, m, m)
-A = Tulip.TLPLinearAlgebra.UnitBlockAngular(cols, B)
-(m, n) = size(A)
-c = rand(n)
-b = rand(m)
-u = sprand(n, 0.75)
-uind = u.nzind
-uval = u.nzval
-p = nnz(u)
-
-test_linalg(A, b, c, uind, uval, zeros(n), zeros(p), zeros(m), zeros(n), zeros(p))
+end

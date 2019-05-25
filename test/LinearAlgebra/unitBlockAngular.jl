@@ -1,5 +1,25 @@
-using LinearAlgebra
+@testset "UnitBlockAngular" begin
 
+# Basic linear algebra
+nblocks = 2
+m = 2
+cols = [ones(m, 1) for _ in 1:nblocks]
+B = Matrix{Float64}(I, m, m)
+A = Tulip.TLPLinearAlgebra.UnitBlockAngular(cols, B)
+(m, n) = size(A)
+c = [1.1, 1.2, 1.3, 1.4]
+b = [1.1, 1.2, 1.3, 1.4]
+u = sparse([1.0, 0.0, 2.0, 3.0])
+uind = u.nzind
+uval = u.nzval
+p = nnz(u)
+
+@test test_linalg(
+    A, b, c, uind, uval,
+    zeros(n), zeros(p), zeros(m), zeros(n), zeros(p)
+)
+
+# Specific tests
 m = 2
 R = 2
 B = [
@@ -37,7 +57,6 @@ Tulip.TLPLinearAlgebra.rank_update!(0.0, C, 1.0, A.B, A.B_, d)
 Tulip.TLPLinearAlgebra.rank_update!(0.0, C, 1.0, A.B, d)
 @test Symmetric(C) ≈ Symmetric(C_)
 
-
 F = Tulip.TLPLinearAlgebra.factor_normaleq(A, θ)
 Tulip.TLPLinearAlgebra.factor_normaleq!(A, θ, F)
 
@@ -49,3 +68,5 @@ r = ones(A.M) .- A* (θ .* (A'*b))  # residual
 
 A2 = Tulip.TLPLinearAlgebra.UnitBlockAngular([i*ones(2, 2) for i in 1:2], sparse(1.0I, 2, 2))
 A3 = Tulip.TLPLinearAlgebra.UnitBlockAngular([i*ones(2, 2) for i in 1:2])
+
+end  # testset
