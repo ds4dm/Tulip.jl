@@ -1,35 +1,50 @@
+import DataStructures:
+    OrderedSet, OrderedDict
+
+include("./constraint.jl")
+include("./variable.jl")
+include("./pbdata.jl")
+
+
 """
-    Point{T, Tv}
+    StandardFormData{Tv, Ti, Ta}
 
-Data structure for primal-dual point.
-
-Numerical precision is `T`, while `Tv` is the vector type.
+Problem data converted in standard form.
 """
-mutable struct Point{T<:Real, Tv<:AbstractVector{T}}
-        
-    # Primal-dual coordinates
-    x::Tv  # primal variables
-    w::Tv  # primal upper-bound slack
+mutable struct StandardFormData{Tv<:Real, Ti<:Integer}
+    A::AbstractMatrix{Tv}  # Constraint matrix
+    b::Vector{Tv}          # Right-hand side
+    c::Vector{Tv}          # Objective
+    uind::Vector{Ti}       # Indices of upper-bounded variables
+    uval::Vector{Tv}       # Finite upper bounds on variables
 
-    y::Tv  # dual variables
-    s::Tv  # reduced cost of `x`
-    z::Tv  # reduced cost of `w`
-
-    t::T  # Homogeneous primal variable
-    k::T  # Homogeneous dual variable
-
+    # TODO: add optimization sense
+    # TODO: add row and column scalings
+    # TODO: add starting points
 end
 
-"""
-    Model{Ta, Tv, Ti}
+# TODO:
+# Add getters and setters
+# Add some useful constructors
+# Add copy and convert functions (to change numerical precision)
 
-Place-holder for problem data and related info.
+
 """
-mutable struct Model{Ta<:AbstractMatrix{<:Real}, Tv<:AbstractVector{<:Real}, Ti<:AbstractVector{<:Integer}}
-    A::Ta  # Constraints matrix
-    b::Tv  # Right-hand side
-    c::Tv  # Objective
-    uind::Ti  # Indices of upper-bounded variables
-    uval::Tv  # Finite upper bounds on variables
+    Model
+
+"""
+mutable struct Model
+    name::String  # Model name
+
+    # pbdata::ProblemData{Tv, Ti}
+
+    # stdform::StandardFormData{Tv, Ti}
+
+
+
+
+    # Constructor
+    # function Model{Tv, Ti}(s::String) where{Tv<:Real, Ti<:Integer}
+    #     return new{Tv, Ti}(s)
+    # end
 end
-
