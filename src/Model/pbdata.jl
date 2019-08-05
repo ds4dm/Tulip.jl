@@ -15,8 +15,8 @@ Problem data is stored in the form
 """
 mutable struct ProblemData{Tv<:Real}
 
-    ncon::Int  # Number of constraints
-    nvar::Int  # Number of variables
+    constr_cnt::Int  # Counter for constraints
+    var_cnt::Int     # Counter for variables
 
     # Coefficients of the constraint matrix
     coeffs::Dict{Tuple{VarId, ConstrId}, Tv}
@@ -35,7 +35,7 @@ mutable struct ProblemData{Tv<:Real}
             0, 0,
             Dict{Tuple{VarId, ConstrId}, Tv}(),
             Dict{VarId, OrderedSet{ConstrId}}(),
-            con2var::Dict{ConstrId, OrderedSet{VarId}}(),
+            Dict{ConstrId, OrderedSet{VarId}}(),
             OrderedDict{VarId, Variable{Tv}}(),
             OrderedDict{ConstrId, AbstractConstraint{Tv}}()
         )
@@ -66,14 +66,24 @@ get_num_constr(pb::ProblemData) = length(pb.constrs)
 
 Create a new variable in the model and return the corresponding ID.
 """
-function add_variable!(pb::ProblemData{Tv}) where {Tv}
-    uuid = pb.nvar + 1
-    pb.nvar += 1
+function add_variable!(pb::ProblemData{Tv}, v::Variable{Tv}) where {Tv<:Real}
+    !haskey(pb.vars, v.id) || error("Variable $(v.id.uuid) already exists.")
 
-    v = Variable{Tv}(uuid)
-    pb.vars[uuid] = v
-    return uuid
+    pb.vars[v.id] = v
+    pb.var2con[v.id] = OrderedSet{ConstrId}()
+    return nothing
 end
+
+function add_variable!(pb::ProblemData{Tv}) where {Tv}
+    idx = VarId(pb.var_cnt + 1)
+    pb.var_cnt += 1
+
+    v = Variable{Tv}(idx)
+    add_variable!(pb, v)
+
+    return idx
+end
+
 
 
 """
@@ -82,10 +92,19 @@ end
 Create a new linear constraint, add it to the model, and return its ID.
 """
 function add_linear_constraint!(pb::ProblemData{Tv}) where {Tv}
-    uuid = pb.ncon + 1
-    pb.ncon += 1
+    idx = ConstrId(pb.constr_cnt + 1)
+    pb.constr_cnt += 1
 
-    c = LinearConstraint{Tv}(uuid)
-    pb.constrs[uuid] = c
-    return uuid
+    c = LinearConstraint{Tv}(idx)
+
+    add_constraint!(pb, c)
+    return idx
+end
+
+function add_constraint!(pb::ProblemData{Tv}, c::LinearConstraint{Tv}) where{Tv<:Real}
+    !haskey(pb.constrs, c.id) || error("Constraint $(c.id.uuid) already exists.")
+    
+    pb.constrs[c.id] = c
+    pb.con2var[c.id] = OrderedSet{VarId}()
+    return nothing
 end
