@@ -2,10 +2,9 @@ using Test
 
 include("../../src/Model/variable.jl")
 
-# TODO: run this with multiple combinations of (Tv, Ti) types.
+# TODO: run this with multiple combinations of Tv types.
 # This may require to encapsulate each testset in its own typed function.
 # Tv types: Float32, Float64, BigFloat
-# Ti types: Int32, Int64, Int128, BigInt
 function run_tests_variable()
     # Constructors
     @testset "Constructors" begin
@@ -13,9 +12,9 @@ function run_tests_variable()
         vdat = VarData("x1", 0.0, 0.0, Inf)
         v = Variable(vid, vdat)
 
-        v = Variable{Float64, Int}(vid)
+        v = Variable{Float64}(vid)
 
-        v = Variable{Float64, Int}(vid, "x1", 0.0, 0.0, Inf)
+        v = Variable{Float64}(vid, "x1", 0.0, 0.0, Inf)
     end
 
     vid = VarId(1)

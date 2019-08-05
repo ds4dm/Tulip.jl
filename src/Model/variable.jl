@@ -1,14 +1,14 @@
 """
-    VarId{Ti<:Integer}
+    VarId
 
 """
-struct VarId{Ti<:Integer}
-    uuid::Ti  # Unique identifier
+struct VarId
+    uuid::Int64  # Unique identifier
 end
 
 
 """
-    VarData{Tv<:Real, Ti<:Integer}
+    VarData{Tv<:Real}
 
 """
 mutable struct VarData{Tv<:Real}
@@ -31,22 +31,22 @@ VarData(name::String, obj::Tv, lb::Tv, ub::Tv) where{Tv<:Real} = VarData{Tv}(nam
 
 
 """
-    Variable{Tv<:Real, Ti<:Integer}
+    Variable{Tv<:Real}
 
 Place-holder for variables.
 """
-struct Variable{Tv<:Real, Ti<:Integer}
-    id::VarId{Ti}     # Unique identifier
+struct Variable{Tv<:Real}
+    id::VarId     # Unique identifier
     dat::VarData{Tv}  # Variable data
 
     # Constructor
-    function Variable(id::VarId{Ti}, dat::VarData{Tv}) where{Tv<:Real, Ti<:Integer}
-        return new{Tv, Ti}(id, dat)
+    function Variable(id::VarId, dat::VarData{Tv}) where{Tv<:Real, Ti<:Integer}
+        return new{Tv}(id, dat)
     end
-    Variable{Tv, Ti}(id::VarId{Ti}) where{Tv<:Real, Ti<:Integer} = Variable(id, VarData{Tv}())
+    Variable{Tv}(id::VarId) where{Tv<:Real, Ti<:Integer} = Variable(id, VarData{Tv}())
 end
 
-function Variable{Tv, Ti}(id::VarId{Ti}, name::String, obj, lb, ub) where{Tv<:Real, Ti<:Integer}
+function Variable{Tv}(id::VarId, name::String, obj, lb, ub) where{Tv<:Real, Ti<:Integer}
     vd = VarData{Tv}(name, obj, lb, ub)
     return Variable(id, vd)
 end
