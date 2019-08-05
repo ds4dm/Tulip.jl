@@ -15,9 +15,9 @@ const test_files = [
     "params",
     "env",
     "LinearAlgebra/linearAlgebra",
-    # "hsd",
-    # "model",
-    # "mathprogbase",
+    "hsd",
+    "model",
+    "mathprogbase",
 ]
 
 for f in test_files
