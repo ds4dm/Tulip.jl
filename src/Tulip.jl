@@ -5,6 +5,9 @@ using SparseArrays
 
 import Base: RefValue
 
+# new code
+include("./Model/Model.jl")
+
 # export readmps
 
 # Cholesky module

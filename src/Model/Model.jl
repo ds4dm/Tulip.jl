@@ -3,6 +3,8 @@ import DataStructures:
 
 include("./constraint.jl")
 include("./variable.jl")
+
+# TODO: add AbstractFormulation{Tv, Ti} type and methods
 include("./pbdata.jl")
 include("./standardform.jl")
 
@@ -11,18 +13,16 @@ include("./standardform.jl")
     Model
 
 """
-mutable struct Model
+mutable struct Model_{Tv<:Real}
     name::String  # Model name
 
-    # pbdata::ProblemData{Tv, Ti}
+    params  # Parameters
 
-    # stdform::StandardFormData{Tv, Ti}
+    pbdata_raw::ProblemData{Tv}   # Raw data
+    pbdata_std::StandardForm{Tv}  # Standard form
 
-
-
-
-    # Constructor
-    # function Model{Tv, Ti}(s::String) where{Tv<:Real, Ti<:Integer}
-    #     return new{Tv, Ti}(s)
-    # end
+    # TODO: add the following fields:
+    # * IPMSolver
+    # * status
+    # * ...
 end
