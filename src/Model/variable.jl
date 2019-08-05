@@ -40,13 +40,13 @@ struct Variable{Tv<:Real}
     dat::VarData{Tv}  # Variable data
 
     # Constructor
-    function Variable(id::VarId, dat::VarData{Tv}) where{Tv<:Real, Ti<:Integer}
+    function Variable(id::VarId, dat::VarData{Tv}) where{Tv<:Real}
         return new{Tv}(id, dat)
     end
-    Variable{Tv}(id::VarId) where{Tv<:Real, Ti<:Integer} = Variable(id, VarData{Tv}())
+    Variable{Tv}(id::VarId) where{Tv<:Real} = Variable(id, VarData{Tv}())
 end
 
-function Variable{Tv}(id::VarId, name::String, obj, lb, ub) where{Tv<:Real, Ti<:Integer}
+function Variable{Tv}(id::VarId, name::String, obj, lb, ub) where{Tv<:Real}
     vd = VarData{Tv}(name, obj, lb, ub)
     return Variable(id, vd)
 end
