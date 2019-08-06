@@ -1,13 +1,24 @@
+using SparseArrays
+
 """
-    StandardFormData{Tv, Ti, Ta}
+    StandardForm{Tv, Ti, Ta}
 
 Problem data converted in standard form.
+```math
+\\begin{align}
+    \\min_{x} \\ \\ \\ & c^{T} x \\\\
+    s.t. \\ \\ \\
+    & A x = b \\\\
+    & x_{i} \\leq u \\\\
+    & x \\geq 0
+\\end{align}
+```
 """
-mutable struct StandardFormData{Tv<:Real, Ti<:Integer}
+mutable struct StandardForm{Tv<:Real}
     A::AbstractMatrix{Tv}  # Constraint matrix
     b::Vector{Tv}          # Right-hand side
     c::Vector{Tv}          # Objective
-    uind::Vector{Ti}       # Indices of upper-bounded variables
+    uind::Vector{Int}      # Indices of upper-bounded variables
     uval::Vector{Tv}       # Finite upper bounds on variables
 
     # TODO: add optimization sense
@@ -15,6 +26,3 @@ mutable struct StandardFormData{Tv<:Real, Ti<:Integer}
     # TODO: add starting points
     # TODO: add Cholesky factor (?)
 end
-
-# TODO:
-# Add function to convert from ProblemData to StandardFormData
