@@ -4,25 +4,27 @@ import DataStructures:
 include("./constraint.jl")
 include("./variable.jl")
 
-# TODO: add AbstractFormulation{Tv, Ti} type and methods
+# Q: add AbstractFormulation{Tv} type and methods?
 include("./pbdata.jl")
 include("./standardform.jl")
 
 
 """
-    Model
+    Model{Tv}
 
 """
 mutable struct Model_{Tv<:Real}
     name::String  # Model name
 
-    params  # Parameters
+    # params  # Parameters
 
     pbdata_raw::ProblemData{Tv}   # Raw data
-    pbdata_std::StandardForm{Tv}  # Standard form
+    # pbdata_std::StandardForm{Tv}  # Standard form
 
     # TODO: add the following fields:
     # * IPMSolver
     # * status
     # * ...
 end
+
+include("./api.jl")
