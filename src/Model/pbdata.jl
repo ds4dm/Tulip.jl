@@ -62,9 +62,9 @@ get_num_constr(pb::ProblemData) = length(pb.constrs)
 # TODO: replace pb.nvar += 1 by an increment function that checks if typemax
 # is reached, and raises an error if it is.
 """
-    add_variable(pb::ProblemData)
+    add_variable(pb::ProblemData{Tv}, v::Variable{Tv})
 
-Create a new variable in the model and return the corresponding ID.
+Add variable `v` to problem `pb`. Raises an error if `v` is already in the model. 
 """
 function add_variable!(pb::ProblemData{Tv}, v::Variable{Tv}) where {Tv<:Real}
     !haskey(pb.vars, v.id) || error("Variable $(v.id.uuid) already exists.")
@@ -74,34 +74,38 @@ function add_variable!(pb::ProblemData{Tv}, v::Variable{Tv}) where {Tv<:Real}
     return nothing
 end
 
-function add_variable!(pb::ProblemData{Tv}) where {Tv}
+
+"""
+    new_variable_index!(pb::ProblemData)
+
+Returns a new variable index and update internal counter.
+"""
+function new_variable_index!(pb::ProblemData)
     idx = VarId(pb.var_cnt + 1)
     pb.var_cnt += 1
-
-    v = Variable{Tv}(idx)
-    add_variable!(pb, v)
-
     return idx
 end
 
 
 
 """
-    add_linear_constraint(pb::ProblemData)
+    new_constraint_index!(pb::ProblemData)
+
+Returns a new constraint index and update internal counter.
+"""
+function new_constraint_index!(pb::ProblemData)
+    idx = ConstrId(pb.constr_cnt + 1)
+    pb.constr_cnt += 1
+    return idx
+end
+
+
+"""
+    add_constraint!(pb::ProblemData, c::AbstractConstraint{Tv})
 
 Create a new linear constraint, add it to the model, and return its ID.
 """
-function add_linear_constraint!(pb::ProblemData{Tv}) where {Tv}
-    idx = ConstrId(pb.constr_cnt + 1)
-    pb.constr_cnt += 1
-
-    c = LinearConstraint{Tv}(idx)
-
-    add_constraint!(pb, c)
-    return idx
-end
-
-function add_constraint!(pb::ProblemData{Tv}, c::LinearConstraint{Tv}) where{Tv<:Real}
+function add_constraint!(pb::ProblemData{Tv}, c::AbstractConstraint{Tv}) where{Tv<:Real}
     !haskey(pb.constrs, c.id) || error("Constraint $(c.id.uuid) already exists.")
     
     pb.constrs[c.id] = c
