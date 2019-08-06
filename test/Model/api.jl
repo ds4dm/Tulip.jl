@@ -13,7 +13,7 @@ function run_tests_api()
         @test y.uuid == 2
 
         # Create a constraint
-        c = TLP.add_constraint!(m, "c1", 1.0, 1.0, [x, y], [1.0, 2.0])
+        c = TLP.add_constraint!(m, "c1", TLP.TLP_BND_FX, 1.0, 1.0, [x, y], [1.0, 2.0])
         @test c.uuid == 1
 
         # Check that coefficients were updated properly

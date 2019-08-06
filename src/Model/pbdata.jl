@@ -27,7 +27,7 @@ mutable struct ProblemData{Tv<:Real}
     vars::OrderedDict{VarId, Variable{Tv}}
 
     # Constraints
-    constrs::OrderedDict{ConstrId, AbstractConstraint{Tv}}
+    constrs::OrderedDict{ConstrId, LinearConstraint{Tv}}
 
     # Only allow empty problems to be instantiated for now
     function ProblemData{Tv}() where {Tv<:Real}
@@ -37,7 +37,7 @@ mutable struct ProblemData{Tv<:Real}
             Dict{VarId, OrderedSet{ConstrId}}(),
             Dict{ConstrId, OrderedSet{VarId}}(),
             OrderedDict{VarId, Variable{Tv}}(),
-            OrderedDict{ConstrId, AbstractConstraint{Tv}}()
+            OrderedDict{ConstrId, LinearConstraint{Tv}}()
         )
     end
 end
@@ -101,11 +101,11 @@ end
 
 
 """
-    add_constraint!(pb::ProblemData, c::AbstractConstraint{Tv})
+    add_constraint!(pb::ProblemData, c::LinearConstraint{Tv})
 
 Create a new linear constraint, add it to the model, and return its ID.
 """
-function add_constraint!(pb::ProblemData{Tv}, c::AbstractConstraint{Tv}) where{Tv<:Real}
+function add_constraint!(pb::ProblemData{Tv}, c::LinearConstraint{Tv}) where{Tv<:Real}
     !haskey(pb.constrs, c.id) || error("Constraint $(c.id.uuid) already exists.")
     
     pb.constrs[c.id] = c

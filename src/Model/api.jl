@@ -5,7 +5,7 @@ Add one linear constraint to the model.
 """
 function add_constraint!(m::Model_{Tv},
     name::String,
-    lb::Tv, ub::Tv,
+    bt::BoundType, lb::Tv, ub::Tv,
     vinds::Vector{VarId},
     vvals::Vector{Tv}
 ) where{Tv<:Real}
@@ -22,7 +22,7 @@ function add_constraint!(m::Model_{Tv},
 
     # Create new constraint object
     cidx = new_constraint_index!(m.pbdata_raw)
-    constr = LinearConstraint{Tv}(cidx, name, lb, ub)
+    constr = LinearConstraint{Tv}(cidx, name, bt, lb, ub)
 
     # Add constraint to model
     add_constraint!(m.pbdata_raw, constr)

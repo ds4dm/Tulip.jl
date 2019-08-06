@@ -5,16 +5,16 @@ function run_tests_lincon()
     # Constructors
     @testset "Constructors" begin
         cid = TLP.ConstrId(1)
-        cdat = TLP.LinConstrData{Float64}("c1", 0.0, Inf)
+        cdat = TLP.LinConstrData{Float64}("c1", TLP.TLP_BND_LO, 0.0, Inf)
         c = TLP.LinearConstraint(cid, cdat)
 
         c = TLP.LinearConstraint{Float64}(cid)
 
-        c = TLP.LinearConstraint{Float64}(cid, "c1", 0.0, Inf)
+        c = TLP.LinearConstraint{Float64}(cid, "c1", TLP.TLP_BND_LO, 0.0, Inf)
     end
 
     cid = TLP.ConstrId(1)
-    cdat = TLP.LinConstrData{Float64}("c1", 0.0, Inf)
+    cdat = TLP.LinConstrData{Float64}("c1", TLP.TLP_BND_LO, 0.0, Inf)
     c = TLP.LinearConstraint(cid, cdat)
 
     # UUID
@@ -35,8 +35,7 @@ function run_tests_lincon()
         @test TLP.get_lower_bound(c) == 0.0
         @test TLP.get_upper_bound(c) == Inf
 
-        TLP.set_lower_bound!(c, -1.0)
-        TLP.set_upper_bound!(c,  1.0)
+        TLP.set_bounds!(c, TLP.TLP_BND_RG, -1.0, 1.0)
 
         @test TLP.get_lower_bound(c) == -1.0
         @inferred TLP.get_lower_bound(c)
@@ -44,11 +43,10 @@ function run_tests_lincon()
         @inferred TLP.get_upper_bound(c)
 
         # Check type conversion
-        TLP.set_lower_bound!(c, 0)
+        TLP.set_bounds!(c, TLP.TLP_BND_RG, 0, 2)
         @test TLP.get_lower_bound(c) == 0.0
         @inferred TLP.get_lower_bound(c)
 
-        TLP.set_upper_bound!(c, 2)
         @test TLP.get_upper_bound(c) ==  2.0
         @inferred TLP.get_upper_bound(c)
     end
