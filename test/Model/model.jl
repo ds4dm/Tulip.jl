@@ -4,4 +4,5 @@ using Test
     include("./variable.jl")
     include("./constraint.jl")
     include("./pbdata.jl")
+    include("./api.jl")
 end
