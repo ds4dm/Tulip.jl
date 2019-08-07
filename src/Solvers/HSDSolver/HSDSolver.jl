@@ -1,25 +1,20 @@
-mutable struct Model{Ta<:AbstractMatrix{<:Real}, Tv<:AbstractVector{<:Real}, Ti<:AbstractVector{<:Integer}}
-    A::Ta
-    b::Tv
-    c::Tv
-    uind::Ti
-    uval::Tv
-end
-
 """
     HSDSolver
 
 Solver for the homogeneous self-dual algorithm.
-
-Solves problems of the form
-    ``
-    \min_{x} c'x
-    s.t.     A x = b
-               x ⩽ u
-               x ⩾ 0
-    ``
 """
-mutable struct HSDSolver{T<:Real, Tv<:AbstractVector{T}} <: AbstractSolver
+mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
+
+    # =================
+    #   Problem data
+    # =================
+    pb::StandardForm{Tv}
+
+
+    # ================
+    #   Book-keping
+    # ================
+    niter::Int  # Number of IPM iterations
 
 
     #=====================
@@ -30,23 +25,14 @@ mutable struct HSDSolver{T<:Real, Tv<:AbstractVector{T}} <: AbstractSolver
     # nvar::Int    # Number of variables
     # nvarub::Int  # Number of upper-bounded variables
 
-    # Primal-dual iterate
-    sol::Point{T, Tv}       # Current primal-dual solution
-    best_sol::Point{T, Tv}  # Best (feasible) solution seen so far
+    point::Point{Tv}    # Current primal-dual iterate
+    res::Residuals{Tv}  # Residuals at current iterate
 
-    # Residuals
-    rp::Tv      # Primal residual
-    rp_norm::T  # Infinite norm of primal residual
-    rd::Tv      # Dual residual
-    rd_norm::T  # Infinite norm of dual residul
-    ru::Tv      # Primal upper-bound residual
-    ru_norm::T  # Infinite norm of primal upper-bound residual
-    rg::T       # Gap residual
+    # rxs::Tv  # rhs for complimentary products
+    # rwz::Tv  # rhs for complimentary products
+    # rtk::T          # rhs for homogeneous complimentary products
 
-    rxs::Tv  # rhs for complimentary products
-    rwz::Tv  # rhs for complimentary products
-    rtk::T          # rhs for homogeneous complimentary products
-
+    # TODO: Constructor
 end
 
 function optimize!(
@@ -79,31 +65,51 @@ function optimize!(
 
 end
 
-function compute_residuals!(model::Model, solver::HSDSolver)
 
+"""
+    compute_residuals!(::HSDSolver, res, pt, A, b, c, uind, uval)
+
+In-place computation of primal-dual residuals at point `pt`.
+"""
+function compute_residuals!(
+    ::HSDSolver,
+    res::Residuals{Tv}, pt::Point{Tv},
+    A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv},
+    uind::Vector{Int}, uval::Vector{Tv}
+) where{Tv<:Real}
     # Primal residual
     # ``rp = t*b - A*x``
-    mul!(solver.rp, model.A, solver.x)
-    rmul!(solver.rp, -oneunit(eltype(solver.rp)))
-    axpy!(solver.t, model.b, solver.rp)
+    mul!(res.rp, A, pt.x)
+    rmul!(res.rp, -oneunit(Tv))
+    axpy!(pt.t, b, res.rp)
 
     # Upper-bound residual
     # ``ru = t*u - w - x``
-    rmul!(solver.ru, -zero(eltype(solver.ru)))
-    axpy!(-oneunit(eltype(solver.x)), solver.w, solver.ru)
-    @views axpy!(-oneunit(eltype(solver.x)), solver.x[model.uind], solver.ru)
-    axpy!(solver.t, model.uval, solver.ru)
+    rmul!(res.ru, zero(Tv))
+    axpy!(-oneunit(Tv), pt.w, res.ru)
+    @views axpy!(-oneunit(Tv), pt.x[uind], res.ru)
+    axpy!(pt.t, uval, res.ru)
 
     # Dual residual
     # ``rd = t*c - A'*y - s + z``
-    mul!(solver.rd, transpose(model.A), solver.y)
-    rmul!(solver.rd, -oneunit(eltype(solver.rd)))
-    axpy!(solver.t, model.c, solver.rd)
-    axpy!(-oneunit(eltype(solver.s)), solver.s, solver.rd)
-    @views axpy!(oneunit(eltype(solver.z)), solver.z, solver.ru[model.uind])
+    mul!(res.rd, transpose(A), pt.y)
+    rmul!(res.rd, -oneunit(Tv))
+    axpy!(pt.t, c, res.rd)
+    axpy!(-oneunit(Tv), pt.s, res.rd)
+    @views axpy!(oneunit(Tv), pt.z, res.rd[uind])
 
     # Gap residual
-    solver.rg = dot(model.c, solver.x) - dot(model.b, solver.y) - dot(model.uval, solver.z) + solver.k
+    res.rg = dot(c, pt.x) - dot(b, pt.y) - dot(uval, pt.z) + pt.k
+
+    # Residuals norm
+    res.rp_nrm = norm(res.rp, Inf)
+    res.ru_nrm = norm(res.ru, Inf)
+    res.rd_nrm = norm(res.rd, Inf)
+    res.rg_nrm = norm(res.rg, Inf)
 
     return nothing
 end
+
+
+
+function check_stopping_criterion(hsd)
