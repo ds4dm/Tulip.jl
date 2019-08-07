@@ -29,6 +29,7 @@ function add_constraint!(m::Model_{Tv},
 
     # Set coefficients
     for (vidx, val) in zip(vinds, vvals)
+        iszero(val) && continue  # Drop zeros
         m.pbdata_raw.coeffs[vidx, cidx] = val
         push!(m.pbdata_raw.var2con[vidx], cidx)
         push!(m.pbdata_raw.con2var[cidx], vidx)
