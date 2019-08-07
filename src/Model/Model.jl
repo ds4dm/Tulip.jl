@@ -1,19 +1,6 @@
 import DataStructures:
     OrderedSet, OrderedDict
 
-"""
-    BoundType
-
-"""
-@enum BoundType begin
-    TLP_BND_UP  # Upper-bounded
-    TLP_BND_LO  # Lower-bounded
-    TLP_BND_FX  # Fixed
-    TLP_BND_FR  # Free
-    TLP_BND_RG  # Range
-end
-
-
 include("./constraint.jl")
 include("./variable.jl")
 
@@ -42,5 +29,6 @@ mutable struct Model_{Tv<:Real}
 
     Model_(name, pb::ProblemData{Tv}) where{Tv<:Real} = new{Tv}(name, pb, nothing)
 end
+
 
 include("./api.jl")

@@ -6,7 +6,9 @@ using SparseArrays
 import Base: RefValue
 
 # new code
+include("./enums.jl")
 include("./Model/Model.jl")
+include("./Solvers/Solvers.jl")
 
 # export readmps
 
