@@ -5,4 +5,5 @@ using Test
     include("./constraint.jl")
     include("./pbdata.jl")
     include("./api.jl")
+    include("./standardform.jl")
 end
