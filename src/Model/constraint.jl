@@ -88,8 +88,9 @@ set_name!(c::LinearConstraint, s::String) = (c.dat.name = s)
     get_bounds(c::LinearConstraint{Tv})
 """
 function get_bounds(c::LinearConstraint{Tv}) where{Tv<:Real}
-    return (c.bt, c.lb, c.ub)
+    return (c.dat.bt, c.dat.lb, c.dat.ub)
 end
+
 
 """
     get_lower_bound(c::LinearConstraint)
