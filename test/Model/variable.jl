@@ -5,16 +5,16 @@ function run_tests_variable()
     # Constructors
     @testset "Constructors" begin
         vid = TLP.VarId(1)
-        vdat = TLP.VarData("x1", 0.0, 0.0, Inf)
+        vdat = TLP.VarData("x1", 0.0, TLP.TLP_BND_LO, 0.0, Inf)
         v = TLP.Variable(vid, vdat)
 
         v = TLP.Variable{Float64}(vid)
 
-        v = TLP.Variable{Float64}(vid, "x1", 0.0, 0.0, Inf)
+        v = TLP.Variable{Float64}(vid, "x1", 0.0, TLP.TLP_BND_LO, 0.0, Inf)
     end
 
     vid = TLP.VarId(1)
-    vdat = TLP.VarData("x1", 0.0, 0.0, Inf)
+    vdat = TLP.VarData("x1", 0.0, TLP.TLP_BND_LO, 0.0, Inf)
     v = TLP.Variable(vid, vdat)
 
     # UUID
@@ -50,8 +50,7 @@ function run_tests_variable()
         @test TLP.get_lower_bound(v) == 0.0
         @test TLP.get_upper_bound(v) == Inf
 
-        TLP.set_lower_bound!(v, -1.0)
-        TLP.set_upper_bound!(v,  1.0)
+        TLP.set_bounds!(v, TLP.TLP_BND_RG, -1.0, 1.0)
 
         @test TLP.get_lower_bound(v) == -1.0
         @inferred TLP.get_lower_bound(v)
@@ -59,11 +58,10 @@ function run_tests_variable()
         @inferred TLP.get_upper_bound(v)
 
         # Check type conversion
-        TLP.set_lower_bound!(v, 0)
+        TLP.set_bounds!(v, TLP.TLP_BND_RG, 0, 2)
         @test TLP.get_lower_bound(v) == 0.0
         @inferred TLP.get_lower_bound(v)
 
-        TLP.set_upper_bound!(v, 2)
         @test TLP.get_upper_bound(v) ==  2.0
         @inferred TLP.get_upper_bound(v)
     end

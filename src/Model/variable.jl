@@ -15,19 +15,21 @@ mutable struct VarData{Tv<:Real}
     name::String
 
     obj::Tv  # Objective coeff
+
+    bt::BoundType
     lb::Tv   # Lower bound
     ub::Tv   # Upper bound
 
     # Constructors
-    VarData{Tv}() where {Tv<:Real} = new{Tv}("", zero(Tv), typemin(Tv), typemax(Tv))
+    VarData{Tv}() where {Tv<:Real} = new{Tv}("", zero(Tv), TLP_BND_FX, zero(Tv), zero(Tv))
     
-    function VarData{Tv}(name::String, obj, lb, ub) where {Tv<:Real}
-        return new{Tv}(name, obj, lb, ub)
+    function VarData{Tv}(name::String, obj, bt, lb, ub) where {Tv<:Real}
+        return new{Tv}(name, obj, bt, lb, ub)
     end
 
 end
 
-VarData(name::String, obj::Tv, lb::Tv, ub::Tv) where{Tv<:Real} = VarData{Tv}(name, obj, lb, ub)
+VarData(name::String, obj::Tv, bt::BoundType, lb::Tv, ub::Tv) where{Tv<:Real} = VarData{Tv}(name, obj, bt, lb, ub)
 
 
 """
@@ -46,8 +48,8 @@ struct Variable{Tv<:Real}
     Variable{Tv}(id::VarId) where{Tv<:Real} = Variable(id, VarData{Tv}())
 end
 
-function Variable{Tv}(id::VarId, name::String, obj, lb, ub) where{Tv<:Real}
-    vd = VarData{Tv}(name, obj, lb, ub)
+function Variable{Tv}(id::VarId, name::String, obj, bt, lb, ub) where{Tv<:Real}
+    vd = VarData{Tv}(name, obj, bt, lb, ub)
     return Variable(id, vd)
 end
 
@@ -93,17 +95,17 @@ set_obj_coeff!(v::Variable, coeff) = (v.dat.obj = coeff)
 
 
 """
+    get_bounds(v::Variable{Tv})
+"""
+function get_bounds(v::Variable{Tv}) where{Tv<:Real}
+    return (v.dat.bt, v.dat.lb, v.dat.ub)
+end
+
+"""
     get_lower_bound(v::Variable)
 
 """
 get_lower_bound(v::Variable) = v.dat.lb
-
-
-"""
-    set_lower_bound(v::Variable, l)
-
-"""
-set_lower_bound!(v::Variable, l) = (v.dat.lb = l)
 
 
 """
@@ -114,7 +116,25 @@ get_upper_bound(v::Variable) = v.dat.ub
 
 
 """
-    set_upper_bound(v::Variable, u)
+    set_bounds!(c::LinearConstraint, bt, lb, ub)
 
 """
-set_upper_bound!(v::Variable, u) = (v.dat.ub = u)
+function set_bounds!(v::Variable{Tv}, bt::BoundType, lb, ub) where{Tv<:Real}
+
+    # Check bounds
+    if bt == TLP_BND_FX
+        (lb == ub) || error(
+            "Invalid bounds for $bt variable: [$lb, $ub]"
+        )
+    elseif bt == TLP_BND_RG
+        (typemin(Tv) < lb <= ub < typemax(Tv)) || error(
+            "Invalid bounds for range: [$lb, $ub]"
+        )
+    end
+
+    v.dat.bt = bt
+    v.dat.lb = lb
+    v.dat.ub = ub
+
+    return nothing
+end

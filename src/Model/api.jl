@@ -46,7 +46,7 @@ Add one scalar variable to the model.
 function add_variable!(
     m::Model_{Tv},
     name::String,
-    obj::Tv, lb::Tv, ub::Tv,
+    obj::Tv, bt::BoundType, lb::Tv, ub::Tv,
     cinds::Vector{ConstrId},
     cvals::Vector{Tv},
 ) where{Tv<:Real}
@@ -63,7 +63,7 @@ function add_variable!(
 
     # Create new constraint object
     vidx = new_variable_index!(m.pbdata_raw)
-    var = Variable{Tv}(vidx, name, obj, lb, ub)
+    var = Variable{Tv}(vidx, name, obj, bt, lb, ub)
 
     # Add constraint to model
     add_variable!(m.pbdata_raw, var)
@@ -81,12 +81,12 @@ end
 function add_variable!(
     m::Model_{Tv},
     name::String,
-    obj::Tv, lb::Tv, ub::Tv
+    obj::Tv, bt::BoundType, lb::Tv, ub::Tv
 ) where{Tv<:Real}
 
     # Create new Variable object
     vidx = new_variable_index!(m.pbdata_raw)
-    var = Variable{Tv}(vidx, name, obj, lb, ub)
+    var = Variable{Tv}(vidx, name, obj, bt, lb, ub)
 
     # Add variable to model
     add_variable!(m.pbdata_raw, var)

@@ -9,7 +9,7 @@ function run_tests_api()
         x = TLP.add_variable!(m)
         @test x.uuid == 1
 
-        y = TLP.add_variable!(m, "y", 1.0, 0.0, Inf)
+        y = TLP.add_variable!(m, "y", 1.0, TLP.TLP_BND_LO, 0.0, Inf)
         @test y.uuid == 2
 
         # Create a constraint
