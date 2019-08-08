@@ -30,6 +30,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
 
     pt::Point{Tv}    # Current primal-dual iterate
     res::Residuals{Tv}  # Residuals at current iterate
+    F::Factorization{Tv}
 
     # rxs::Tv  # rhs for complimentary products
     # rwz::Tv  # rhs for complimentary products
@@ -39,7 +40,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
 end
 
 
-# include("./hsd_step.jl")
+include("./hsd_step.jl")
 
 
 """
@@ -54,6 +55,7 @@ function compute_residuals!(
     A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv},
     uind::Vector{Int}, uval::Vector{Tv}
 ) where{Tv<:Real}
+
     # Primal residual
     # ``rp = t*b - A*x``
     mul!(res.rp, A, pt.x)
@@ -76,7 +78,7 @@ function compute_residuals!(
     @views axpy!(oneunit(Tv), pt.z, res.rd[uind])
 
     # Gap residual
-    res.rg = dot(c, pt.x) - dot(b, pt.y) - dot(uval, pt.z) + pt.k
+    res.rg = dot(c, pt.x) - (dot(b, pt.y) - dot(uval, pt.z)) + pt.k
 
     # Residuals norm
     res.rp_nrm = norm(res.rp, Inf)
@@ -109,7 +111,7 @@ end
     optimize!
 
 """
-function optimize!(hsd::HSDSolver, env::TulipEnv)
+function optimize!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
 
     # TODO: pre-check whether model needs to be re-optimized.
     # This should happen outside of this function
@@ -132,6 +134,14 @@ function optimize!(hsd::HSDSolver, env::TulipEnv)
 
     # TODO: set starting point
     # Q: should we allocate memory for `pt` here?
+    hsd.pt.x .= oneunit(Tv)
+    hsd.pt.w .= oneunit(Tv)
+    hsd.pt.t  = oneunit(Tv)
+    hsd.pt.y .= zero(Tv)
+    hsd.pt.s .= oneunit(Tv)
+    hsd.pt.z .= oneunit(Tv)
+    hsd.pt.k  = oneunit(Tv)
+    update_mu!(hsd.pt)
 
     # Main loop
     # Iteration 0 corresponds to the starting point.
@@ -146,6 +156,8 @@ function optimize!(hsd::HSDSolver, env::TulipEnv)
             hsd.pb.A, hsd.pb.b, hsd.pb.c, hsd.pb.uind, hsd.pb.uval
         )
 
+        update_mu!(hsd.pt)
+
         # I.B - Log
         # TODO: Put this in a logging function
         ttot = time() - tstart
@@ -154,8 +166,8 @@ function optimize!(hsd::HSDSolver, env::TulipEnv)
             @printf "%4d" niter
             
             # Objectives
-            @printf "  %+16.7e" dot(hsd.pb.c, hsd.pt.x)
-            @printf "%+16.7e" (dot(hsd.pb.b, hsd.pt.y) - dot(hsd.pb.uval, hsd.pt.z))
+            @printf "  %+16.7e" dot(hsd.pb.c, hsd.pt.x) / hsd.pt.t
+            @printf "%+16.7e" (dot(hsd.pb.b, hsd.pt.y) - dot(hsd.pb.uval, hsd.pt.z)) / hsd.pt.t
             
             # Residuals
             @printf " %9.2e" max(hsd.res.rp_nrm, hsd.res.ru_nrm)
