@@ -1,8 +1,10 @@
 module Solvers
 
 using LinearAlgebra
+using Printf
 
-import Tulip.StandardForm
+import Tulip:
+    TerminationStatus, SolutionStatus, TulipEnv, StandardForm
 
 
 """
@@ -126,6 +128,12 @@ function check_stopping_criteria!(
 
 ) end
 
+
+"""
+    compute_step!
+
+"""
+function compute_step!(::AbstractIPMSolver, ::TulipEnv) end
 
 include("HSDSolver/HSDSolver.jl")
 # include("MPC/MPSSolver.jl")  # TODO
