@@ -4,7 +4,7 @@ using LinearAlgebra
 using Printf
 
 import Tulip:
-    TerminationStatus, SolutionStatus, TulipEnv, StandardForm
+    TerminationStatus, SolutionStatus, TulipEnv, StandardForm, factor_normaleq!
 
 
 """
@@ -31,6 +31,11 @@ mutable struct Point{Tv<:Real}
 
     # Centrality parameter
     μ::Tv
+end
+
+function update_mu!(pt::Point{Tv}) where{Tv<:Real}
+    pt.μ = ((dot(pt.x, pt.s) + dot(pt.w, pt.z) + pt.t * pt.k)) / (pt.n + pt.p + 1)
+    return nothing
 end
 
 
