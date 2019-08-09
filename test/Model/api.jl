@@ -1,27 +1,21 @@
 # TODO: unit tests with various numerical types: Float32, Float64, BigFloat
-function run_tests_api()
+function run_tests_api(::Tv) where{Tv<:Real}
 
-    @testset "Model creation" begin
-        # Create variable
-        m = TLP.Model_{Float64}()
+    m = Tulip.Model_{Float64}()
+    env = m.env
 
-        # Create two variables
-        x = TLP.add_variable!(m)
-        @test x.uuid == 1
+    x1 = TLP.add_variable!(m, "x1", 1.0, TLP.TLP_BND_LO, 0.0, Inf)
+    x2 = TLP.add_variable!(m, "x1", 2.0, TLP.TLP_BND_LO, 0.0, Inf)
 
-        y = TLP.add_variable!(m, "y", 1.0, TLP.TLP_BND_LO, 0.0, Inf)
-        @test y.uuid == 2
+    c1 = TLP.add_constraint!(m, "c1", TLP.TLP_BND_FX, 2.0, 2.0, [x1, x2], [1.0, 1.0])
 
-        # Create a constraint
-        c = TLP.add_constraint!(m, "c1", TLP.TLP_BND_FX, 1.0, 1.0, [x, y], [1.0, 2.0])
-        @test c.uuid == 1
-
-        # Check that coefficients were updated properly
-        @test m.pbdata_raw.coeffs[x, c] == 1.0
-        @test m.pbdata_raw.coeffs[y, c] == 2.0
-    end
+    # TODO: build standard form and solve model
 
     return nothing
 end
 
-@testset "low-level API" begin run_tests_api() end
+@testset "low-level API" begin
+    for Tv in TvTYPES
+        @testset "$Tv" begin run_tests_api(zero(Tv)) end
+    end
+end
