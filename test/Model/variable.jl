@@ -2,13 +2,14 @@
 # This may require to encapsulate each testset in its own typed function.
 # Tv types: Float32, Float64, BigFloat, Rational
 function run_tests_variable(::Tv) where{Tv<:Real}
-    # Constructors
+    
     @testset "VarId" begin
         vid = TLP.VarId(1)
 
         @test vid.uuid == 1
     end
 
+    # TODO: move these tests to another file
     @testset "Bounds" begin
 
         # These should pass
@@ -100,7 +101,7 @@ function run_tests_variable(::Tv) where{Tv<:Real}
         @inferred TLP.get_upper_bound(v)
 
         # Check type conversion
-        TLP.set_bounds!(v, TLP.TLP_BND_RG, Tv(0), Tv(2))
+        TLP.set_bounds!(v, TLP.TLP_BND_RG, 0, 2)
         @test TLP.get_lower_bound(v) == Tv(0)
         @inferred TLP.get_lower_bound(v)
 
