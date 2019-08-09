@@ -49,6 +49,7 @@ include("./hsd_step.jl")
 In-place computation of primal-dual residuals at point `pt`.
 """
 # TODO: check whether having just hsd as argument makes things slower
+# TODO: Update solution status
 function compute_residuals!(
     ::HSDSolver,
     res::Residuals{Tv}, pt::Point{Tv},
@@ -91,19 +92,51 @@ end
 
 
 """
-    check_stopping_criterion()
+    update_solver_status!()
 
-Check stopping criteria and return `true` if solver should stop.
+Update status and return true if solver should stop.
 """
-function check_stopping_criterion(
-    hsd::HSDSolver,
-    res::Residuals, pt::Point,
+function update_solver_status!(
+    hsd::HSDSolver{Tv},
+    pt::Point{Tv}, res::Residuals{Tv},
     A, b, c, uind, uval,
+    ϵp, ϵd, ϵg, ϵi
+) where{Tv<:Real}
+    hsd.solver_status = TerminationStatus(0)
+    
+    pbnd = dot(c, pt.x)
+    dbnd = dot(b, pt.y) - dot(uval, pt.z)
+    # Check for optimal solution
+    if (
+        res.rp_nrm / (pt.t * (oneunit(Tv) + norm(b, Inf))) <= ϵp
+        && res.ru_nrm / (pt.t * (oneunit(Tv) + norm(uval, Inf))) <= ϵp
+        && res.rd_nrm / (pt.t * (oneunit(Tv) + norm(c, Inf))) <= ϵd
+        && (abs(pbnd - dbnd) / (pt.t + abs(dbnd))) <= ϵg
+    )
+        # Optimality reached
+        hsd.solver_status = TerminationStatus(1)
+        return nothing
+    end
 
-)
-    stop = true
+    # Check for infeasibility certificates
+    if (pt.μ < ϵi) && ((pt.t / pt.k) < ϵi)
+        # Check for primal or dual infeasibility
+        if dot(c, pt.x) < -ϵi
+            # Primal infeasible
+            hsd.solver_status = TerminationStatus(2)
+            return nothing
+        
+        elseif (-dot(b, pt.y) - dot(uval, pt.z)) < -ϵi
+            # Dual infeasible
+            hsd.solver_status = TerminationStatus(3)
+            return nothing
+        else
+            # Should never be reached
+            error("Detected infeasibility, but")
+        end
+    end
 
-    return stop
+    return nothing
 end
 
 
@@ -188,8 +221,29 @@ function optimize!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
         #   followed by a check on the solver status to determine whether to stop
         # In particular, user limits should be checked last (if an optimal solution is found,
         # we want to report optimal, not user limits)
-        niter < env.barrier_iter_max.val || break
-        ttot < env.time_limit.val || break
+        update_solver_status!(
+            hsd, hsd.pt, hsd.res,
+            hsd.pb.A, hsd.pb.b, hsd.pb.c, hsd.pb.uind, hsd.pb.uval,
+            env.barrier_tol_pfeas.val,
+            env.barrier_tol_dfeas.val,
+            env.barrier_tol_conv.val,
+            env.barrier_tol_infeas.val
+        )
+
+        if (
+            hsd.solver_status == TerminationStatus(1)     # Optimal
+            || hsd.solver_status == TerminationStatus(2)  # Primal infeasible
+            || hsd.solver_status == TerminationStatus(3)  # Dual infeasible
+        )
+            break
+        elseif niter >= env.barrier_iter_max.val 
+            hsd.solver_status = TerminationStatus(4)  # Iteration limit
+            break
+        elseif ttot >= env.time_limit.val
+            hsd.solver_status = TerminationStatus(5)  # Iteration limit
+            break
+        end
+        
 
         # TODO: step
         # For now, include the factorization in the step function
