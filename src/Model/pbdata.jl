@@ -3,7 +3,7 @@
 
 Pace-holder and interface for problem data.
 
-Problem data is stored in the form
+Problem data is stored in canonical form
 ```math
 \\begin{align}
     \\min_{x} \\ \\ \\ & c^{T} x \\\\
@@ -59,22 +59,6 @@ Return the number of constraints in the problem.
 get_num_constr(pb::ProblemData) = length(pb.constrs)
 
 
-# TODO: replace pb.nvar += 1 by an increment function that checks if typemax
-# is reached, and raises an error if it is.
-"""
-    add_variable(pb::ProblemData{Tv}, v::Variable{Tv})
-
-Add variable `v` to problem `pb`. Raises an error if `v` is already in the model. 
-"""
-function add_variable!(pb::ProblemData{Tv}, v::Variable{Tv}) where {Tv<:Real}
-    !haskey(pb.vars, v.id) || error("Variable $(v.id.uuid) already exists.")
-
-    pb.vars[v.id] = v
-    pb.var2con[v.id] = OrderedSet{ConstrId}()
-    return nothing
-end
-
-
 """
     new_variable_index!(pb::ProblemData)
 
@@ -87,7 +71,6 @@ function new_variable_index!(pb::ProblemData)
 end
 
 
-
 """
     new_constraint_index!(pb::ProblemData)
 
@@ -97,6 +80,20 @@ function new_constraint_index!(pb::ProblemData)
     idx = ConstrId(pb.constr_cnt + 1)
     pb.constr_cnt += 1
     return idx
+end
+
+
+"""
+    add_variable(pb::ProblemData{Tv}, v::Variable{Tv})
+
+Add variable `v` to problem `pb`. Raises an error if `v` is already in the model. 
+"""
+function add_variable!(pb::ProblemData{Tv}, v::Variable{Tv}) where {Tv<:Real}
+    !haskey(pb.vars, v.id) || error("Variable $(v.id.uuid) already exists.")
+
+    pb.vars[v.id] = v
+    pb.var2con[v.id] = OrderedSet{ConstrId}()
+    return nothing
 end
 
 
