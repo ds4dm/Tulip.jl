@@ -5,11 +5,6 @@ using SparseArrays
 
 import Base: RefValue
 
-# new code
-include("./enums.jl")
-include("./Model/Model.jl")
-include("./Solvers/Solvers.jl")
-
 # export readmps
 
 # Cholesky module
@@ -26,6 +21,11 @@ include("model.jl")
 include("prepross.jl")
 include("ipm.jl")
 include("readmps.jl")
-include("TulipSolverInterface.jl")
+include("MPB_wrapper.jl")
+
+# new code
+include("./enums.jl")
+include("./Model/Model.jl")
+include("./Solvers/Solvers.jl")
 
 end # module
