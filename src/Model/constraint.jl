@@ -7,8 +7,6 @@ struct ConstrId
 end
 
 
-
-
 """
     LinConstrData{Tv<:Real}
 
@@ -21,13 +19,10 @@ mutable struct LinConstrData{Tv<:Real}
     lb::Tv
     ub::Tv
 
-    LinConstrData{Tv}() where{Tv<:Real} = new{Tv}("", TLP_BND_FX, zero(Tv), zero(Tv))
-
-    function LinConstrData{Tv}(name::String, bt::BoundType, lb, ub) where{Tv<:Real}
+    function LinConstrData{Tv}(name::String, bt::BoundType, lb::Real, ub::Real) where{Tv<:Real}
         return new{Tv}(name, bt, lb, ub)
     end
 end
-
 
 abstract type AbstractConstraint{Tv<:Real} end
 
@@ -47,10 +42,6 @@ struct LinearConstraint{Tv<:Real} <: AbstractConstraint{Tv}
     # TODO: check
     function LinearConstraint(id::ConstrId, dat::LinConstrData{Tv}) where{Tv<:Real}
         return new{Tv}(id, dat)
-    end
-    
-    function LinearConstraint{Tv}(id::ConstrId) where{Tv<:Real}
-        return LinearConstraint(id, LinConstrData{Tv}())
     end
 end
 

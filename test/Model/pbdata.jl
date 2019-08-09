@@ -32,7 +32,9 @@ function run_tests_pbdata(::Tv) where{Tv<:Real}
         cidx = TLP.new_constraint_index!(pb)
         @test cidx.uuid == 1
 
-        c = TLP.LinearConstraint{Tv}(cidx)
+        cdat = TLP.LinConstrData{Tv}("c1", TLP.TLP_BND_RG, zero(Tv), oneunit(Tv))
+        c = TLP.LinearConstraint(cidx, cdat)
+
         TLP.add_constraint!(pb, c)
         @test haskey(pb.constrs, cidx)
         @test haskey(pb.con2var, cidx)
