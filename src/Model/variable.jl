@@ -119,7 +119,7 @@ get_upper_bound(v::Variable) = v.dat.ub
     set_bounds!(c::LinearConstraint, bt, lb, ub)
 
 """
-function set_bounds!(v::Variable{Tv}, bt::BoundType, lb, ub) where{Tv<:Real}
+function set_bounds!(v::Variable{Tv}, bt::BoundType, lb::Tv, ub::Tv) where{Tv<:Real}
     # Check bounds
     _check_bounds(bt, lb, ub) || error("Invalid bounds for $bt: [$lb, $ub]")
 
@@ -129,3 +129,5 @@ function set_bounds!(v::Variable{Tv}, bt::BoundType, lb, ub) where{Tv<:Real}
 
     return nothing
 end
+
+set_bounds!(v::Variable{Tv}, bt, lb::Real, ub::Real) where {Tv<:Real}= set_bounds!(v, bt, Tv(lb), Tv(ub))

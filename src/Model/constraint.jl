@@ -101,18 +101,9 @@ get_upper_bound(c::LinearConstraint) = c.dat.ub
     set_bounds!(c::LinearConstraint, bt, lb, ub)
 
 """
-function set_bounds!(c::LinearConstraint{Tv}, bt, lb, ub) where{Tv<:Real}
-
+function set_bounds!(c::LinearConstraint{Tv}, bt, lb::Tv, ub::Tv) where{Tv<:Real}
     # Check bounds
-    if bt == TLP_BND_FX
-        (lb == ub) || error(
-            "Invalid bounds for $bt constraint: [$lb, $ub]"
-        )
-    elseif bt == TLP_BND_RG
-        (typemin(Tv) < lb <= ub < typemax(Tv)) || error(
-            "Invalid bounds for range constraint: [$lb, $ub]"
-        )
-    end
+    _check_bounds(bt, lb, ub) || error("Invalid bounds for $bt: [$lb, $ub]")
 
     c.dat.bt = bt
     c.dat.lb = lb
@@ -121,3 +112,6 @@ function set_bounds!(c::LinearConstraint{Tv}, bt, lb, ub) where{Tv<:Real}
     return nothing
 end
 
+function set_bounds!(c::LinearConstraint{Tv}, bt, lb::Real, ub::Real) where{Tv<:Real}
+    set_bounds!(c, bt, Tv(lb), Tv(ub))
+end
