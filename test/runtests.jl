@@ -6,6 +6,8 @@ using SparseArrays
 using Tulip
 TLP = Tulip
 
+const TvTYPES = [Float32, Float64, BigFloat, Rational]
+
 # write your own tests here
 const testdir = dirname(@__FILE__)
 

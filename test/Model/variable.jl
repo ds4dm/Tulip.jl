@@ -112,7 +112,7 @@ function run_tests_variable(::Tv) where{Tv<:Real}
 end
 
 @testset "Variable" begin
-    for Tv in [Float32, Float64, BigFloat, Rational]
+    for Tv in TvTYPES
         @testset "$Tv" begin run_tests_variable(zero(Tv)) end
     end
 end 
