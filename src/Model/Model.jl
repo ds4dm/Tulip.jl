@@ -15,8 +15,7 @@ include("./standardform.jl")
 """
 mutable struct Model_{Tv<:Real}
     name::String  # Model name
-
-    # params  # Parameters
+    env::TulipEnv  # Parameters
 
     pbdata_raw::Union{Nothing, ProblemData{Tv}}   # Raw data
     pbdata_std::Union{Nothing, StandardForm{Tv}}  # Standard form
@@ -25,10 +24,8 @@ mutable struct Model_{Tv<:Real}
     # * IPMSolver
     # * status
     # * ...
-    Model_{Tv}() where{Tv<:Real} = new{Tv}("", ProblemData{Tv}(), nothing)
-
-    Model_(name, pb::ProblemData{Tv}) where{Tv<:Real} = new{Tv}(name, pb, nothing)
+    Model_{Tv}() where{Tv<:Real} = new{Tv}("", TulipEnv(), ProblemData{Tv}(), nothing)
 end
 
 
-include("./api.jl")
+include("API/api.jl")

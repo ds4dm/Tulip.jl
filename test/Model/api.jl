@@ -3,7 +3,7 @@ function run_tests_api()
 
     @testset "Model creation" begin
         # Create variable
-        m = TLP.Model_("test", TLP.ProblemData{Float64}())
+        m = TLP.Model_{Float64}()
 
         # Create two variables
         x = TLP.add_variable!(m)
