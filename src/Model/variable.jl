@@ -21,15 +21,15 @@ mutable struct VarData{Tv<:Real}
     ub::Tv   # Upper bound
 
     # Constructors
-    VarData{Tv}() where {Tv<:Real} = new{Tv}("", zero(Tv), TLP_BND_FX, zero(Tv), zero(Tv))
-    
-    function VarData{Tv}(name::String, obj, bt, lb, ub) where {Tv<:Real}
+    function VarData{Tv}(name::String, obj::Real, bt::BoundType, lb::Real, ub::Real) where {Tv<:Real}
         return new{Tv}(name, obj, bt, lb, ub)
     end
 
 end
 
-VarData(name::String, obj::Tv, bt::BoundType, lb::Tv, ub::Tv) where{Tv<:Real} = VarData{Tv}(name, obj, bt, lb, ub)
+function VarData(name::String, obj::Tv, bt::BoundType, lb::Tv, ub::Tv) where{Tv<:Real}
+    VarData{Tv}(name, obj, bt, lb, ub)
+end
 
 
 """
@@ -45,10 +45,10 @@ struct Variable{Tv<:Real}
     function Variable(id::VarId, dat::VarData{Tv}) where{Tv<:Real}
         return new{Tv}(id, dat)
     end
-    Variable{Tv}(id::VarId) where{Tv<:Real} = Variable(id, VarData{Tv}())
 end
 
 function Variable{Tv}(id::VarId, name::String, obj, bt, lb, ub) where{Tv<:Real}
+    _check_bounds(bt, lb, ub) || error("Invalid bounds for $bt: [$lb, $ub]")
     vd = VarData{Tv}(name, obj, bt, lb, ub)
     return Variable(id, vd)
 end
@@ -71,7 +71,7 @@ get_name(v::Variable) = v.dat.name
 
 
 """
-    set_name(v::Variable, s::String)
+    set_name!(v::Variable, s::String)
 
 Set the name of variable `v` to `s`.
 """
@@ -120,21 +120,31 @@ get_upper_bound(v::Variable) = v.dat.ub
 
 """
 function set_bounds!(v::Variable{Tv}, bt::BoundType, lb, ub) where{Tv<:Real}
-
     # Check bounds
-    if bt == TLP_BND_FX
-        (lb == ub) || error(
-            "Invalid bounds for $bt variable: [$lb, $ub]"
-        )
-    elseif bt == TLP_BND_RG
-        (typemin(Tv) < lb <= ub < typemax(Tv)) || error(
-            "Invalid bounds for range: [$lb, $ub]"
-        )
-    end
+    _check_bounds(bt, lb, ub) || error("Invalid bounds for $bt: [$lb, $ub]")
 
     v.dat.bt = bt
     v.dat.lb = lb
     v.dat.ub = ub
 
     return nothing
+end
+
+
+function _check_bounds(bt::BoundType, lb::Tv, ub::Tv) where{Tv<:Real}
+    if bt == TLP_BND_FX
+        return Tv(-Inf)  < lb == ub  < Tv(Inf)
+    elseif bt == TLP_BND_RG
+        return Tv(-Inf)  < lb <= ub  < Tv(Inf)
+    elseif bt == TLP_BND_UP
+        return Tv(-Inf) == lb  < ub  < Tv(Inf)
+    elseif bt == TLP_BND_LO
+        return Tv(-Inf)  < lb  < ub == Tv(Inf)
+    elseif bt == TLP_BND_FR
+        return (Tv(-Inf) == lb) && (ub == Tv(Inf))
+    else
+        error("Unsupported bound type: $bt.")
+    end
+
+    return false
 end
