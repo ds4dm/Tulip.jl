@@ -1,3 +1,4 @@
+# TODO: parametrize and run tests for mutiple types
 function run_tests_pbdata()
 
     @testset "Constructor" begin
@@ -13,7 +14,9 @@ function run_tests_pbdata()
         # Add variable
         vidx = TLP.new_variable_index!(pb)
         @test vidx.uuid == 1
-        v = TLP.Variable{Float64}(vidx)
+
+        vdat = TLP.VarData{Float64}("x", 0.0, TLP.TLP_BND_LO, 0.0, Inf)
+        v = TLP.Variable(vidx, vdat)
         TLP.add_variable!(pb, v)
         @test haskey(pb.vars, vidx)
         @test haskey(pb.var2con, vidx)
@@ -43,6 +46,4 @@ function run_tests_pbdata()
 
 end
 
-@testset "ProblemData" begin
-    run_tests_pbdata()
-end
+@testset "ProblemData" begin run_tests_pbdata() end

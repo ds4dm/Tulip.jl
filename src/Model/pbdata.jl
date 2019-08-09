@@ -109,3 +109,34 @@ function add_constraint!(pb::ProblemData{Tv}, c::LinearConstraint{Tv}) where{Tv<
     pb.con2var[c.id] = OrderedSet{VarId}()
     return nothing
 end
+
+
+"""
+    set_coeff!(pb::ProblemData{Tv}, vid::VarId, cid::ConstrId, val::Tv)
+
+"""
+function set_coeff!(pb::ProblemData{Tv}, vid::VarId, cid::ConstrId, val::Tv) where{Tv<:Real}
+    
+    if !haskey(pb.coeffs, (vid, cid))
+        # Entry does not exist
+        iszero(val) && return nothing  # Ignore zero values
+
+        # Set coefficient
+        pb.coeffs[vid, cid] = val
+        push!(pb.var2con[vid], cid)
+        push!(pb.con2var[cid], vid)
+    else
+        # Entry exists. Need to check if coeff is zero or not
+        if iszero(val)
+            # Delete coefficient from problem
+            delete!(pb.coeffs, (vid, cid))
+            delete!(pb.var2con[vid], cid)
+            delete!(pb.con2var[cid], vid)
+        else
+            # Just replace the value
+            pb.coeffs[vid, cid] = val
+        end
+    end
+
+    return nothing
+end
