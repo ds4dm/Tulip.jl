@@ -51,3 +51,22 @@ function add_constraint!(
     
     return cidx
 end
+
+add_constraint!(
+    m::Model_{Tv},
+    name::String,
+    bt::BoundType, lb::Real, ub::Real,
+    colids::Vector{VarId},
+    colvals::Vector{T}
+) where{Tv<:Real, T<:Real} = add_constraint!(
+    m, name,
+    bt, Tv(lb), Tv(ub),
+    colids, Tv.(colvals)
+)
+
+add_constraint!(
+    m::Model_{Tv},
+    name::String,
+    obj::Real,
+    bt::BoundType, lb::Real, ub::Real
+) where{Tv<:Real} = add_constraint!(m, name, obj, bt, lb, ub, VarrId[], Tv[])
