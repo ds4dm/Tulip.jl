@@ -86,10 +86,8 @@ function run_tests_api(::Tv) where{Tv<:Real}
 
     end
 
-    x1 = TLP.add_variable!(m, "x1", 1.0, TLP.TLP_BND_LO, 0.0, Inf)
-    x2 = TLP.add_variable!(m, "x1", 2.0, TLP.TLP_BND_RG, 0.0, 1.0)
-
-    c1 = TLP.add_constraint!(m, "c1", TLP.TLP_BND_FX, 2.0, 2.0, [x1, x2], [1.0, 1.0])
+    # TODO
+    # Separate tests by category
 
     # TODO: build standard form and solve model
     # Do no include tests here yet
@@ -131,7 +129,7 @@ end
 #   1. Convert to dense and use dense factorizations
 #   2. Drop support for eltypes other than Float64
 @testset "low-level API" begin
-    for Tv in [Float64]
+    for Tv in TvTYPES
         @testset "$Tv" begin run_tests_api(zero(Tv)) end
     end
 end
