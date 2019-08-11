@@ -79,3 +79,15 @@ add_variable!(m::Model_{Tv}) where{Tv<:Real} = add_variable!(m,
 )
 
 # TODO: Add multiple variables
+
+
+# ===============================
+#       QUERY VARIABLE INFO
+# ===============================
+
+get_num_var(m::Model_) = get_num_var(m.pbdata_raw)
+
+get_var_name(m::Model_, vid::VarId) = get_name(m.pbdata_raw.vars[vid])
+
+get_var_bounds(m::Model_, vid::VarId) = get_bounds(m.pbdata_raw.vars[vid])
+
