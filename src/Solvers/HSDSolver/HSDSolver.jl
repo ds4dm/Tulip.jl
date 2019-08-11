@@ -19,6 +19,11 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     primal_status::SolutionStatus
     dual_status::SolutionStatus
 
+    primal_bound_unscaled::Tv  # Unscaled primal bound c'x
+    primal_bound_scaled::Tv  # Scaled primal bound (c'x) / t
+    dual_bound_unscaled::Tv  # Unscaled dual bound b'y - u'z
+    dual_bound_scaled::Tv  # Scaled dual bound (b'y - u'z) / t
+
 
     #=====================
         Working memory
@@ -37,6 +42,38 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     # rtk::T          # rhs for homogeneous complimentary products
 
     # TODO: Constructor
+    function HSDSolver{Tv}(pb::StandardForm{Tv}) where{Tv<:Real}
+        ncon, nvar, nupb = size(pb.A, 1), size(pb.A, 2), length(pb.uval)
+        hsd = new{Tv}()
+
+        hsd.pb = pb
+
+        hsd.niter = 0
+        hsd.solver_status = TerminationStatus(0)
+        hsd.primal_status = SolutionStatus(0)
+        hsd.dual_status = SolutionStatus(0)
+
+        hsd.primal_bound_scaled = Tv(Inf)
+        hsd.primal_bound_unscaled = Tv(Inf)
+        hsd.dual_bound_scaled = Tv(-Inf)
+        hsd.dual_bound_unscaled = Tv(-Inf)
+
+        hsd.pt = Point(
+            ncon, nvar, nupb,
+            ones(Tv, nvar), ones(Tv, nupb), oneunit(Tv),
+            ones(Tv, ncon), ones(Tv, nvar), ones(Tv, nupb), oneunit(Tv),
+            oneunit(Tv)
+        )
+        hsd.res = Residuals(
+            zeros(Tv, ncon), zeros(Tv, nupb),
+            zeros(Tv, nvar), zero(Tv),
+            zero(Tv), zero(Tv), zero(Tv), zero(Tv)
+        )
+
+        hsd.F = symbolic_cholesky(pb.A)
+
+        return hsd
+    end
 end
 
 
@@ -51,7 +88,7 @@ In-place computation of primal-dual residuals at point `pt`.
 # TODO: check whether having just hsd as argument makes things slower
 # TODO: Update solution status
 function compute_residuals!(
-    ::HSDSolver,
+    hsd::HSDSolver{Tv},
     res::Residuals{Tv}, pt::Point{Tv},
     A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv},
     uind::Vector{Int}, uval::Vector{Tv}
@@ -87,6 +124,12 @@ function compute_residuals!(
     res.rd_nrm = norm(res.rd, Inf)
     res.rg_nrm = norm(res.rg, Inf)
 
+    # Compute primal and dual bounds
+    hsd.primal_bound_unscaled = dot(c, pt.x)
+    hsd.primal_bound_scaled   = hsd.primal_bound_unscaled / pt.t
+    hsd.dual_bound_unscaled   = dot(b, pt.y) - dot(uval, pt.z)
+    hsd.dual_bound_scaled     = hsd.dual_bound_unscaled / pt.t
+
     return nothing
 end
 
@@ -104,14 +147,12 @@ function update_solver_status!(
 ) where{Tv<:Real}
     hsd.solver_status = TerminationStatus(0)
     
-    pbnd = dot(c, pt.x)
-    dbnd = dot(b, pt.y) - dot(uval, pt.z)
     # Check for optimal solution
     if (
-        res.rp_nrm / (pt.t * (oneunit(Tv) + norm(b, Inf))) <= ϵp
-        && res.ru_nrm / (pt.t * (oneunit(Tv) + norm(uval, Inf))) <= ϵp
-        && res.rd_nrm / (pt.t * (oneunit(Tv) + norm(c, Inf))) <= ϵd
-        && (abs(pbnd - dbnd) / (pt.t + abs(dbnd))) <= ϵg
+        res.rp_nrm     <= ϵp * pt.t * (oneunit(Tv) + norm(b, Inf))
+        && res.ru_nrm  <= ϵp * pt.t * (oneunit(Tv) + norm(uval, Inf))
+        && res.rd_nrm  <=  ϵd * pt.t * (oneunit(Tv) + norm(c, Inf))
+        && (abs(hsd.primal_bound_unscaled - hsd.dual_bound_unscaled) / (pt.t + abs(hsd.dual_bound_unscaled))) <= ϵg
     )
         # Optimality reached
         hsd.solver_status = TerminationStatus(1)
@@ -122,13 +163,13 @@ function update_solver_status!(
     if (pt.μ < ϵi) && ((pt.t / pt.k) < ϵi)
         # Check for primal or dual infeasibility
         if dot(c, pt.x) < -ϵi
-            # Primal infeasible
-            hsd.solver_status = TerminationStatus(2)
+            # Dual infeasible
+            hsd.solver_status = TerminationStatus(3)
             return nothing
         
         elseif (-dot(b, pt.y) - dot(uval, pt.z)) < -ϵi
-            # Dual infeasible
-            hsd.solver_status = TerminationStatus(3)
+            # Primal infeasible
+            hsd.solver_status = TerminationStatus(2)
             return nothing
         else
             # Should never be reached
@@ -184,7 +225,8 @@ function optimize!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
     while(true)
 
         # I.A - Compute residuals at current iterate
-        compute_residuals!(hsd,
+        compute_residuals!(
+            hsd,
             hsd.res, hsd.pt,
             hsd.pb.A, hsd.pb.b, hsd.pb.c, hsd.pb.uind, hsd.pb.uval
         )

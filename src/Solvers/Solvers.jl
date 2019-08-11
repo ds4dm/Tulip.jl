@@ -4,7 +4,9 @@ using LinearAlgebra
 using Printf
 
 import Tulip:
-    TerminationStatus, SolutionStatus, TulipEnv, StandardForm, factor_normaleq!
+    TerminationStatus, SolutionStatus, TulipEnv, StandardForm,
+    
+    symbolic_cholesky, factor_normaleq!
 
 
 """
