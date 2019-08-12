@@ -39,8 +39,8 @@ function compute_step!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
     θ .\= oneunit(Tv)
 
     # Update factorization
-    factor_normaleq!(A, θ, hsd.F)
-    F = hsd.F
+    F = factor_normaleq!(A, θ, hsd.F)
+    # F = hsd.F
 
     # Search directions
     # Predictor
