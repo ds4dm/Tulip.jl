@@ -3,12 +3,12 @@
 # ==================================
 
 """
-    add_constraint!(m::Model_)
+    add_constraint!(m::Model)
 
 Add one linear constraint to the model.
 """
 function add_constraint!(
-    m::Model_{Tv},
+    m::Model{Tv},
     name::String,
     bt::BoundType, lb::Tv, ub::Tv,
     colids::Vector{VarId},
@@ -53,7 +53,7 @@ function add_constraint!(
 end
 
 add_constraint!(
-    m::Model_{Tv},
+    m::Model{Tv},
     name::String,
     bt::BoundType, lb::Real, ub::Real,
     colids::Vector{VarId},
@@ -65,7 +65,7 @@ add_constraint!(
 )
 
 add_constraint!(
-    m::Model_{Tv},
+    m::Model{Tv},
     name::String,
     obj::Real,
     bt::BoundType, lb::Real, ub::Real

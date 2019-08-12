@@ -13,7 +13,7 @@ include("./standardform.jl")
     Model{Tv}
 
 """
-mutable struct Model_{Tv<:Real}
+mutable struct Model{Tv<:Real}
     name::String  # Model name
     env::TulipEnv  # Parameters
 
@@ -24,7 +24,7 @@ mutable struct Model_{Tv<:Real}
     # * IPMSolver
     # * status
     # * ...
-    Model_{Tv}() where{Tv<:Real} = new{Tv}("", TulipEnv(), ProblemData{Tv}(), nothing)
+    Model{Tv}() where{Tv<:Real} = new{Tv}("", TulipEnv(), ProblemData{Tv}(), nothing)
 end
 
 

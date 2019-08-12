@@ -1,7 +1,7 @@
 # TODO: tests in multiple precision: Float32, Float64, BigFloat
 function run_tests_standardform()
 
-    model = TLP.Model_{Float64}()
+    model = TLP.Model{Float64}()
 
     A0 = [
         [1 -1 1 1   -1   1 0  0  0.0];
@@ -83,7 +83,7 @@ end
     s.t.    x1 + x2 in [0, 1]
 
 
-model = TLP.Model_{Float64}()
+model = TLP.Model{Float64}()
 
 x = TLP.add_variable!(model, "x", -1.0, TLP.TLP_BND_LO, 0.0, Inf)
 y = TLP.add_variable!(model, "y", -1.0, TLP.TLP_BND_LO, 0.0, Inf)

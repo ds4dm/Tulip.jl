@@ -1,11 +1,11 @@
 # TODO: unit tests with various numerical types: Float32, Float64, BigFloat
 function run_tests_api(::Tv) where{Tv<:Real}
 
-    m = Tulip.Model_{Tv}()
+    m = Tulip.Model{Tv}()
     env = m.env
 
     @testset "add_variable" begin
-        m = TLP.Model_{Tv}()
+        m = TLP.Model{Tv}()
 
         @test TLP.get_num_var(m) == 0
 
@@ -25,7 +25,7 @@ function run_tests_api(::Tv) where{Tv<:Real}
     @testset "add_variables" begin
         # TODO
         #=
-        m = TLP.Model_{Tv}()
+        m = TLP.Model{Tv}()
 
         @test TLP.get_num_var(m) == 0
         x = TLP.add_variables!(m, 2)
@@ -35,7 +35,7 @@ function run_tests_api(::Tv) where{Tv<:Real}
     end
 
     @testset "names" begin
-        m = TLP.Model_{Tv}()
+        m = TLP.Model{Tv}()
 
         x = TLP.add_variable!(m)
         @test TLP.get_var_name(m, x) == ""
@@ -51,7 +51,7 @@ function run_tests_api(::Tv) where{Tv<:Real}
     end
 
     @testset "Bounds" begin
-        m = TLP.Model_{Tv}()
+        m = TLP.Model{Tv}()
 
         # Variables are added ot the model with Float64 input to check for type conversion
         xup = TLP.add_variable!(m, "xup", zero(Tv), TLP.TLP_BND_UP, -Inf, 0.0)
