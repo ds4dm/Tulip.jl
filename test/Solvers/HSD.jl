@@ -23,9 +23,9 @@ function test_hsd()
     optimize!(hsd, env)
 
     # Check status
-    println(hsd.solver_status)
-    println(hsd.primal_status)
-    println(hsd.dual_status)
+    # println(hsd.solver_status)
+    # println(hsd.primal_status)
+    # println(hsd.dual_status)
 end
 
 @testset "HSD" begin
