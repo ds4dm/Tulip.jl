@@ -3,7 +3,31 @@ module TLPLinearAlgebra
 using LinearAlgebra
 using SparseArrays
 
-export factor_normaleq, factor_normaleq!, symbolic_cholesky
+export factor_normaleq, factor_normaleq!, symbolic_cholesky, construct_matrix
+
+
+"""
+    construct_matrix
+
+"""
+function construct_matrix(
+    ::Type{Matrix}, m::Int, n::Int,
+    aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{Tv}
+) where{Tv<:Real}
+
+    A = zeros(Tv, m, n)
+    for(i, j, v) in zip(aI, aJ, aV)
+        A[i, j] = v
+    end
+    return A
+end
+
+construct_matrix(
+    ::Type{SparseMatrixCSC}, m::Int, n::Int,
+    aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{Tv}
+) where{Tv<:Real} = sparse(aI, aJ, aV, m, n)
+
+
 
 """
     symbolic_cholesky

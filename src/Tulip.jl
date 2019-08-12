@@ -12,7 +12,8 @@ import Base: RefValue
     import .TLPLinearAlgebra:
         factor_normaleq,
         factor_normaleq!,
-        symbolic_cholesky
+        symbolic_cholesky,
+        construct_matrix
 
 # package code goes here
 include("env.jl")

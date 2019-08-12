@@ -10,6 +10,7 @@ mutable struct TulipEnv
     =======================================================#
 
     algo::IntParam   # Which interior-point algorithm
+    matrix_type::Type  # Type of constraint matrix
 
 
     #=======================================================
@@ -44,6 +45,8 @@ mutable struct TulipEnv
         env = new()
 
         env.algo = RealParam(:algo, 1, 0, 1)
+        env.matrix_type = SparseMatrixCSC
+        
         env.verbose = RealParam(:verbose, 0, 0, 1)
         env.barrier_iter_max = RealParam(:barrier_iter_max, 100, 0, typemax(Int64))
         env.time_limit = RealParam(:time_limit, Inf, 0.0, Inf)
