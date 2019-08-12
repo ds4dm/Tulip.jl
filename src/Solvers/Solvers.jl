@@ -1,12 +1,12 @@
-module Solvers
+# module Solvers
 
-using LinearAlgebra
+# using LinearAlgebra
 using Printf
 
-import Tulip:
-    TerminationStatus, SolutionStatus, TulipEnv, StandardForm,
+# import Tulip:
+#     TerminationStatus, SolutionStatus, TulipEnv, StandardForm,
     
-    symbolic_cholesky, factor_normaleq!
+#     symbolic_cholesky, factor_normaleq!
 
 
 """
@@ -145,4 +145,4 @@ function compute_step!(::AbstractIPMSolver, ::TulipEnv) end
 include("HSDSolver/HSDSolver.jl")
 # include("MPC/MPSSolver.jl")  # TODO
 
-end  # module
+# end  # module

@@ -15,6 +15,11 @@ Problem data converted in standard form.
 ```
 """
 mutable struct StandardForm{Tv<:Real}
+
+    ncon::Int  # Number of constraints
+    nvar::Int  # Number of variables
+    nupb::Int  # Number of upper-bounded variables
+
     A::AbstractMatrix{Tv}  # Constraint matrix
     b::Vector{Tv}          # Right-hand side
     c::Vector{Tv}          # Objective
@@ -24,7 +29,11 @@ mutable struct StandardForm{Tv<:Real}
     # TODO: add optimization sense
     # TODO: add row and column scalings
     # TODO: add starting points
-    # TODO: add Cholesky factor (?)
+    con2idx::Dict{ConstrId, Int}  # maps a constraint ID to the corresponding constraint index
+    var2idx::Dict{Union{VarId, ConstrId}, Int}  # maps a Variable ID to the corresponding variable index
+    idx2var::Vector{Union{VarId, ConstrId}}  # Returns the ID of the i-th variable. ConstrID means that variable is a slack
+    idx2con::Vector{ConstrId}  # Returns the ConstrID of the i-th constraint.
+    # TODO: add bound info
 end
 
 
@@ -33,7 +42,7 @@ end
 
 Convert problem to standard form.
 """
-function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
+function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real}
 
     nvars = 0  # Number of variables   in standard form model
     ncons = 0  # Number of constraints in standard form model
@@ -43,7 +52,7 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
 
     # Keep track of indices
     con2idx = Dict{ConstrId, Int}()
-    var2idx = Dict{VarId, Int}()
+    var2idx = Dict{Union{VarId, ConstrId}, Int}()
     idx2var = Union{VarId, ConstrId}[]
     idx2con = ConstrId[]
 
@@ -232,7 +241,8 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
 
     # Finally, add coefficients for the slacks
     # Go through the constraints once again
-    # Here we need to update c, uind, uval and the coeffs of A 
+    # Here we need to update c, uind, uval and the coeffs of A
+    # TODO: record indices of slack variables
     for (cidx, con) in pb.constrs
 
         cind = con2idx[cidx]
@@ -243,6 +253,7 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
             nvars += 1
             vind = nvars
             push!(idx2var, cidx)
+            var2idx[cidx] = nvars
 
             # Update objective
             push!(c, zero(Tv))
@@ -258,6 +269,7 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
             nvars += 1
             vind = nvars
             push!(idx2var, cidx)
+            var2idx[cidx] = nvars
 
             # Update objective
             push!(c, zero(Tv))
@@ -273,6 +285,7 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
             nvars += 1
             vind = nvars
             push!(idx2var, cidx)
+            var2idx[cidx] = nvars
 
             # Update objective
             push!(c, zero(Tv))
@@ -290,7 +303,12 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
     end
 
     # Done.
+    A = construct_matrix(Ta, ncons, nvars, aI, aJ, aV)
 
-    
-    return ncons, nvars, aI, aJ, aV, b, c, uind, uval, con2idx, var2idx, idx2con, idx2var
+    # return ncons, nvars, aI, aJ, aV, b, c, uind, uval, con2idx, var2idx, idx2con, idx2var
+    return StandardForm(
+        ncons, nvars, length(uind),
+        A, b, c, uind, uval,
+        con2idx, var2idx, idx2var, idx2con
+    )
 end

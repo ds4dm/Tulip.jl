@@ -8,12 +8,12 @@ import Base: RefValue
 # export readmps
 
 # Cholesky module
-    include("LinearAlgebra/LinearAlgebra.jl")
-    import .TLPLinearAlgebra:
-        factor_normaleq,
-        factor_normaleq!,
-        symbolic_cholesky,
-        construct_matrix
+include("LinearAlgebra/LinearAlgebra.jl")
+import .TLPLinearAlgebra:
+    factor_normaleq,
+    factor_normaleq!,
+    symbolic_cholesky,
+    construct_matrix
 
 # package code goes here
 include("env.jl")
