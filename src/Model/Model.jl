@@ -29,3 +29,17 @@ end
 
 
 include("API/api.jl")
+
+function optimize!(m::Model{Tv}) where{Tv<:Real}
+
+    # convert to standard form
+    sf = convert_to_standard_form(m.env.matrix_type, m.pbdata_raw)
+    m.pbdata_std = sf
+
+    # Instantiate HSD solver
+    hsd = HSDSolver{Tv}(m.pbdata_std)
+
+    # Solve problem
+    optimize!(hsd, m.env)
+    return hsd.solver_status
+end
