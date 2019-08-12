@@ -51,27 +51,27 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
     b = zeros(Tv, m0)
     nslack = 0  # Number of additional slack variables
     for (cidx, con) in pb.constrs
-        if con.dat.bt == TLP_BND_FX
+        if con.dat.bt == TLP_FX
             # Equality constraint: keep as is
             ncons += 1
             con2idx[cidx] = ncons
             push!(idx2con, cidx)
             b[ncons] = con.dat.lb
-        elseif con.dat.bt == TLP_BND_LO
+        elseif con.dat.bt == TLP_LO
             # a'x >= b: add surplus
             ncons += 1
             nslack += 1
             con2idx[cidx] = ncons
             push!(idx2con, cidx)
             b[ncons] = con.dat.lb
-        elseif con.dat.bt == TLP_BND_UP
+        elseif con.dat.bt == TLP_UP
             # a'x <= b: add slack
             ncons += 1
             nslack += 1
             con2idx[cidx] = ncons
             push!(idx2con, cidx)
             b[ncons] = con.dat.ub
-        elseif con.dat.bt == TLP_BND_RG
+        elseif con.dat.bt == TLP_RG
             # Range constraint: add a bounded slack
             ncons += 1
             nslack += 1
@@ -94,7 +94,7 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
     for (vidx, var) in pb.vars
         # Record variable info
 
-        if var.dat.bt == TLP_BND_FX
+        if var.dat.bt == TLP_FX
             # Fixed variable
             # TODO: remove
             nvars += 1
@@ -120,7 +120,7 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
                 b[cind] -= v * var.dat.lb
             end
             
-        elseif var.dat.bt == TLP_BND_UP
+        elseif var.dat.bt == TLP_UP
             # Upper-bounded variable: x <= u
 
             # Change to -x >= -u and shift right-hand side
@@ -145,7 +145,7 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
             end
 
 
-        elseif var.dat.bt == TLP_BND_LO
+        elseif var.dat.bt == TLP_LO
             # Lower-bounded variable x >= l
 
             # Shift right-hand side
@@ -167,7 +167,7 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
                 b[cind] -= v * var.dat.lb
             end
 
-        elseif var.dat.bt == TLP_BND_FR
+        elseif var.dat.bt == TLP_FR
             # Free variable
             # Split into the difference of two variables
 
@@ -197,7 +197,7 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
                 push!(aV, -v)
             end
 
-        elseif var.dat.bt == TLP_BND_RG
+        elseif var.dat.bt == TLP_RG
             # Ranged variable
             # Shift right-hand side
             # update upper-bounds vectors
@@ -237,7 +237,7 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
 
         cind = con2idx[cidx]
 
-        if con.dat.bt == TLP_BND_LO
+        if con.dat.bt == TLP_LO
             # a'x >= l
             # change to a'x - s = l
             nvars += 1
@@ -252,7 +252,7 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
             push!(aJ, vind)
             push!(aV, -oneunit(Tv))
 
-        elseif con.dat.bt == TLP_BND_UP
+        elseif con.dat.bt == TLP_UP
             # a'x <= u
             # change to a'x + s = u
             nvars += 1
@@ -267,7 +267,7 @@ function convert_to_standard_form(pb::ProblemData{Tv}) where {Tv<:Real}
             push!(aJ, vind)
             push!(aV, oneunit(Tv))
 
-        elseif con.dat.bt == TLP_BND_RG
+        elseif con.dat.bt == TLP_RG
             # l <= a'x <= u
             # change to a'x - s = l, 0 <= s <= u-l
             nvars += 1

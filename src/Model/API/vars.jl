@@ -74,7 +74,7 @@ add_variable!(m::Model{Tv},
 add_variable!(m::Model{Tv}) where{Tv<:Real} = add_variable!(m,
     "",
     zero(Tv),
-    TLP_BND_LO, zero(Tv), Tv(Inf),
+    TLP_LO, zero(Tv), Tv(Inf),
     ConstrId[], Tv[]
 )
 

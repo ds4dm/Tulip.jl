@@ -12,13 +12,13 @@ function run_tests_api(::Tv) where{Tv<:Real}
         x = TLP.add_variable!(m)
         @test TLP.get_num_var(m) == 1
 
-        y = TLP.add_variable!(m, "y", zero(Tv), TLP.TLP_BND_LO, zero(Tv), Tv(Inf))
+        y = TLP.add_variable!(m, "y", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
         @test TLP.get_num_var(m) == 2
 
-        z = TLP.add_variable!(m, "z", 0, TLP.TLP_BND_FX, 1, 1, TLP.ConstrId[], Int[])
+        z = TLP.add_variable!(m, "z", 0, TLP.TLP_FX, 1, 1, TLP.ConstrId[], Int[])
         @test TLP.get_num_var(m) == 3
         
-        t = TLP.add_variable!(m, "t", zero(Tv), TLP.TLP_BND_RG, zero(Tv), oneunit(Tv), TLP.ConstrId[], Tv[])
+        t = TLP.add_variable!(m, "t", zero(Tv), TLP.TLP_RG, zero(Tv), oneunit(Tv), TLP.ConstrId[], Tv[])
         @test TLP.get_num_var(m) == 4
     end
 
@@ -40,13 +40,13 @@ function run_tests_api(::Tv) where{Tv<:Real}
         x = TLP.add_variable!(m)
         @test TLP.get_var_name(m, x) == ""
 
-        y = TLP.add_variable!(m, "y", zero(Tv), TLP.TLP_BND_LO, zero(Tv), Tv(Inf))
+        y = TLP.add_variable!(m, "y", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
         @test TLP.get_var_name(m, y) == "y"
 
-        z = TLP.add_variable!(m, "z", 0, TLP.TLP_BND_FX, 1, 1, TLP.ConstrId[], Int[])
+        z = TLP.add_variable!(m, "z", 0, TLP.TLP_FX, 1, 1, TLP.ConstrId[], Int[])
         @test TLP.get_var_name(m, z) == "z"
         
-        t = TLP.add_variable!(m, "t", zero(Tv), TLP.TLP_BND_RG, zero(Tv), oneunit(Tv), TLP.ConstrId[], Tv[])
+        t = TLP.add_variable!(m, "t", zero(Tv), TLP.TLP_RG, zero(Tv), oneunit(Tv), TLP.ConstrId[], Tv[])
         @test TLP.get_var_name(m, t) == "t"
     end
 
@@ -54,33 +54,33 @@ function run_tests_api(::Tv) where{Tv<:Real}
         m = TLP.Model{Tv}()
 
         # Variables are added ot the model with Float64 input to check for type conversion
-        xup = TLP.add_variable!(m, "xup", zero(Tv), TLP.TLP_BND_UP, -Inf, 0.0)
+        xup = TLP.add_variable!(m, "xup", zero(Tv), TLP.TLP_UP, -Inf, 0.0)
         (bt, lb, ub) = TLP.get_var_bounds(m, xup)
-        @test bt == TLP.TLP_BND_UP
+        @test bt == TLP.TLP_UP
         @test lb == Tv(-Inf)
         @test ub == zero(Tv)
 
-        xlo = TLP.add_variable!(m, "xlo", zero(Tv), TLP.TLP_BND_LO, 0.0, Inf)
+        xlo = TLP.add_variable!(m, "xlo", zero(Tv), TLP.TLP_LO, 0.0, Inf)
         (bt, lb, ub) = TLP.get_var_bounds(m, xlo)
-        @test bt == TLP.TLP_BND_LO
+        @test bt == TLP.TLP_LO
         @test lb == zero(Tv)
         @test ub == Tv(Inf)
 
-        xfx = TLP.add_variable!(m, "xfx", zero(Tv), TLP.TLP_BND_FX, 1.0, 1.0)
+        xfx = TLP.add_variable!(m, "xfx", zero(Tv), TLP.TLP_FX, 1.0, 1.0)
         (bt, lb, ub) = TLP.get_var_bounds(m, xfx)
-        @test bt == TLP.TLP_BND_FX
+        @test bt == TLP.TLP_FX
         @test lb == Tv(1.0)
         @test ub == Tv(1.0)
 
-        xfr = TLP.add_variable!(m, "xfr", zero(Tv), TLP.TLP_BND_FR, -Inf, Inf)
+        xfr = TLP.add_variable!(m, "xfr", zero(Tv), TLP.TLP_FR, -Inf, Inf)
         (bt, lb, ub) = TLP.get_var_bounds(m, xfr)
-        @test bt == TLP.TLP_BND_FR
+        @test bt == TLP.TLP_FR
         @test lb == Tv(-Inf)
         @test ub == Tv(Inf)
 
-        xrg = TLP.add_variable!(m, "xrg", zero(Tv), TLP.TLP_BND_RG, 0.0, 1.0)
+        xrg = TLP.add_variable!(m, "xrg", zero(Tv), TLP.TLP_RG, 0.0, 1.0)
         (bt, lb, ub) = TLP.get_var_bounds(m, xrg)
-        @test bt == TLP.TLP_BND_RG
+        @test bt == TLP.TLP_RG
         @test lb == zero(Tv)
         @test ub == Tv(1.0)
 

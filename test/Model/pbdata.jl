@@ -15,7 +15,7 @@ function run_tests_pbdata(::Tv) where{Tv<:Real}
         vidx = TLP.new_variable_index!(pb)
         @test vidx.uuid == 1
 
-        vdat = TLP.VarData{Tv}("x", zero(Tv), TLP.TLP_BND_LO, zero(Tv), Tv(Inf))
+        vdat = TLP.VarData{Tv}("x", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
         v = TLP.Variable(vidx, vdat)
         TLP.add_variable!(pb, v)
         @test haskey(pb.vars, vidx)
@@ -32,7 +32,7 @@ function run_tests_pbdata(::Tv) where{Tv<:Real}
         cidx = TLP.new_constraint_index!(pb)
         @test cidx.uuid == 1
 
-        cdat = TLP.LinConstrData{Tv}("c1", TLP.TLP_BND_RG, zero(Tv), oneunit(Tv))
+        cdat = TLP.LinConstrData{Tv}("c1", TLP.TLP_RG, zero(Tv), oneunit(Tv))
         c = TLP.LinearConstraint(cidx, cdat)
 
         TLP.add_constraint!(pb, c)

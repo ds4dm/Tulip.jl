@@ -11,32 +11,32 @@ function run_tests_standardform()
     ]
 
     # Add each kind of variable
-    x_fx = TLP.add_variable!(model, "xfx", 1.0, TLP.TLP_BND_FX,  0.1, 0.1)
-    x_up = TLP.add_variable!(model, "xup", 2.0, TLP.TLP_BND_UP, -Inf, 0.02)
-    x_lo = TLP.add_variable!(model, "xlo", 3.0, TLP.TLP_BND_LO,  0.003, Inf)
-    x_fr = TLP.add_variable!(model, "xfr", 4.0, TLP.TLP_BND_FR, -Inf, Inf)
-    x_rg = TLP.add_variable!(model, "xrg", 5.0, TLP.TLP_BND_RG,  0.000050, 0.000055)
+    x_fx = TLP.add_variable!(model, "xfx", 1.0, TLP.TLP_FX,  0.1, 0.1)
+    x_up = TLP.add_variable!(model, "xup", 2.0, TLP.TLP_UP, -Inf, 0.02)
+    x_lo = TLP.add_variable!(model, "xlo", 3.0, TLP.TLP_LO,  0.003, Inf)
+    x_fr = TLP.add_variable!(model, "xfr", 4.0, TLP.TLP_FR, -Inf, Inf)
+    x_rg = TLP.add_variable!(model, "xrg", 5.0, TLP.TLP_RG,  0.000050, 0.000055)
 
     # Add each kind of constraint
-    c_fx = TLP.add_constraint!(model, "cfx", TLP.TLP_BND_FX, 1.0, 1.0,
+    c_fx = TLP.add_constraint!(model, "cfx", TLP.TLP_FX, 1.0, 1.0,
         # This row will go from
         # [1, 1, 1, 1, 1] to
         # [1, -1, 1, 1, -1, 1, 0, 0, 0]
         [x_fx, x_up, x_lo, x_fr, x_rg], ones(5)
     )
-    c_up = TLP.add_constraint!(model, "cup", TLP.TLP_BND_UP, -Inf, 20.0,
+    c_up = TLP.add_constraint!(model, "cup", TLP.TLP_UP, -Inf, 20.0,
         # This row will go from
         # [0, 0, 0, 4,  0] to
         # [0, 0, 0, 4, -4, 0, 1, 0, 0]
         [x_fr], [4.4]
     )
-    c_lo = TLP.add_constraint!(model, "clo", TLP.TLP_BND_LO, 300.0, Inf,
+    c_lo = TLP.add_constraint!(model, "clo", TLP.TLP_LO, 300.0, Inf,
         # This row will go from
         # [0,  2, 0, 0, 0] to
         # [0, -2, 0, 0, 0, 0, 0, -1, 0]
         [x_up], [2.0]
     )
-    c_rg = TLP.add_constraint!(model, "crg", TLP.TLP_BND_RG, -4000.0, 4000.0,
+    c_rg = TLP.add_constraint!(model, "crg", TLP.TLP_RG, -4000.0, 4000.0,
         # This row will go from
         # [0, 0, 0, 0, 5] to
         # [0, 0, 0, 0, 0, 5, 0, 0, -1]
@@ -85,10 +85,10 @@ end
 
 model = TLP.Model{Float64}()
 
-x = TLP.add_variable!(model, "x", -1.0, TLP.TLP_BND_LO, 0.0, Inf)
-y = TLP.add_variable!(model, "y", -1.0, TLP.TLP_BND_LO, 0.0, Inf)
+x = TLP.add_variable!(model, "x", -1.0, TLP.TLP_LO, 0.0, Inf)
+y = TLP.add_variable!(model, "y", -1.0, TLP.TLP_LO, 0.0, Inf)
 
-c = TLP.add_constraint!(model, "c1", TLP.TLP_BND_RG, 0.0, 1.0, [x, y], [1.0, 1.0])
+c = TLP.add_constraint!(model, "c1", TLP.TLP_RG, 0.0, 1.0, [x, y], [1.0, 1.0])
 
 m, n, aI, aJ, aV, b, c, uind, uval, con2idx, var2idx, idx2con, idx2var = TLP.convert_to_standard_form(model.pbdata_raw)
 

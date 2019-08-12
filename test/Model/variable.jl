@@ -13,11 +13,11 @@ function run_tests_variable(::Tv) where{Tv<:Real}
     @testset "Bounds" begin
 
         # These should pass
-        @test TLP._check_bounds(TLP.TLP_BND_UP, Tv(-Inf), Tv(0))
-        @test TLP._check_bounds(TLP.TLP_BND_LO, Tv(0), Tv(Inf))
-        @test TLP._check_bounds(TLP.TLP_BND_FX, Tv(1), Tv(1))
-        @test TLP._check_bounds(TLP.TLP_BND_FR, Tv(-Inf), Tv(Inf))
-        @test TLP._check_bounds(TLP.TLP_BND_RG, Tv(0), Tv(1))
+        @test TLP._check_bounds(TLP.TLP_UP, Tv(-Inf), Tv(0))
+        @test TLP._check_bounds(TLP.TLP_LO, Tv(0), Tv(Inf))
+        @test TLP._check_bounds(TLP.TLP_FX, Tv(1), Tv(1))
+        @test TLP._check_bounds(TLP.TLP_FR, Tv(-Inf), Tv(Inf))
+        @test TLP._check_bounds(TLP.TLP_RG, Tv(0), Tv(1))
 
         # These should fail
         # TODO: add all possible cases
@@ -25,37 +25,37 @@ function run_tests_variable(::Tv) where{Tv<:Real}
     end
 
     @testset "VarData" begin
-        vdat = TLP.VarData{Tv}("x1", zero(Tv), TLP.TLP_BND_LO, zero(Tv), Tv(Inf))
+        vdat = TLP.VarData{Tv}("x1", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
 
         @test vdat.name == "x1"
         @test vdat.obj == zero(Tv)
-        @test vdat.bt == TLP.TLP_BND_LO
+        @test vdat.bt == TLP.TLP_LO
         @test vdat.lb == zero(Tv)
         @test vdat.ub == Tv(Inf)
 
-        vdat = TLP.VarData("x1", zero(Tv), TLP.TLP_BND_LO, zero(Tv), Tv(Inf))
+        vdat = TLP.VarData("x1", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
 
         @test isa(vdat, TLP.VarData{Tv})
         @test vdat.name == "x1"
         @test vdat.obj == zero(Tv)
-        @test vdat.bt == TLP.TLP_BND_LO
+        @test vdat.bt == TLP.TLP_LO
         @test vdat.lb == zero(Tv)
         @test vdat.ub == Tv(Inf)
     end
         
     @testset "Constructors" begin
         vid = TLP.VarId(1)
-        vdat = TLP.VarData{Tv}("x1", zero(Tv), TLP.TLP_BND_LO, zero(Tv), Tv(Inf))
+        vdat = TLP.VarData{Tv}("x1", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
 
         v = TLP.Variable(vid, vdat)
         @test isa(v, TLP.Variable{Tv})
 
-        v = TLP.Variable{Tv}(vid, "x1", zero(Tv), TLP.TLP_BND_LO, zero(Tv), Tv(Inf))
+        v = TLP.Variable{Tv}(vid, "x1", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
         @test isa(v, TLP.Variable{Tv})
     end
 
     vid = TLP.VarId(1)
-    vdat = TLP.VarData("x1", zero(Tv), TLP.TLP_BND_LO, zero(Tv), Tv(Inf))
+    vdat = TLP.VarData("x1", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
     v = TLP.Variable(vid, vdat)
 
     # UUID
@@ -91,9 +91,9 @@ function run_tests_variable(::Tv) where{Tv<:Real}
         @test TLP.get_lower_bound(v) == zero(Tv)
         @test TLP.get_upper_bound(v) == Tv(Inf)
 
-        TLP.set_bounds!(v, TLP.TLP_BND_RG, Tv(-1), Tv(1))
+        TLP.set_bounds!(v, TLP.TLP_RG, Tv(-1), Tv(1))
 
-        @test TLP.get_bounds(v) == (TLP.TLP_BND_RG, Tv(-1), Tv(1))
+        @test TLP.get_bounds(v) == (TLP.TLP_RG, Tv(-1), Tv(1))
 
         @test TLP.get_lower_bound(v) == Tv(-1)
         @inferred TLP.get_lower_bound(v)
@@ -101,7 +101,7 @@ function run_tests_variable(::Tv) where{Tv<:Real}
         @inferred TLP.get_upper_bound(v)
 
         # Check type conversion
-        TLP.set_bounds!(v, TLP.TLP_BND_RG, 0, 2)
+        TLP.set_bounds!(v, TLP.TLP_RG, 0, 2)
         @test TLP.get_lower_bound(v) == Tv(0)
         @inferred TLP.get_lower_bound(v)
 
