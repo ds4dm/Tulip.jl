@@ -15,7 +15,7 @@ Compute next IP iterate for the HSD formulation.
 - `rp, ru, rd, rg`: Primal, dual and optimality residuals
 - `x, w, y, s, z, t, k`: Primal-dual iterate
 """
-function compute_step!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
+function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
 
     # Names
     pt = hsd.pt
@@ -83,7 +83,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
 
     # Step length for affine-scaling direction
     α = max_step_length(pt, Δ)
-    γ = Tv((oneunit(Tv) - α)^2 * min(oneunit(Tv) - α, env.beta1.val))
+    γ = Tv((oneunit(Tv) - α)^2 * min(oneunit(Tv) - α, env.beta1))
     η = oneunit(Tv) - γ
     
     # Mehrothra corrector
@@ -98,15 +98,12 @@ function compute_step!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
         -pt.w .* pt.z .+ γ * pt.μ .- Δ.w .* Δ.z,
         -pt.t  * pt.k  + γ * pt.μ  - Δ.t  * Δ.k
     )
-    @info typeof(pt)
-    @info typeof(Δ)
     α = max_step_length(pt, Δ)
-    @info typeof(α), α
 
     # Extra corrections
     ncor = 0
     while (
-        ncor < env.barrier_max_num_cor.val
+        ncor < env.barrier_max_num_cor
         && α < Tv(0.999)    
     )
         α_ = α
@@ -121,7 +118,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
             pt,
             Δ, α_,
             Δc,
-            env.beta1.val, env.beta2.val, env.beta3.val, env.beta4.val,
+            env.beta1, env.beta2, env.beta3, env.beta4,
         )
         if αc > α_
             # Use corrector

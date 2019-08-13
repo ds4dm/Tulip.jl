@@ -185,7 +185,7 @@ end
     optimize!
 
 """
-function optimize!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
+function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
 
     # TODO: pre-check whether model needs to be re-optimized.
     # This should happen outside of this function
@@ -197,7 +197,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
     # TODO: allocate space for factorization
 
     # IPM LOG
-    if env.verbose.val != 0
+    if env.verbose != 0
         @printf "%4s  %16s%16s %9s%9s%9s  %7s  %4s\n" "Itn" "PObj" "DObj" "PFeas" "DFeas" "GFeas" "Mu" "Time"
         # println(" Itn    Primal Obj      Dual Obj        PFeas    DFeas    GFeas     Mu       Time")
     end
@@ -236,7 +236,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
         # I.B - Log
         # TODO: Put this in a logging function
         ttot = time() - tstart
-        if env.verbose.val !=0
+        if env.verbose !=0
             # Display log
             @printf "%4d" niter
             
@@ -266,10 +266,10 @@ function optimize!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
         update_solver_status!(
             hsd, hsd.pt, hsd.res,
             hsd.pb.A, hsd.pb.b, hsd.pb.c, hsd.pb.uind, hsd.pb.uval,
-            env.barrier_tol_pfeas.val,
-            env.barrier_tol_dfeas.val,
-            env.barrier_tol_conv.val,
-            env.barrier_tol_infeas.val
+            env.barrier_tol_pfeas,
+            env.barrier_tol_dfeas,
+            env.barrier_tol_conv,
+            env.barrier_tol_infeas
         )
 
         if (
@@ -278,10 +278,10 @@ function optimize!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
             || hsd.solver_status == TerminationStatus(3)  # Dual infeasible
         )
             break
-        elseif niter >= env.barrier_iter_max.val 
+        elseif niter >= env.barrier_iter_max 
             hsd.solver_status = TerminationStatus(4)  # Iteration limit
             break
-        elseif ttot >= env.time_limit.val
+        elseif ttot >= env.time_limit
             hsd.solver_status = TerminationStatus(5)  # Iteration limit
             break
         end

@@ -4,12 +4,12 @@ import Base:
 
 include("params.jl")
 
-mutable struct TulipEnv
+mutable struct Env{Tv<:Real}
     #=======================================================
         Algorithmic features
     =======================================================#
 
-    algo::IntParam   # Which interior-point algorithm
+    algo::Int   # Which interior-point algorithm
     matrix_type::Type  # Type of constraint matrix
 
 
@@ -17,51 +17,51 @@ mutable struct TulipEnv
         Stopping criteria & tolerances
     =======================================================#
 
-    barrier_iter_max::IntParam          # Maximum number of barrier iterations
-    time_limit::FloatParam              # Time limit (in seconds)
+    barrier_iter_max::Int          # Maximum number of barrier iterations
+    time_limit::Float64              # Time limit (in seconds)
 
-    barrier_tol_pfeas::FloatParam       # Primal feasibility tolerance
-    barrier_tol_dfeas::FloatParam       # Dual feasibility tolerance
-    barrier_tol_conv::FloatParam        # Optimality gap tolerance
-    barrier_tol_infeas::FloatParam      # Infeasibility tolerance
+    barrier_tol_pfeas::Tv       # Primal feasibility tolerance
+    barrier_tol_dfeas::Tv       # Dual feasibility tolerance
+    barrier_tol_conv::Tv        # Optimality gap tolerance
+    barrier_tol_infeas::Tv      # Infeasibility tolerance
 
-    beta1::FloatParam
-    beta2::FloatParam
-    beta3::FloatParam
-    beta4::FloatParam
+    beta1::Tv
+    beta2::Tv
+    beta3::Tv
+    beta4::Tv
 
-    barrier_max_num_cor::IntParam       # Max number of centrality corrections
+    barrier_max_num_cor::Int       # Max number of centrality corrections
 
 
     #=======================================================
         Other parameters
     =======================================================#
 
-    verbose::IntParam           # 0 means no output, 1 means normal
+    verbose::Int           # 0 means no output, 1 means normal
     
     # create environment with default values
     # user can over-ride these values afterwards
-    function TulipEnv()
+    function Env{Tv}() where{Tv<:Real}
         env = new()
 
-        env.algo = RealParam(:algo, 1, 0, 1)
+        env.algo = 1
         env.matrix_type = SparseMatrixCSC
         
-        env.verbose = RealParam(:verbose, 0, 0, 1)
-        env.barrier_iter_max = RealParam(:barrier_iter_max, 100, 0, typemax(Int64))
-        env.time_limit = RealParam(:time_limit, Inf, 0.0, Inf)
+        env.verbose = 0
+        env.barrier_iter_max = 100
+        env.time_limit = Inf
 
-        env.barrier_tol_pfeas  = RealParam(:barrier_tol_pfeas,  1e-8, 0.0, 1.0)
-        env.barrier_tol_dfeas  = RealParam(:barrier_tol_dfeas,  1e-8, 0.0, 1.0)
-        env.barrier_tol_conv   = RealParam(:barrier_tol_conv,   1e-8, 0.0, 1.0)
-        env.barrier_tol_infeas = RealParam(:barrier_tol_infeas, 1e-8, 0.0, 1.0)
+        env.barrier_tol_pfeas  = Tv(1e-8)
+        env.barrier_tol_dfeas  = Tv(1e-8)
+        env.barrier_tol_conv   = Tv(1e-8)
+        env.barrier_tol_infeas = Tv(1e-8)
 
-        env.beta1 = RealParam(:beta1, 1e-1,   0.0, 1.0)
-        env.beta2 = RealParam(:beta2, 1e-8,   0.0, 1.0)
-        env.beta3 = RealParam(:beta3, 0.9999, 0.0, 1.0)
-        env.beta4 = RealParam(:beta4, 1e-1,   0.0, 1.0)
+        env.beta1 = Tv(1e-1)
+        env.beta2 = Tv(1e-8)
+        env.beta3 = Tv(0.9999)
+        env.beta4 = Tv(1e-1)
 
-        env.barrier_max_num_cor = RealParam(:barrier_max_num_cor, 5, 0, typemax(Int64))
+        env.barrier_max_num_cor = 5
 
         return env
     end
@@ -73,64 +73,11 @@ end
 
 Copy environmenment.
 """
-function copy(env::TulipEnv)
-    env_ = TulipEnv()
-    for s in fieldnames(TulipEnv)
-        p = copy(Core.getfield(env, s))
+function copy(env::Env{Tv}) where{Tv<:Real}
+    env_ = Env{Tv}()
+    for s in fieldnames(Env)
+        p = Core.getfield(env, s)
         Core.setfield!(env_, s, p)
     end
     return env_
-end
-
-"""
-    getindex(env::TulipEnv, p::Symbol)
-
-Retrieve parameter value. Raises an error if parameter does not exist.
-
-    getindex(env::TulipEnv, p::String)
-
-"""
-getindex(env::TulipEnv, p::Symbol) = get_param_value(Core.getfield(env, p))
-getindex(env::TulipEnv, param::String) = getindex(env, Symbol(param))
-
-# import Base.getproperty
-# function getproperty(env::TulipEnv, name::Symbol)
-#     p = Core.getfield(env, name)
-#     if isa(p, AbstractParam)
-#         return p.val
-#     else
-#         return p
-#     end
-# end
-
-"""
-    setindex!(env, v, p)
-
-Set value of given parameter to v. Raises an error if parameter does not exist,
-or if incorrect value.
-"""
-setindex!(env::TulipEnv, v, p::Symbol) = set_param_value!(Core.getfield(env, p), v)
-setindex!(env::TulipEnv, v, p::String) = set_param_value!(Core.getfield(env, Symbol(p)), v)
-
-"""
-    set_param!(env; kwargs...)
-
-Set multiple parameters at the same time.
-"""
-function set_param!(env; kwargs...)
-    for (p, v) in kwargs
-        set_param_value!(Core.getfield(env, p), v)
-    end
-end
-
-"""
-    reset!(env)
-
-Reset all parameters' values to default
-"""
-function reset!(env::TulipEnv)
-    for p in fieldnames(TulipEnv)
-        set_param_default!(Core.getfield(env, p))
-    end
-    return nothing
 end

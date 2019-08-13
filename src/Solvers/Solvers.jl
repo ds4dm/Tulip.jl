@@ -4,7 +4,7 @@
 using Printf
 
 # import Tulip:
-#     TerminationStatus, SolutionStatus, TulipEnv, StandardForm,
+#     TerminationStatus, SolutionStatus, Env, StandardForm,
     
 #     symbolic_cholesky, factor_normaleq!
 
