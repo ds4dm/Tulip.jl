@@ -13,14 +13,11 @@ const testdir = dirname(@__FILE__)
 
 const test_files = [
     # include test file name here (without .jl extension)
-    "Model/model",
-    "params",
     "env",
     "LinearAlgebra/linearAlgebra",
-    "Solvers/HSD"
-    # "hsd",
-    # "model",
-    # "mathprogbase",
+    "Solvers/HSD",
+    "Model/model",
+    "examples"
 ]
 
 for f in test_files
