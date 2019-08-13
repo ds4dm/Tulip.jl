@@ -312,3 +312,8 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
         con2idx, var2idx, idx2var, idx2con
     )
 end
+
+# TODO: when applicable, do not re-create the whole standard form
+# Example cases:
+# * Changes in objective only
+# * Changes that do not affect the sparsity structure of A

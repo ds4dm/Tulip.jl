@@ -45,61 +45,33 @@ function run_tests_standardform()
     # free constraints are not allowed
 
     # Convert to standard form
-    ncons, nvars, aI, aJ, aV, b, c, uind, uval, con2idx, var2idx, idx2con, idx2var = TLP.convert_to_standard_form(model.pbdata_raw)
+    sf = TLP.convert_to_standard_form(SparseMatrixCSC, model.pbdata_raw)
 
-    @test ncons == 4
-    @test nvars == 9  # 5 vars + 1 free split + 3 slacks
+    @test sf.ncon == 4
+    @test sf.nvar == 9  # 5 vars + 1 free split + 3 slacks
+    @test sf.nupb == 3  # 1 FX var + 1 RG var + 1 RG con
 
     # objective
-    @test c[1] == 1.0
-    @test c[2] == -2.0
-    @test c[3] == 3.0
-    @test c[4] == 4.0
-    @test c[5] == -4.0
-    @test c[6] == 5.0
+    @test sf.c[1] == 1.0
+    @test sf.c[2] == -2.0
+    @test sf.c[3] == 3.0
+    @test sf.c[4] == 4.0
+    @test sf.c[5] == -4.0
+    @test sf.c[6] == 5.0
 
     # Right-hand-side
     b0 = [1.0, 20.0, 300.0, -4000.0]
     l0 = [0.1, 0.02, 0.003, 0.0, 0.0, 0.000050, 0.0, 0.0, 0.0]
 
-    @test b ≈ (b0 .- A0 * l0)
+    @test sf.b ≈ (b0 .- A0 * l0)
 
     # Constraint matrix
-    @test length(aI) == length(aJ) == length(aV) == 13
-    A = sparse(aI, aJ, aV, ncons, nvars)
-    @test Matrix{Float64}(A) ≈ A0
+    @test Matrix{Float64}(sf.A) ≈ A0
 
     # Upper-bounds
-    @test uind == [1, 6, 9]
-    @test uval ≈ [0.0, 5e-6, 8000.0]
+    @test sf.uind == [1, 6, 9]
+    @test sf.uval ≈ [0.0, 5e-6, 8000.0]
 
 end
 
 @testset "StandardForm" begin run_tests_standardform() end
-
-# Simple example:
-#=
-    min     -x1 -x2
-    s.t.    x1 + x2 in [0, 1]
-
-
-model = TLP.Model{Float64}()
-
-x = TLP.add_variable!(model, "x", -1.0, TLP.TLP_LO, 0.0, Inf)
-y = TLP.add_variable!(model, "y", -1.0, TLP.TLP_LO, 0.0, Inf)
-
-c = TLP.add_constraint!(model, "c1", TLP.TLP_RG, 0.0, 1.0, [x, y], [1.0, 1.0])
-
-m, n, aI, aJ, aV, b, c, uind, uval, con2idx, var2idx, idx2con, idx2var = TLP.convert_to_standard_form(model.pbdata_raw)
-
-@show m, n
-
-A = sparse(aI, aJ, aV, m, n)
-@show Matrix(A)
-
-@show b
-@show c
-
-@show uind
-@show uval
-=#
