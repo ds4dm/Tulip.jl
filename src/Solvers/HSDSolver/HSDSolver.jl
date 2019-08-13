@@ -307,6 +307,9 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
 
     end
 
+    # TODO: print message based on termination status
+    env.verbose == 1 && println("Solver exited with status $((hsd.solver_status))")
+
     return nothing
 
 end
