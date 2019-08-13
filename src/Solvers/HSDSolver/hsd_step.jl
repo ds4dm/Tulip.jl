@@ -83,7 +83,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
 
     # Step length for affine-scaling direction
     α = max_step_length(pt, Δ)
-    γ = (oneunit(Tv) - α)^2 * min(oneunit(Tv) - α, env.beta1.val)
+    γ = Tv((oneunit(Tv) - α)^2 * min(oneunit(Tv) - α, env.beta1.val))
     η = oneunit(Tv) - γ
     
     # Mehrothra corrector
@@ -98,7 +98,10 @@ function compute_step!(hsd::HSDSolver{Tv}, env::TulipEnv) where{Tv<:Real}
         -pt.w .* pt.z .+ γ * pt.μ .- Δ.w .* Δ.z,
         -pt.t  * pt.k  + γ * pt.μ  - Δ.t  * Δ.k
     )
+    @info typeof(pt)
+    @info typeof(Δ)
     α = max_step_length(pt, Δ)
+    @info typeof(α), α
 
     # Extra corrections
     ncor = 0
@@ -291,7 +294,7 @@ Compute maximum length of homogeneous step.
 function max_step_length(x::Vector{Tv}, dx::Vector{Tv}) where{Tv<:Real}
     n = size(x, 1)
     n == size(dx, 1) || throw(DimensionMismatch())
-    a = Inf
+    a = Tv(Inf)
 
     #=@inbounds=# for i in Base.OneTo(n)
         if dx[i] < zero(Tv)
@@ -357,8 +360,8 @@ function compute_higher_corrector_hsd_!(
     vt = (pt.t  + α_  * Δ.t)  * (pt.k  + α_  * Δ.k)
 
     # Compute target cross-products
-    mu_l = beta4 * pt.μ * γ
-    mu_u = γ * pt.μ / beta4
+    mu_l = Tv(beta4 * pt.μ * γ)
+    mu_u = Tv(γ * pt.μ / beta4)
     #=@inbounds=# for i in 1:nvar
         if vx[i] < mu_l
             vx[i] = mu_l - vx[i]
