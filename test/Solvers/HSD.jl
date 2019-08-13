@@ -31,12 +31,92 @@ function run_tests_hsd(::Tv) where{Tv<:Real}
     end
 
     @testset "Residuals" begin
+        # Simple example:
+        #=
+            min     x1 - x2
+            s.t.    x1 + x2 = 1
+                    x1 - x2 = 0
+                    0 <= x1 <= 2
+                    0 <= x2 <= 2
+        =#
+        m, n, p = 2, 2, 2
+        A = Matrix{Tv}([
+            [1.0    1.0];
+            [1.0   -1.0]
+        ])
+        b = Vector{Tv}([1.0, 0.0])
+        c = Vector{Tv}([1.0, -1.0])
+        uind = [1, 2]
+        uval = Vector{Tv}([2.0, 2.0])
 
+        hsd = TLP.HSDSolver{Tv}(m, n, p, A, b, c, uind, uval)
+
+        # Primal-dual optimal solution
+        # x1 = x2 = 0.5; w1 = w2 = 1.5; t = 1
+        # y1 = 0, y2 = 1; s1 = s2 = 0; z1 = z2 = 0; k = 0
+        pt = TLP.Point{Tv}(
+            m, n, p,
+            Tv.([0.5, 0.5]), Tv.([1.5, 1.5]), Tv(1),
+            Tv.([0.0, 1.0]), Tv.([0, 0]), Tv.([0, 0]), Tv(0),
+            Tv(0)
+        )
+        res = TLP.Residuals{Tv}(
+            zeros(Tv, m), zeros(Tv, p), zeros(Tv, n), zero(Tv),
+            zero(Tv), zero(Tv), zero(Tv), zero(Tv)
+        )
+
+        @inferred TLP.compute_residuals!(hsd, res, pt, A, b, c, uind, uval)
+        TLP.compute_residuals!(hsd, res, pt, A, b, c, uind, uval)
+        
+        @test res.rp_nrm == zero(Tv)
+        @test res.ru_nrm == zero(Tv)
+        @test res.rd_nrm == zero(Tv)
+        @test res.rg_nrm == zero(Tv)
+        
     end
 
     @testset "Convergence" begin
 
-        # TODO: optimal
+        # Optimal case
+        #=
+            min     x1 - x2
+            s.t.    x1 + x2 = 1
+                    x1 - x2 = 0
+                    0 <= x1 <= 2
+                    0 <= x2 <= 2
+        =#
+        m, n, p = 2, 2, 2
+        A = Matrix{Tv}([
+            [1.0    1.0];
+            [1.0   -1.0]
+        ])
+        b = Vector{Tv}([1.0, 0.0])
+        c = Vector{Tv}([1.0, -1.0])
+        uind = [1, 2]
+        uval = Vector{Tv}([2.0, 2.0])
+
+        hsd = TLP.HSDSolver{Tv}(m, n, p, A, b, c, uind, uval)
+
+        # Primal-dual optimal solution
+        # x1 = x2 = 0.5; w1 = w2 = 1.5; t = 1
+        # y1 = 0, y2 = 1; s1 = s2 = 0; z1 = z2 = 0; k = 0
+        pt = TLP.Point{Tv}(
+            m, n, p,
+            Tv.([0.5, 0.5]), Tv.([1.5, 1.5]), Tv(1),
+            Tv.([0.0, 1.0]), Tv.([0, 0]), Tv.([0, 0]), Tv(0),
+            Tv(0)
+        )
+        res = TLP.Residuals{Tv}(
+            zeros(Tv, m), zeros(Tv, p), zeros(Tv, n), zero(Tv),
+            zero(Tv), zero(Tv), zero(Tv), zero(Tv)
+        )
+        TLP.compute_residuals!(hsd, res, pt, A, b, c, uind, uval)
+
+        hsd.solver_status = TLP.Trm_Unknown
+        TLP.update_solver_status!(hsd, pt, res, A, b, c, uind, uval,
+            Tv(1e-8), Tv(1e-8), Tv(1e-8), Tv(1e-8)
+        )
+        @test hsd.solver_status == TLP.Trm_Optimal
 
         # TODO: dual infeasible
 
