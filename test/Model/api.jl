@@ -14,12 +14,15 @@ function run_tests_api(::Tv) where{Tv<:Real}
 
         y = TLP.add_variable!(m, "y", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
         @test TLP.get_num_var(m) == 2
+        @test TLP.get_var_name(m, y) == "y"
 
         z = TLP.add_variable!(m, "z", 0, TLP.TLP_FX, 1, 1, TLP.ConstrId[], Int[])
         @test TLP.get_num_var(m) == 3
+        @test TLP.get_var_name(m, z) == "z"
         
         t = TLP.add_variable!(m, "t", zero(Tv), TLP.TLP_RG, zero(Tv), oneunit(Tv), TLP.ConstrId[], Tv[])
         @test TLP.get_num_var(m) == 4
+        @test TLP.get_var_name(m, t) == "t"
     end
 
     @testset "add_variables" begin
@@ -32,22 +35,6 @@ function run_tests_api(::Tv) where{Tv<:Real}
 
         @test TLP.get_num_var(m) == 2
         =#
-    end
-
-    @testset "names" begin
-        m = TLP.Model{Tv}()
-
-        x = TLP.add_variable!(m)
-        @test TLP.get_var_name(m, x) == ""
-
-        y = TLP.add_variable!(m, "y", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
-        @test TLP.get_var_name(m, y) == "y"
-
-        z = TLP.add_variable!(m, "z", 0, TLP.TLP_FX, 1, 1, TLP.ConstrId[], Int[])
-        @test TLP.get_var_name(m, z) == "z"
-        
-        t = TLP.add_variable!(m, "t", zero(Tv), TLP.TLP_RG, zero(Tv), oneunit(Tv), TLP.ConstrId[], Tv[])
-        @test TLP.get_var_name(m, t) == "t"
     end
 
     @testset "Bounds" begin
@@ -128,6 +115,7 @@ end
 # Until then, two solutions:
 #   1. Convert to dense and use dense factorizations
 #   2. Drop support for eltypes other than Float64
+#   3. Use the LDLFactorization package of Dominique
 @testset "low-level API" begin
     for Tv in TvTYPES
         @testset "$Tv" begin run_tests_api(zero(Tv)) end
