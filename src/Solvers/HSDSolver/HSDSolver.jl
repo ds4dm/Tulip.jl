@@ -8,12 +8,18 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     # =================
     #   Problem data
     # =================
-    pb::StandardForm{Tv}
+    ncon::Int  # Number of linear constraints
+    nvar::Int  # Number of variables
+    nupb::Int  # Number of upper-bounded variables
+    A::AbstractMatrix{Tv}  # Constraint matrix
+    b::Vector{Tv}  # Right-hand side
+    c::Vector{Tv}  # Objective coefficients
+    uind::Vector{Int}  # Indices of upper-bounded variables
+    uval::Vector{Tv}   # Upper-bounds on variables
 
-
-    # ================
-    #   Book-keping
-    # ================
+    # =================
+    #   Book-keeping
+    # =================
     niter::Int  # Number of IPM iterations
     solver_status::TerminationStatus  # Optimization status
     primal_status::SolutionStatus
@@ -28,25 +34,29 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     #=====================
         Working memory
     =====================#
-
-    # ncon::Int    # Number of constraints
-    # nvar::Int    # Number of variables
-    # nvarub::Int  # Number of upper-bounded variables
-
     pt::Point{Tv}    # Current primal-dual iterate
     res::Residuals{Tv}  # Residuals at current iterate
-    F::Factorization{Tv}
+    F::Union{Nothing, Factorization{Tv}}
 
     # rxs::Tv  # rhs for complimentary products
     # rwz::Tv  # rhs for complimentary products
     # rtk::T          # rhs for homogeneous complimentary products
 
     # TODO: Constructor
-    function HSDSolver{Tv}(pb::StandardForm{Tv}) where{Tv<:Real}
-        ncon, nvar, nupb = size(pb.A, 1), size(pb.A, 2), length(pb.uval)
+    function HSDSolver{Tv}(ncon::Int, nvar::Int, nupb::Int,
+        A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv},
+        uind::Vector{Int}, uval::Vector{Tv}
+    ) where{Tv<:Real}
         hsd = new{Tv}()
 
-        hsd.pb = pb
+        hsd.ncon = ncon
+        hsd.nvar = nvar
+        hsd.nupb = nupb
+        hsd.A = A
+        hsd.b = b
+        hsd.c = c
+        hsd.uind = uind
+        hsd.uval = uval
 
         hsd.niter = 0
         hsd.solver_status = TerminationStatus(0)
@@ -70,7 +80,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
             zero(Tv), zero(Tv), zero(Tv), zero(Tv)
         )
 
-        hsd.F = symbolic_cholesky(pb.A)
+        hsd.F = nothing
 
         return hsd
     end
@@ -195,6 +205,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
     niter = 0
 
     # TODO: allocate space for factorization
+    hsd.F = symbolic_cholesky(hsd.A)
 
     # IPM LOG
     if env.verbose != 0
@@ -228,7 +239,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
         compute_residuals!(
             hsd,
             hsd.res, hsd.pt,
-            hsd.pb.A, hsd.pb.b, hsd.pb.c, hsd.pb.uind, hsd.pb.uval
+            hsd.A, hsd.b, hsd.c, hsd.uind, hsd.uval
         )
 
         update_mu!(hsd.pt)
@@ -241,8 +252,8 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
             @printf "%4d" niter
             
             # Objectives
-            @printf "  %+16.7e" dot(hsd.pb.c, hsd.pt.x) / hsd.pt.t
-            @printf "%+16.7e" (dot(hsd.pb.b, hsd.pt.y) - dot(hsd.pb.uval, hsd.pt.z)) / hsd.pt.t
+            @printf "  %+16.7e" dot(hsd.c, hsd.pt.x) / hsd.pt.t
+            @printf "%+16.7e" (dot(hsd.b, hsd.pt.y) - dot(hsd.uval, hsd.pt.z)) / hsd.pt.t
             
             # Residuals
             @printf " %9.2e" max(hsd.res.rp_nrm, hsd.res.ru_nrm)
@@ -265,7 +276,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
         # we want to report optimal, not user limits)
         update_solver_status!(
             hsd, hsd.pt, hsd.res,
-            hsd.pb.A, hsd.pb.b, hsd.pb.c, hsd.pb.uind, hsd.pb.uval,
+            hsd.A, hsd.b, hsd.c, hsd.uind, hsd.uval,
             env.barrier_tol_pfeas,
             env.barrier_tol_dfeas,
             env.barrier_tol_conv,

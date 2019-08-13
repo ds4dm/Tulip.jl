@@ -26,7 +26,8 @@ include("readmps.jl")
 
 # new code
 include("./enums.jl")
-include("./Model/Model.jl")
 include("./Solvers/Solvers.jl")
+include("./Model/Model.jl")
+
 
 end # module

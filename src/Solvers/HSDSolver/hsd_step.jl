@@ -25,11 +25,11 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     nvar = hsd.pt.n
     nupb = hsd.pt.p
 
-    A = hsd.pb.A
-    b = hsd.pb.b
-    c = hsd.pb.c
-    uind = hsd.pb.uind
-    uval = hsd.pb.uval
+    A = hsd.A
+    b = hsd.b
+    c = hsd.c
+    uind = hsd.uind
+    uval = hsd.uval
 
     
     # Compute scaling
