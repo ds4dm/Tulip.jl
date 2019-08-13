@@ -14,7 +14,6 @@ function ex_unbounded(::Tv) where{Tv<:Real}
             x1, x2  >= 0
     =#
     m = TLP.Model{Tv}()
-    m.name = "Infeasible"
 
     # Create example
     x1 = TLP.add_variable!(m, "x1", -1.0, TLP.TLP_LO, 0.0, Inf)
