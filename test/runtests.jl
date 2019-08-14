@@ -18,6 +18,7 @@ const test_files = [
     "LinearAlgebra/linearAlgebra",
     "Solvers/HSD",
     "Model/model",
+    "reader",
     "examples"
 ]
 
