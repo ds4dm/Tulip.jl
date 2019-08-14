@@ -3,29 +3,17 @@
 
     Parse an MPS file, and return a linear program in standard form.
 """
-function readmps(file_name)
+function readmps!(m::Model{Tv}, fname::String) where{Tv<:Real}
+
+    # First, empty model
+    empty!(m)
+
+    # Now, parse MPS file
     section = ""
     d = Dict{String,Any}()
 
-    row2idx = Dict()  # name <-> index correspondence for rows
-    col2idx = Dict()  # name <-> index correspondence for columns
-
-    senses = []  # sense of rows
-     
-    coeffs_row = Vector{Int}(undef, 0)
-    coeffs_col = Vector{Int}(undef, 0)
-    coeffs_val = Vector{Float64}(undef, 0)
-
-    obj_col = Vector{Int}(undef, 0)
-    obj_val = Vector{Float64}(undef, 0)
-
-    rhs_row = Vector{Int}(undef, 0)
-    rhs_val = Vector{Float64}(undef, 0)
-
-    lb_col = Vector{Int}(undef, 0)
-    lb_val = Vector{Float64}(undef, 0)
-    ub_col = Vector{Int}(undef, 0)
-    ub_val = Vector{Float64}(undef, 0)
+    con2idx = Dict{String, ConstrId}()  # name <-> index correspondence for rows
+    var2idx = Dict{String, VarId}()     # name <-> index correspondence for columns
 
     ranges_row = Vector{Int}(undef, 0)
     ranges_val = Vector{Float64}(undef, 0)
@@ -36,7 +24,7 @@ function readmps(file_name)
     d["bound"] = ""
     d["range"] = ""
 
-    open(file_name) do f
+    open(fname) do f
         for ln in eachline(f)
 
             fields = parseline(ln)
@@ -52,10 +40,10 @@ function readmps(file_name)
                     # extract problem name
                     if length(fields) >= 2
                         # second field is name, rest is ignored
-                        d["name"] = fields[2]
+                        m.name = fields[2]
                     else
                         #  empty name
-                        d["name"] = ""
+                        m.name = ""
                     end
                     continue
                 end
@@ -65,22 +53,19 @@ function readmps(file_name)
             end
 
             if section == "ROWS"
-                parsemps_rows!(ln, fields, d, row2idx, senses)
+                parsemps_rows!(m, ln, fields, con2idx)
 
             elseif section == "COLUMNS"
-                parsemps_columns!(
-                    ln, fields, d, col2idx, row2idx,
-                    coeffs_row, coeffs_col, coeffs_val, obj_col, obj_val
-                )
+                parsemps_columns!(m, ln, fields, var2idx, con2idx)
 
             elseif section == "RHS"
-                parsemps_rhs!(ln, fields, d, row2idx, rhs_row, rhs_val)
+                parsemps_rhs!(m, ln, fields, con2idx, d)
 
             elseif section == "RANGES"
-                parsemps_ranges!(ln, fields, d, row2idx, ranges_row, ranges_val)
+                parsemps_ranges!(ln, fields, con2idx, ranges_row, ranges_val)
 
             elseif section == "BOUNDS"
-                parsemps_bounds!(ln, fields, d, col2idx, lb_col, lb_val, ub_col, ub_val)
+                parsemps_bounds!(m, ln, fields, d, var2idx)
 
             elseif section == "ENDATA"
                 # end of file
@@ -96,68 +81,7 @@ function readmps(file_name)
     # extract relevant info
     ranges = sparsevec(ranges_row, ranges_val)
 
-    # transform to standard form
-    m, n, obj, rhs, coeffs, lb, ub = convert_to_standard_form(
-        d, 
-        obj_col, obj_val,
-        rhs_row, rhs_val, senses,
-        coeffs_row, coeffs_col, coeffs_val,
-        lb_col, lb_val, ub_col, ub_val,
-        ranges_row, ranges_val
-    )
-    
-    return m, n, obj, rhs, coeffs, lb, ub, ranges
-end
-
-
-function convert_to_standard_form(
-        d,
-        obj_col, obj_val,  # objective
-        rhs_row, rhs_val, senses,  # right-hand side and senses
-        coeffs_row, coeffs_col, coeffs_val,  # coefficients
-        lb_col, lb_val, ub_col, ub_val,  # lower and uper bounds
-        ranges_row, ranges_val
-    )
-    
-    m = d["nrows"]  # number of constraints in original formulation
-    n = d["ncols"]  # number of variables in original formulation
-
-    # I. Tranform constraints to equality constraints
-    for j=1:m
-        if senses[j] == "L"
-            # add slack variable
-            n += 1
-            push!(coeffs_row, j)
-            push!(coeffs_col, n)
-            push!(coeffs_val, 1.0)
-            senses[j] = "E"
-
-        elseif senses[j] == "G"
-            # add surplus variable
-            n += 1
-            push!(coeffs_row, j)
-            push!(coeffs_col, n)
-            push!(coeffs_val, -1.0)
-            senses[j] = "E"
-        end
-    end
-
-    coeffs = sparse(coeffs_row, coeffs_col, coeffs_val, m, n)
-    obj = Array(sparsevec(obj_col, obj_val, n))
-    rhs = Array(sparsevec(rhs_row, rhs_val, m))
-
-
-    # II. Form bounds
-    lb = zeros(n)  # lower bound
-    ub = Inf * ones(n)  # upper bound
-    for (i, j) in enumerate(lb_col)
-        lb[j] = lb_val[i]
-    end
-    for (i, j) in enumerate(ub_col)
-        ub[j] = ub_val[i]
-    end
-
-    return m, n, obj, rhs, coeffs, lb, ub
+    return m
 end
 
 
@@ -204,7 +128,7 @@ function parseline(ln)
 end
 
 
-function parsemps_rows!(ln, fields, d, row2idx, senses)
+function parsemps_rows!(m::Model{Tv}, ln, fields, con2idx) where{Tv<:Real}
     # parse a ROWS line of the MPS file
     # `ln` is a string that contains the current line
     # `fields` is an array such that fields == split(ln)
@@ -224,12 +148,20 @@ function parsemps_rows!(ln, fields, d, row2idx, senses)
     #   "G" -> greater-or-equal inequality constraint
     if fields[1] == "N"
         # objective
-        row2idx[fields[2]] = 0
+        con2idx[fields[2]] = ConstrId(0)
     elseif fields[1] == "E" || fields[1] == "L" || fields[1] == "G"
         # constraint
-        d["nrows"] += 1
-        row2idx[fields[2]] = d["nrows"]  # name
-        push!(senses, fields[1])  # sense (i.e., E, L, or G)
+        if fields[1] == "E"
+            lb, ub = zero(Tv), zero(Tv)
+        elseif fields[1] == "L"
+            lb, ub = Tv(-Inf), zero(Tv)
+        elseif fields[1] == "G"
+            lb, ub = zero(Tv), Tv(Inf)
+        end
+
+        # add constraint to model
+        ridx = add_constraint!(m, String(fields[2]), lb, ub, VarId[], Float64[])
+        con2idx[String(fields[2])] = ridx
     else
         # input error, current line is ignored
         @warn "INPUT ERROR:\t$(ln)"
@@ -238,9 +170,7 @@ function parsemps_rows!(ln, fields, d, row2idx, senses)
 end
 
 
-function parsemps_columns!(ln, fields, d, col2idx, row2idx,
-    coeffs_row, coeffs_col, coeffs_val, obj_col, obj_val
-)
+function parsemps_columns!(m::Model{Tv}, ln, fields, var2idx, con2idx) where{Tv<:Real}
     # parse a ROWS line of the MPS file
     # `ln` is a string that contains the current line
     # `fields` contains the 6 fields of that line
@@ -253,49 +183,55 @@ function parsemps_columns!(ln, fields, d, col2idx, row2idx,
 
     # First field is empty, second field is variable's name
     cname = fields[2]
-    if !haskey(col2idx, cname)
-        d["ncols"] += 1
-        col2idx[cname] = d["ncols"]  # Add column name to the pool
+    if !haskey(var2idx, cname)
+        # d["ncols"] += 1
+        # var2idx[cname] = d["ncols"]  # Add column name to the pool
+        # Create new variable
+        vidx = add_variable!(m, String(cname), zero(Tv), zero(Tv), Tv(Inf))
+        var2idx[cname] = vidx
     end
 
     # Second and third fields are
     # the row's name, and the corresponding coefficient
     rname = fields[3]  # row name
-    if !haskey(row2idx, rname)
+    if !haskey(con2idx, rname)
         # current row not in list of rows, current line ignored
         @warn "COL ERROR UNKNOWN ROW $(rname)|$(ln)"
         return nothing
     end
     coeff = parse(Float64, fields[4])  # coefficient value
-    if row2idx[rname] == 0
+    if con2idx[rname].uuid == 0
         # objective coefficient
-        push!(obj_col, col2idx[cname])
-        push!(obj_val, coeff)
+        # push!(obj_col, var2idx[cname])
+        # push!(obj_val, coeff)
+        set_obj_coeff!(m.pbdata_raw.vars[var2idx[cname]], coeff)
     else
         # constraint coefficient
-        push!(coeffs_col, col2idx[cname])
-        push!(coeffs_row, row2idx[rname])
-        push!(coeffs_val, coeff)
+        set_coeff!(m.pbdata_raw, var2idx[cname], con2idx[rname], coeff)
+        # push!(coeffs_row, con2idx[rname])
+        # push!(coeffs_val, coeff)
     end
 
     # optional other fields
     if length(fields) >= 6
         rname = fields[5]  # row name
-        if !haskey(row2idx, rname)
+        if !haskey(con2idx, rname)
             # current row not in list of rows, current line ignored
             @warn "COL ERROR UNKNOWN ROW $(rname)|$(ln)"
             return nothing
         end
         coeff = parse(Float64, fields[6])  # coefficient value
-        if row2idx[rname] == 0
+        if con2idx[rname].uuid == 0
             # objective coefficient
-            push!(obj_col, col2idx[cname])
-            push!(obj_val, coeff)
+            # push!(obj_col, var2idx[cname])
+            # push!(obj_val, coeff)
+            set_obj_coeff!(m.pbdata_raw.vars[var2idx[cname]], coeff)
         else
             # constraint coefficient
-            push!(coeffs_col, col2idx[cname])
-            push!(coeffs_row, row2idx[rname])
-            push!(coeffs_val, coeff)
+            # push!(coeffs_col, var2idx[cname])
+            # push!(coeffs_row, con2idx[rname])
+            # push!(coeffs_val, coeff)
+            set_coeff!(m.pbdata_raw, var2idx[cname], con2idx[rname], coeff)
         end
     end
 
@@ -303,7 +239,7 @@ function parsemps_columns!(ln, fields, d, col2idx, row2idx,
 end
 
 
-function parsemps_rhs!(ln, fields, d, row2idx, rhs_row, rhs_val)
+function parsemps_rhs!(m::Model{Tv}, ln, fields, con2idx, d) where{Tv<:Real}
     # parse a line of the RHS section
     # `ln` is the current line
     # `fields` contains the fields of that line
@@ -330,41 +266,75 @@ function parsemps_rhs!(ln, fields, d, row2idx, rhs_row, rhs_val)
     
     # parse line
     rname = fields[3]
-    if !haskey(row2idx, rname)
+    if !haskey(con2idx, rname)
         # current row not in list of rows, current line ignored
         @warn "RHS ERROR UNKNOWN ROW $(rname)|$(ln)"
         return nothing
     end
     rval = parse(Float64, fields[4])
     # update index and value
-    if row2idx[rname] == 0
+    if con2idx[rname].uuid == 0
         d["obj_offset"] = -rval
     else
-        push!(rhs_row, row2idx[rname])
-        push!(rhs_val, rval)
+        # Check type of constraint and update coefficient accordingly
+        (bt, lb, ub) = get_bounds(m.pbdata_raw.constrs[con2idx[rname]])
+        if bt == TLP_UP
+            # a'x <= b
+            set_bounds!(m.pbdata_raw.constrs[con2idx[rname]], Tv(-Inf), rval)
+        elseif bt == TLP_LO
+            # a'x >= b
+            set_bounds!(m.pbdata_raw.constrs[con2idx[rname]], rval, Tv(Inf))
+        elseif bt == TLP_FR
+            # This should not happen
+            error("Got right-hand side for free constraint")
+        elseif bt == TLP_FX
+            # a'x = b
+            set_bounds!(m.pbdata_raw.constrs[con2idx[rname]], rval, rval)
+        elseif bt == TLP_RG
+            # This should not happen
+            error("Got single right-hand side for ranged constraint.")
+        end
+        # push!(rhs_row, con2idx[rname])
+        # push!(rhs_val, rval)
     end
 
     # optional fields
     if length(fields) >= 6
         rname = fields[5]  # row name
-        if !haskey(row2idx, rname)
+        if !haskey(con2idx, rname)
             # current row not in list of rows, current line ignored
             @warn "RHS ERROR UNKNOWN ROW $(rname)|$(ln)"
             return nothing
         end
         rval = parse(Float64, fields[6])  # coefficient value
         # update index and value
-        if row2idx[rname] == 0
+        if con2idx[rname].uuid == 0
             d["obj_offset"] = -rval
         else
-            push!(rhs_row, row2idx[rname])
-            push!(rhs_val, rval)
+            # Check type of constraint and update coefficient accordingly
+            (bt, lb, ub) = get_bounds(m.pbdata_raw.constrs[con2idx[rname]])
+            if bt == TLP_UP
+                # a'x <= b
+                set_bounds!(m.pbdata_raw.constrs[con2idx[rname]], Tv(-Inf), rval)
+            elseif bt == TLP_LO
+                # a'x >= b
+                set_bounds!(m.pbdata_raw.constrs[con2idx[rname]], rval, Tv(Inf))
+            elseif bt == TLP_FR
+                # This should not happen
+                error("Got right-hand side for free constraint")
+            elseif bt == TLP_FX
+                # a'x = b
+                set_bounds!(m.pbdata_raw.constrs[con2idx[rname]], rval, rval)
+            elseif bt == TLP_RG
+                # This should not happen
+                error("Got single right-hand side for ranged constraint.")
+            end
         end
     end
 end
 
 
-function parsemps_ranges!(ln, fields, d, row2idx, ranges_row, ranges_val)
+function parsemps_ranges!(m::Model{Tv}, ln, fields, d, con2idx) where{Tv<:Real}
     if length(fields) < 4
         # input error, current line is ignored
         @warn "RNG LINE TOO SHORT|$(ln)"
@@ -381,30 +351,60 @@ function parsemps_ranges!(ln, fields, d, row2idx, ranges_row, ranges_val)
 
     # parse line
     rname = fields[3]
-    rngval = parse(Float64, fields[4])
-    if !haskey(row2idx, rname)
+    rval = parse(Float64, fields[4])
+    if !haskey(con2idx, rname)
         # unknown row
         @warn "RNG ERROR UNKNOWN ROW $(rname)|$(ln)"
         return nothing
     end
-    push!(ranges_row, row2idx[rname])
-    push!(ranges_val, rngval)
+    cidx = con2idx[rname]
+    (bt, lb, ub) = get_bounds(m.pbdata_raw.constrs[cidx])
+    if bt == TLP_LO
+        # `l <= a'x <= Inf` becomes `l <= a'x <= l + |r|`
+        set_bounds!(m.pbdata_raw.constrs[cidx], lb, lb + abs(rval))
+    elseif bt == TLP_UP
+        # `-Inf <= a'x <= u` becomes `u - |r| <= a'x <= u`
+        set_bounds!(m.pbdata_raw.constrs[cidx], ub - abs(rval), ub)
+    elseif bt == TLP_FX && rval >= 0.0
+        # `a'x = b` becomes `b <= a'x <= b + |r|`
+        set_bounds!(m.pbdata_raw.constrs[cidx], lb, lb + rval)
+    elseif bt == TLP_FX && rval < 0.0
+        # `a'x = b` becomes `b - |r| <= a'x <= b`
+        set_bounds!(m.pbdata_raw.constrs[cidx], ub - abs(rval), ub)
+    else
+        error("Unkown row type for RANGES: $bt.")
+    end
 
     if length(fields) >=6
         rname = fields[5]
         rngval = parse(Float64, fields[6])
-        if !haskey(row2idx, rname)
+        if !haskey(con2idx, rname)
             # unknown row
             @warn "RNG ERROR UNKNOWN ROW $(rname)|$(ln)"
             return nothing
         end
-        push!(ranges_row, row2idx[rname])
-        push!(ranges_val, rngval)
+        cidx = con2idx[rname]
+        (bt, lb, ub) = get_bounds(m.pbdata_raw.constrs[cidx])
+        if bt == TLP_LO
+            # `l <= a'x <= Inf` becomes `l <= a'x <= l + |r|`
+            set_bounds!(m.pbdata_raw.constrs[cidx], lb, lb + abs(rval))
+        elseif bt == TLP_UP
+            # `-Inf <= a'x <= u` becomes `u - |r| <= a'x <= u`
+            set_bounds!(m.pbdata_raw.constrs[cidx], ub - abs(rval), ub)
+        elseif bt == TLP_FX && rval >= 0.0
+            # `a'x = b` becomes `b <= a'x <= b + |r|`
+            set_bounds!(m.pbdata_raw.constrs[cidx], lb, lb + rval)
+        elseif bt == TLP_FX && rval < 0.0
+            # `a'x = b` becomes `b - |r| <= a'x <= b`
+            set_bounds!(m.pbdata_raw.constrs[cidx], ub - abs(rval), ub)
+        else
+            error("Unkown row type for RANGES: $bt.")
+        end
     end
 end
 
 
-function parsemps_bounds!(ln, fields, d, col2idx, lb_col, lb_val, ub_col, ub_val)
+function parsemps_bounds!(m::Model{Tv}, ln, fields, d, var2idx) where{Tv<:Real}
     # parse a line of the BOUNDS section
 
     if (length(fields) < 3
@@ -419,35 +419,49 @@ function parsemps_bounds!(ln, fields, d, col2idx, lb_col, lb_val, ub_col, ub_val
     btype = fields[1]
     bname = fields[2]
     cname = fields[3]
-    if !haskey(col2idx, cname)
-        @warn "BND ERROR UNKNOWN COL $(rname)|$(ln)"
+    if !haskey(var2idx, cname)
+        @warn "BND ERROR UNKNOWN COL $(cname)|$(ln)"
         return nothing
     end
 
+    vidx = var2idx[cname]
+    bval = parse(Float64, fields[4])
+
     if btype == "LO"
-        push!(lb_col, col2idx[cname])
-        push!(lb_val, parse(Float64, fields[4]))
+        # b <= x < Inf
+        set_bounds!(m.pbdata_raw.vars[vidx], bval, Inf)
     elseif btype == "UP"
-        push!(ub_col, col2idx[cname])
-        push!(ub_val, parse(Float64, fields[4]))
+        # 0 <= x <= b
+        set_bounds!(m.pbdata_raw.vars[vidx], 0.0, bval)
     elseif btype == "FR"
-        push!(lb_col, col2idx[cname])
-        push!(lb_val, -Inf)
-        push!(ub_col, col2idx[cname])
-        push!(ub_val, Inf)
+        # -Inf < x < Inf
+        set_bounds!(m.pbdata_raw.vars[vidx], -Inf, Inf)
     elseif btype == "FX"
-        push!(lb_col, col2idx[cname])
-        push!(lb_val, parse(Float64, fields[4]))
-        push!(ub_col, col2idx[cname])
-        push!(ub_val, parse(Float64, fields[4]))
+        # x = b
+        set_bounds!(m.pbdata_raw.vars[vidx], bval, bval)
     elseif btype == "MI"
-        push!(lb_col, col2idx[cname])
-        push!(lb_val, -Inf)
+        # -Inf < x <= b
+        set_bounds!(m.pbdata_raw.vars[vidx], -Inf, bval)
     elseif btype == "PL"
-        push!(ub_col, col2idx[cname])
-        push!(ub_val, Inf)
+        # -Inf < x <= b
+        set_bounds!(m.pbdata_raw.vars[vidx], 0.0, Inf)
+    elseif btype == "BV"
+        # x = 0 or 1, x binary
+        # Keep bounds but ignore binary requirement
+        @warn "Binary variable $cname; recording bounds but ignoring binary."
+        set_bounds!(m.pbdata_raw.vars[vidx], 0.0, 1.0)
+    elseif btype == "LI"
+        # 0 <= x < Inf, x integer
+        # Keep bounds but ignore integer requirement
+        @warn "Integer variable $cname; recording bounds but ignoring binary."
+        set_bounds!(m.pbdata_raw.vars[vidx], 0.0, Inf)
+    elseif btype == "UI"
+        # 0 <= x <= b, x integer
+        # Keep bounds but ignore integer requirement
+        @warn "Integer variable $cname; recording bounds but ignoring binary."
+        set_bounds!(m.pbdata_raw.vars[vidx], 0.0, bval)
     else
         # error in bound type
-        @warn "BND ERROR WRONG BOUND TYPE $(btype)"
+        @warn "Unknown bound type: $(btype). Input ignored."
     end
 end
