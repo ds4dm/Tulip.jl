@@ -1,8 +1,4 @@
-import Base:
-    copy,
-    getindex, setindex!
-
-include("params.jl")
+import Base.copy
 
 mutable struct Env{Tv<:Real}
     #=======================================================
