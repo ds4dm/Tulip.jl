@@ -115,7 +115,7 @@ end
     set_coeff!(pb::ProblemData{Tv}, vid::VarId, cid::ConstrId, val::Tv)
 
 """
-function set_coeff!(pb::ProblemData{Tv}, vid::VarId, cid::ConstrId, val::Tv) where{Tv<:Real}
+function set_coeff!(pb::ProblemData{Tv}, vid::VarId, cid::ConstrId, val::Real) where{Tv<:Real}
     
     if !haskey(pb.coeffs, (vid, cid))
         # Entry does not exist
