@@ -9,22 +9,6 @@ function run_tests_variable(::Tv) where{Tv<:Real}
         @test vid.uuid == 1
     end
 
-    # TODO: move these tests to another file
-    @testset "Bounds" begin
-
-        # These should pass
-        @test TLP.bound_type(Tv(-Inf), Tv(0)) == TLP.TLP_UP
-        @test TLP.bound_type(Tv(0), Tv(Inf)) == TLP.TLP_LO
-        @test TLP.bound_type(Tv(1), Tv(1)) == TLP.TLP_FX
-        @test TLP.bound_type(Tv(-Inf), Tv(Inf)) == TLP.TLP_FR
-        @test TLP.bound_type(Tv(0), Tv(1)) == TLP.TLP_RG
-
-        # These should fail
-        # TODO: add all possible cases
-        @test_throws ErrorException TLP.bound_type(Tv(Inf), Tv(Inf))
-        @test_throws ErrorException TLP.bound_type(Tv(1), Tv(0))
-    end
-
     @testset "VarData" begin
 
         # internal constructor

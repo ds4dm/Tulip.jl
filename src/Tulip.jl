@@ -16,18 +16,13 @@ import .TLPLinearAlgebra:
     construct_matrix
 
 # package code goes here
-include("env.jl")
-include("status.jl")
-# include("model.jl")
-# include("prepross.jl")
-# include("ipm.jl")
-include("readmps.jl")
-# include("MPB_wrapper.jl")
+include("env.jl")       # Parameters
+include("status.jl")    # Termination and solution statuses
+include("./bounds.jl")   # Bounds
 
-# new code
-include("./enums.jl")
+
 include("./Solvers/Solvers.jl")
 include("./Model/Model.jl")
-
+include("readmps.jl")
 
 end # module
