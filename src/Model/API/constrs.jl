@@ -9,17 +9,12 @@ Add one linear constraint to the model.
 """
 function add_constraint!(
     m::Model{Tv},
-    name::String,
-    bt::BoundType, lb::Tv, ub::Tv,
-    colids::Vector{VarId},
-    colvals::Vector{Tv}
+    name::String, lb::Tv, ub::Tv, colids::Vector{VarId}, colvals::Vector{Tv}
 ) where{Tv<:Real}
 
     # =================
     #   Sanity checks
     # =================
-    _check_bounds(bt, lb, ub) || error("Invalid bounds for $bt: [$lb, $ub].")
-
     length(colids) == length(colvals) || throw(DimensionMismatch(
         "colidx has length $(length(colids)) but vval has length $(length(colvals))"
     ))
@@ -34,7 +29,7 @@ function add_constraint!(
     #   Create Constraint object
     # ============================
     cidx = new_constraint_index!(m.pbdata_raw)
-    constr = LinearConstraint{Tv}(cidx, name, bt, lb, ub)
+    constr = LinearConstraint{Tv}(cidx, name, lb, ub)
 
     # Add constraint to model
     add_constraint!(m.pbdata_raw, constr)
@@ -54,19 +49,12 @@ end
 
 add_constraint!(
     m::Model{Tv},
-    name::String,
-    bt::BoundType, lb::Real, ub::Real,
-    colids::Vector{VarId},
-    colvals::Vector{T}
+    name::String, lb::Real, ub::Real, colids::Vector{VarId}, colvals::Vector{T}
 ) where{Tv<:Real, T<:Real} = add_constraint!(
-    m, name,
-    bt, Tv(lb), Tv(ub),
-    colids, Tv.(colvals)
+    m, name, Tv(lb), Tv(ub), colids, Tv.(colvals)
 )
 
 add_constraint!(
     m::Model{Tv},
-    name::String,
-    obj::Real,
-    bt::BoundType, lb::Real, ub::Real
-) where{Tv<:Real} = add_constraint!(m, name, obj, bt, lb, ub, VarrId[], Tv[])
+    name::String, obj::Real, lb::Real, ub::Real
+) where{Tv<:Real} = add_constraint!(m, name, obj, lb, ub, VarrId[], Tv[])

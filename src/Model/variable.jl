@@ -21,16 +21,16 @@ mutable struct VarData{Tv<:Real}
     ub::Tv   # Upper bound
 
     # Constructors
-    function VarData{Tv}(name::String, obj::Real, bt::BoundType, lb::Real, ub::Real) where {Tv<:Real}
+    function VarData{Tv}(name::String, obj::Tv, lb::Tv, ub::Tv) where {Tv<:Real}
+        bt = bound_type(lb, ub)
         return new{Tv}(name, obj, bt, lb, ub)
     end
 
 end
 
-function VarData(name::String, obj::Tv, bt::BoundType, lb::Tv, ub::Tv) where{Tv<:Real}
-    VarData{Tv}(name, obj, bt, lb, ub)
+function VarData{Tv}(name::String, obj::Real, lb::Real, ub::Real) where {Tv<:Real}
+    return VarData{Tv}(name::String, Tv(obj), Tv(lb), Tv(ub))
 end
-
 
 """
     Variable{Tv<:Real}
@@ -47,10 +47,13 @@ struct Variable{Tv<:Real}
     end
 end
 
-function Variable{Tv}(id::VarId, name::String, obj, bt, lb, ub) where{Tv<:Real}
-    _check_bounds(bt, lb, ub) || error("Invalid bounds for $bt: [$lb, $ub]")
-    vd = VarData{Tv}(name, obj, bt, lb, ub)
+function Variable{Tv}(id::VarId, name::String, obj::Tv, lb::Tv, ub::Tv) where{Tv<:Real}
+    vd = VarData{Tv}(name, obj, lb, ub)
     return Variable(id, vd)
+end
+
+function Variable{Tv}(id::VarId, name::String, obj::Real, lb::Real, ub::Real) where{Tv<:Real}
+    return Variable{Tv}(id, name, Tv(obj), Tv(lb), Tv(ub))
 end
 
 
@@ -119,9 +122,9 @@ get_upper_bound(v::Variable) = v.dat.ub
     set_bounds!(c::LinearConstraint, bt, lb, ub)
 
 """
-function set_bounds!(v::Variable{Tv}, bt::BoundType, lb::Tv, ub::Tv) where{Tv<:Real}
+function set_bounds!(v::Variable{Tv}, lb::Tv, ub::Tv) where{Tv<:Real}
     # Check bounds
-    _check_bounds(bt, lb, ub) || error("Invalid bounds for $bt: [$lb, $ub]")
+    bt = bound_type(lb, ub)
 
     v.dat.bt = bt
     v.dat.lb = lb
@@ -130,4 +133,4 @@ function set_bounds!(v::Variable{Tv}, bt::BoundType, lb::Tv, ub::Tv) where{Tv<:R
     return nothing
 end
 
-set_bounds!(v::Variable{Tv}, bt, lb::Real, ub::Real) where {Tv<:Real}= set_bounds!(v, bt, Tv(lb), Tv(ub))
+set_bounds!(v::Variable{Tv}, lb::Real, ub::Real) where {Tv<:Real}= set_bounds!(v, Tv(lb), Tv(ub))

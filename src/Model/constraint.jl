@@ -19,9 +19,14 @@ mutable struct LinConstrData{Tv<:Real}
     lb::Tv
     ub::Tv
 
-    function LinConstrData{Tv}(name::String, bt::BoundType, lb::Real, ub::Real) where{Tv<:Real}
+    function LinConstrData{Tv}(name::String, lb::Tv, ub::Tv) where{Tv<:Real}
+        bt = bound_type(lb, ub)
         return new{Tv}(name, bt, lb, ub)
     end
+end
+
+function LinConstrData{Tv}(name::String, lb::Real, ub::Real) where{Tv<:Real}
+    return LinConstrData{Tv}(name, Tv(lb), Tv(ub))
 end
 
 abstract type AbstractConstraint{Tv<:Real} end
@@ -45,9 +50,13 @@ struct LinearConstraint{Tv<:Real} <: AbstractConstraint{Tv}
     end
 end
 
-function LinearConstraint{Tv}(id::ConstrId, name::String, bt, lb, ub) where{Tv<:Real}
-    cdat = LinConstrData{Tv}(name, bt, lb, ub)
+function LinearConstraint{Tv}(id::ConstrId, name::String, lb::Tv, ub::Tv) where{Tv<:Real}
+    cdat = LinConstrData{Tv}(name, lb, ub)
     return LinearConstraint(id, cdat)
+end
+
+function LinearConstraint{Tv}(id::ConstrId, name::String, lb::Real, ub::Real) where{Tv<:Real}
+    return LinearConstraint{Tv}(id, name, Tv(lb), Tv(ub))
 end
 
 
@@ -101,17 +110,16 @@ get_upper_bound(c::LinearConstraint) = c.dat.ub
     set_bounds!(c::LinearConstraint, bt, lb, ub)
 
 """
-function set_bounds!(c::LinearConstraint{Tv}, bt, lb::Tv, ub::Tv) where{Tv<:Real}
+function set_bounds!(c::LinearConstraint{Tv}, lb::Tv, ub::Tv) where{Tv<:Real}
     # Check bounds
-    _check_bounds(bt, lb, ub) || error("Invalid bounds for $bt: [$lb, $ub]")
+    bt = bound_type(lb, ub)
 
     c.dat.bt = bt
     c.dat.lb = lb
     c.dat.ub = ub
-
     return nothing
 end
 
-function set_bounds!(c::LinearConstraint{Tv}, bt, lb::Real, ub::Real) where{Tv<:Real}
-    set_bounds!(c, bt, Tv(lb), Tv(ub))
+function set_bounds!(c::LinearConstraint{Tv}, lb::Real, ub::Real) where{Tv<:Real}
+    set_bounds!(c, Tv(lb), Tv(ub))
 end

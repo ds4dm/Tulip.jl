@@ -13,28 +13,30 @@ function run_tests_variable(::Tv) where{Tv<:Real}
     @testset "Bounds" begin
 
         # These should pass
-        @test TLP._check_bounds(TLP.TLP_UP, Tv(-Inf), Tv(0))
-        @test TLP._check_bounds(TLP.TLP_LO, Tv(0), Tv(Inf))
-        @test TLP._check_bounds(TLP.TLP_FX, Tv(1), Tv(1))
-        @test TLP._check_bounds(TLP.TLP_FR, Tv(-Inf), Tv(Inf))
-        @test TLP._check_bounds(TLP.TLP_RG, Tv(0), Tv(1))
+        @test TLP.bound_type(Tv(-Inf), Tv(0)) == TLP.TLP_UP
+        @test TLP.bound_type(Tv(0), Tv(Inf)) == TLP.TLP_LO
+        @test TLP.bound_type(Tv(1), Tv(1)) == TLP.TLP_FX
+        @test TLP.bound_type(Tv(-Inf), Tv(Inf)) == TLP.TLP_FR
+        @test TLP.bound_type(Tv(0), Tv(1)) == TLP.TLP_RG
 
         # These should fail
         # TODO: add all possible cases
-
+        @test_throws ErrorException TLP.bound_type(Tv(Inf), Tv(Inf))
+        @test_throws ErrorException TLP.bound_type(Tv(1), Tv(0))
     end
 
     @testset "VarData" begin
-        vdat = TLP.VarData{Tv}("x1", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
 
+        # internal constructor
+        vdat = TLP.VarData{Tv}("x1", zero(Tv), zero(Tv), Tv(Inf))
         @test vdat.name == "x1"
         @test vdat.obj == zero(Tv)
         @test vdat.bt == TLP.TLP_LO
         @test vdat.lb == zero(Tv)
         @test vdat.ub == Tv(Inf)
 
-        vdat = TLP.VarData("x1", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
-
+        # Constructor with un-typed data fields
+        vdat = TLP.VarData{Tv}("x1", 0, 0, Inf)
         @test isa(vdat, TLP.VarData{Tv})
         @test vdat.name == "x1"
         @test vdat.obj == zero(Tv)
@@ -45,17 +47,23 @@ function run_tests_variable(::Tv) where{Tv<:Real}
         
     @testset "Constructors" begin
         vid = TLP.VarId(1)
-        vdat = TLP.VarData{Tv}("x1", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
+        vdat = TLP.VarData{Tv}("x1", zero(Tv), zero(Tv), Tv(Inf))
 
+        # Construct from ID and (typed) data
         v = TLP.Variable(vid, vdat)
         @test isa(v, TLP.Variable{Tv})
 
-        v = TLP.Variable{Tv}(vid, "x1", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
+        # Construct from ID and (typed) data fields
+        v = TLP.Variable{Tv}(vid, "x1", zero(Tv), zero(Tv), Tv(Inf))
+        @test isa(v, TLP.Variable{Tv})
+
+        # Construct from ID an un-typed data fields
+        v = TLP.Variable{Tv}(vid, "x1", 0, 0, Inf)
         @test isa(v, TLP.Variable{Tv})
     end
 
     vid = TLP.VarId(1)
-    vdat = TLP.VarData("x1", zero(Tv), TLP.TLP_LO, zero(Tv), Tv(Inf))
+    vdat = TLP.VarData{Tv}("x1", zero(Tv), zero(Tv), Tv(Inf))
     v = TLP.Variable(vid, vdat)
 
     # UUID
@@ -91,22 +99,27 @@ function run_tests_variable(::Tv) where{Tv<:Real}
         @test TLP.get_lower_bound(v) == zero(Tv)
         @test TLP.get_upper_bound(v) == Tv(Inf)
 
-        TLP.set_bounds!(v, TLP.TLP_RG, Tv(-1), Tv(1))
+        TLP.set_bounds!(v, Tv(-1), Tv(1))
 
+        @inferred TLP.get_bounds(v)
         @test TLP.get_bounds(v) == (TLP.TLP_RG, Tv(-1), Tv(1))
 
-        @test TLP.get_lower_bound(v) == Tv(-1)
+        # Check for type stability
         @inferred TLP.get_lower_bound(v)
-        @test TLP.get_upper_bound(v) ==  Tv(1)
         @inferred TLP.get_upper_bound(v)
+
+        # check values
+        @test TLP.get_lower_bound(v) == Tv(-1)
+        @test TLP.get_upper_bound(v) == Tv(1)
 
         # Check type conversion
-        TLP.set_bounds!(v, TLP.TLP_RG, 0, 2)
-        @test TLP.get_lower_bound(v) == Tv(0)
-        @inferred TLP.get_lower_bound(v)
+        TLP.set_bounds!(v, 0, 2)
 
-        @test TLP.get_upper_bound(v) ==  Tv(2)
+        @inferred TLP.get_lower_bound(v)
         @inferred TLP.get_upper_bound(v)
+        @test TLP.get_lower_bound(v) == Tv(0)
+        @test TLP.get_upper_bound(v) == Tv(2)
+        
     end
 
     return nothing

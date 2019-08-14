@@ -12,7 +12,7 @@ Add one scalar variable to the model.
 function add_variable!(
     m::Model{Tv},
     name::String,
-    obj::Tv, bt::BoundType, lb::Tv, ub::Tv,
+    obj::Tv, lb::Tv, ub::Tv,
     rowids::Vector{ConstrId},
     rowvals::Vector{Tv}
 ) where{Tv<:Real}
@@ -20,10 +20,6 @@ function add_variable!(
     # =================
     #   Sanity checks
     # =================
-    # TODO: check inputs, check bounds
-    # Q: when should bounds be checked?
-    _check_bounds(bt, lb, ub) || error("Invalid bounds for $bt: [$lb, $ub].")
-
     length(rowids) == length(rowvals) || error(
         "rowids has length $(length(rowids)) but rowvals has length $(length(rowvals))"
     )
@@ -38,7 +34,7 @@ function add_variable!(
     #   Create Variable object
     # ==========================
     vidx = new_variable_index!(m.pbdata_raw)
-    var = Variable{Tv}(vidx, name, obj, bt, lb, ub)
+    var = Variable{Tv}(vidx, name, obj, lb, ub)
 
     # Add constraint to model
     add_variable!(m.pbdata_raw, var)
@@ -56,26 +52,20 @@ end
 
 add_variable!(
     m::Model{Tv},
-    name::String, obj::Real,
-    bt::BoundType, lb::Real, ub::Real,
+    name::String, obj::Real, lb::Real, ub::Real,
     rowids::Vector{ConstrId},
     rowvals::Vector{T}
 ) where{Tv<:Real, T<:Real} = add_variable!(m, name,
-    Tv(obj), bt, Tv(lb), Tv(ub), rowids, Tv.(rowvals)
+    Tv(obj), Tv(lb), Tv(ub), rowids, Tv.(rowvals)
 )
 
 
 add_variable!(m::Model{Tv},
-    name::String,
-    obj::Real,
-    bt::BoundType, lb::Real, ub::Real
-) where{Tv<:Real} = add_variable!(m, name, obj, bt, lb, ub, ConstrId[], Tv[])
+    name::String, obj::Real, lb::Real, ub::Real
+) where{Tv<:Real} = add_variable!(m, name, obj, lb, ub, ConstrId[], Tv[])
 
 add_variable!(m::Model{Tv}) where{Tv<:Real} = add_variable!(m,
-    "",
-    zero(Tv),
-    TLP_LO, zero(Tv), Tv(Inf),
-    ConstrId[], Tv[]
+    "", zero(Tv), zero(Tv), Tv(Inf), ConstrId[], Tv[]
 )
 
 # TODO: Add multiple variables
