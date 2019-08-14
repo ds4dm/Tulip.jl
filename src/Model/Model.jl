@@ -37,6 +37,14 @@ mutable struct Model{Tv<:Real}
     end
 end
 
+function empty!(m::Model{Tv}) where{Tv<:Real}
+    # Empty model
+    m.pbdata_raw = ProblemData{Tv}()
+    m.pbdata_std = nothing
+    m.solver = nothing
+
+    return m
+end
 
 include("API/api.jl")
 
