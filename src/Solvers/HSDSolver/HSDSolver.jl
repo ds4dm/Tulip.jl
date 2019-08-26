@@ -202,7 +202,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
 
     # Initialization
     tstart = time()
-    niter = 0
+    hsd.niter = 0
 
     # TODO: allocate space for factorization
     hsd.F = symbolic_cholesky(hsd.A)
@@ -249,7 +249,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
         ttot = time() - tstart
         if env.verbose !=0
             # Display log
-            @printf "%4d" niter
+            @printf "%4d" hsd.niter
             
             # Objectives
             @printf "  %+16.7e" dot(hsd.c, hsd.pt.x) / hsd.pt.t
@@ -289,7 +289,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
             || hsd.solver_status == TerminationStatus(3)  # Dual infeasible
         )
             break
-        elseif niter >= env.barrier_iter_max 
+        elseif hsd.niter >= env.barrier_iter_max 
             hsd.solver_status = TerminationStatus(4)  # Iteration limit
             break
         elseif ttot >= env.time_limit
@@ -303,7 +303,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
         # Q: should we use more arguments here?
         compute_step!(hsd, env)
 
-        niter += 1
+        hsd.niter += 1
 
     end
 
