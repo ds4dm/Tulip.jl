@@ -15,8 +15,8 @@ function readmps!(m::Model{Tv}, fname::String) where{Tv<:Real}
     con2idx = Dict{String, ConstrId}()  # name <-> index correspondence for rows
     var2idx = Dict{String, VarId}()     # name <-> index correspondence for columns
 
-    ranges_row = Vector{Int}(undef, 0)
-    ranges_val = Vector{Float64}(undef, 0)
+    lb = Dict{VarId, Tv}()  # Lower bounds on variables
+    ub = Dict{VarId, Tv}()  # Upper bounds on variables
 
     d["nrows"] = 0
     d["ncols"] = 0
@@ -56,16 +56,16 @@ function readmps!(m::Model{Tv}, fname::String) where{Tv<:Real}
                 parsemps_rows!(m, ln, fields, con2idx)
 
             elseif section == "COLUMNS"
-                parsemps_columns!(m, ln, fields, var2idx, con2idx)
+                parsemps_columns!(m, ln, fields, var2idx, con2idx, lb, ub)
 
             elseif section == "RHS"
                 parsemps_rhs!(m, ln, fields, con2idx, d)
 
             elseif section == "RANGES"
-                parsemps_ranges!(ln, fields, con2idx, ranges_row, ranges_val)
+                parsemps_ranges!(m, ln, fields, d, con2idx)
 
             elseif section == "BOUNDS"
-                parsemps_bounds!(m, ln, fields, d, var2idx)
+                parsemps_bounds!(m, ln, fields, d, var2idx, lb, ub)
 
             elseif section == "ENDATA"
                 # end of file
@@ -78,8 +78,10 @@ function readmps!(m::Model{Tv}, fname::String) where{Tv<:Real}
         # End of file reached
     end
 
-    # extract relevant info
-    ranges = sparsevec(ranges_row, ranges_val)
+    # Set variable bounds
+    for (vidx, var) in m.pbdata_raw.vars
+        set_bounds!(var, lb[vidx], ub[vidx])
+    end
 
     return m
 end
@@ -170,7 +172,7 @@ function parsemps_rows!(m::Model{Tv}, ln, fields, con2idx) where{Tv<:Real}
 end
 
 
-function parsemps_columns!(m::Model{Tv}, ln, fields, var2idx, con2idx) where{Tv<:Real}
+function parsemps_columns!(m::Model{Tv}, ln, fields, var2idx, con2idx, lb, ub) where{Tv<:Real}
     # parse a ROWS line of the MPS file
     # `ln` is a string that contains the current line
     # `fields` contains the 6 fields of that line
@@ -189,6 +191,8 @@ function parsemps_columns!(m::Model{Tv}, ln, fields, var2idx, con2idx) where{Tv<
         # Create new variable
         vidx = add_variable!(m, String(cname), zero(Tv), zero(Tv), Tv(Inf))
         var2idx[cname] = vidx
+        lb[vidx] = zero(Tv)
+        ub[vidx] = Tv(Inf)
     end
 
     # Second and third fields are
@@ -404,8 +408,11 @@ function parsemps_ranges!(m::Model{Tv}, ln, fields, d, con2idx) where{Tv<:Real}
 end
 
 
-function parsemps_bounds!(m::Model{Tv}, ln, fields, d, var2idx) where{Tv<:Real}
+function parsemps_bounds!(m::Model{Tv}, ln, fields, d, var2idx, lb, ub) where{Tv<:Real}
     # parse a line of the BOUNDS section
+
+    # Check
+    
 
     if (length(fields) < 3
         || ((length(fields) < 4) 
@@ -424,44 +431,71 @@ function parsemps_bounds!(m::Model{Tv}, ln, fields, d, var2idx) where{Tv<:Real}
         return nothing
     end
 
+    if d["bound"] == ""
+        d["bound"] = bname
+    else
+        # Some field was already read; if this one is different, skip
+        d["bound"] == bname || return nothing
+    end
+
     vidx = var2idx[cname]
+
+    if length(fields) == 3
+        if btype == "FR"
+            # -Inf < x < Inf
+            lb[vidx] = -Inf
+            ub[vidx] = Inf
+            return
+        elseif btype == "MI"
+            # -Inf < x 
+            lb[vidx] = -Inf
+
+        elseif btype == "PL"
+            # x < Inf
+            ub[vidx] = Inf
+        
+        elseif btype == "BV"
+            # x = 0 or 1, x binary
+            # Keep bounds but ignore binary requirement
+            @warn "Binary variable $cname; recording bounds but ignoring binary."
+            lb[vidx] = 0.0
+            ub[vidx] = 1.0
+        else
+            @warn "Unknown bound type: $(btype). Input ignored."
+        end
+        return
+    end
+
     bval = parse(Float64, fields[4])
 
     if btype == "LO"
-        # b <= x < Inf
-        set_bounds!(m.pbdata_raw.vars[vidx], bval, Inf)
+        # b <= x
+        lb[vidx] = bval
+
     elseif btype == "UP"
-        # 0 <= x <= b
-        set_bounds!(m.pbdata_raw.vars[vidx], 0.0, bval)
-    elseif btype == "FR"
-        # -Inf < x < Inf
-        set_bounds!(m.pbdata_raw.vars[vidx], -Inf, Inf)
+        # x <= b
+        ub[vidx] = bval
+
     elseif btype == "FX"
         # x = b
-        set_bounds!(m.pbdata_raw.vars[vidx], bval, bval)
-    elseif btype == "MI"
-        # -Inf < x <= b
-        set_bounds!(m.pbdata_raw.vars[vidx], -Inf, bval)
-    elseif btype == "PL"
-        # -Inf < x <= b
-        set_bounds!(m.pbdata_raw.vars[vidx], 0.0, Inf)
-    elseif btype == "BV"
-        # x = 0 or 1, x binary
-        # Keep bounds but ignore binary requirement
-        @warn "Binary variable $cname; recording bounds but ignoring binary."
-        set_bounds!(m.pbdata_raw.vars[vidx], 0.0, 1.0)
+        lb[vidx] = bval
+        ub[vidx] = bval
+
     elseif btype == "LI"
         # 0 <= x < Inf, x integer
         # Keep bounds but ignore integer requirement
         @warn "Integer variable $cname; recording bounds but ignoring binary."
-        set_bounds!(m.pbdata_raw.vars[vidx], 0.0, Inf)
+        lb[vidx] = bval
+
     elseif btype == "UI"
         # 0 <= x <= b, x integer
         # Keep bounds but ignore integer requirement
         @warn "Integer variable $cname; recording bounds but ignoring binary."
-        set_bounds!(m.pbdata_raw.vars[vidx], 0.0, bval)
+        ub[vidx] = bval
     else
         # error in bound type
         @warn "Unknown bound type: $(btype). Input ignored."
     end
+
+    return nothing
 end

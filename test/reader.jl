@@ -1,56 +1,63 @@
-INSTANCE_DIR = joinpath(@__DIR__, "../dat/dummy/")
 function run_tests_mps_reader(::Tv) where{Tv<:Real}
     m = TLP.Model{Tv}()
 
-    TLP.readmps!(m, joinpath(INSTANCE_DIR, "lpex_opt.mps"))
+    TLP.readmps!(m, joinpath(@__DIR__, "test_lp.mps"))
 
     @testset "Name" begin
-        @test m.name == "LP1"
+        @test m.name == "TESTLP"
     end
 
     @testset "Variables" begin
-        @test TLP.get_num_var(m) == 2
+        @test TLP.get_num_var(m) == 9
 
-        vars = collect(keys(m.pbdata_raw.vars))
-        @test length(vars) == 2
-        
-        x1, x2 = vars[1], vars[2]
+        x = collect(keys(m.pbdata_raw.vars))
+        @test length(x) == 9
 
         # Names
         @testset "Names" begin
-            @test TLP.get_var_name(m, x1) == "X1"
-            @test TLP.get_var_name(m, x2) == "X2"
+            for j in 1:9
+                @test TLP.get_var_name(m, x[j]) == "X$(j)"
+            end
         end
 
         # Objective coeffs
         @testset "Obj" begin
-            @test m.pbdata_raw.vars[x1].dat.obj == Tv(1.0)
-            @test m.pbdata_raw.vars[x2].dat.obj == Tv(2.0)
+            for j in 1:9
+                @test m.pbdata_raw.vars[x[j]].dat.obj == Tv(j)
+            end
         end
 
         # Bounds
         @testset "Bounds" begin
-            @test TLP.get_var_bounds(m, x1) == (TLP.TLP_RG, Tv(0.0), Tv(1.0))
-            @test TLP.get_var_bounds(m, x2) == (TLP.TLP_RG, Tv(0.0), Tv(1.0))
+            @test TLP.get_var_bounds(m, x[1]) == (TLP.TLP_LO, Tv(1), Tv(Inf))
+            @test TLP.get_var_bounds(m, x[2]) == (TLP.TLP_RG, Tv(0), Tv(1))
+            @test TLP.get_var_bounds(m, x[3]) == (TLP.TLP_FX, Tv(1), Tv(1))
+            @test TLP.get_var_bounds(m, x[4]) == (TLP.TLP_FR, Tv(-Inf), Tv(Inf))
+            @test TLP.get_var_bounds(m, x[5]) == (TLP.TLP_UP, Tv(-Inf), Tv(5))
+            @test TLP.get_var_bounds(m, x[6]) == (TLP.TLP_LO, Tv(0), Tv(Inf))
+            @test TLP.get_var_bounds(m, x[7]) == (TLP.TLP_RG, Tv(0), Tv(1))
+            @test TLP.get_var_bounds(m, x[8]) == (TLP.TLP_LO, Tv(1), Tv(Inf))
+            @test TLP.get_var_bounds(m, x[9]) == (TLP.TLP_RG, Tv(0), Tv(1))
         end
     end
 
     @testset "Constraints" begin
-        @test TLP.get_num_constr(m.pbdata_raw) == 2
+        @test TLP.get_num_constr(m.pbdata_raw) == 3
 
         cons = collect(keys(m.pbdata_raw.constrs))
-        @test length(cons) ==2
+        @test length(cons) == 3
 
-        c1, c2 = cons[1], cons[2]
 
         @testset "Names" begin
-            @test TLP.get_name(m.pbdata_raw.constrs[c1]) == "ROW1"
-            @test TLP.get_name(m.pbdata_raw.constrs[c2]) == "ROW2"
+            for i in 1:3
+                @test TLP.get_name(m.pbdata_raw.constrs[cons[i]]) == "ROW$(i)"
+            end
         end
 
         @testset "Bounds" begin
-            @test TLP.get_bounds(m.pbdata_raw.constrs[c1]) == (TLP.TLP_FX, Tv(1.0), Tv(1.0))
-            @test TLP.get_bounds(m.pbdata_raw.constrs[c2]) == (TLP.TLP_FX, Tv(0.0), Tv(0.0))
+            @test TLP.get_bounds(m.pbdata_raw.constrs[cons[1]]) == (TLP.TLP_FX, Tv(1), Tv(1))
+            @test TLP.get_bounds(m.pbdata_raw.constrs[cons[2]]) == (TLP.TLP_UP, Tv(-Inf), Tv(2))
+            @test TLP.get_bounds(m.pbdata_raw.constrs[cons[3]]) == (TLP.TLP_LO, Tv(3), Tv(Inf))
         end
     end
 end
