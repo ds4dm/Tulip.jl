@@ -3,11 +3,16 @@ include("./constrs.jl")
 
 
 """
-    get_value(m::Model, x::VarIdx)
+    get_value(m::Model, x::VarId)
 
 Return value of variable `x` in current solution.
 """
-function get_value(m::Model, x::VarId) where{Tv<:Real}
+function get_value(m::Model{Tv}, x::VarId) where{Tv<:Real}
+    #=
+        TODO
+        Type inferrence breaks because we use `m.solver.pt`.
+        Instead, define a function get_primal_value for IPM solvers.
+    =#
     # TODO: check solver status and throw error if need be.
 
     # Get variable bounds in original formulation
@@ -18,7 +23,7 @@ function get_value(m::Model, x::VarId) where{Tv<:Real}
     x_ = m.solver.pt.x[j] / m.solver.pt.t  # Value in HSD model
 
     # Post-crush the solution
-    # TODO: perform a systematic post-crush after optimization is done
+    # TODO: instead, perform a systematic post-crush after optimization is done
     if bt == TLP_LO || bt == TLP_FX || bt == TLP_RG
         return x_ + lb
     elseif bt == TLP_UP
