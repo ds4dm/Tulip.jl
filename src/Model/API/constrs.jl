@@ -66,6 +66,6 @@ add_constraint!(
 
 get_num_constr(m::Model) = get_num_constr(m.pbdata_raw)
 
-get_constr_name(m::Model, i::ConstrId) = get_name(m.pbdata_raw.vars[i])
+get_constr_name(m::Model, i::ConstrId) = get_name(m.pbdata_raw.constrs[i])
 
 get_constr_bounds(m::Model, i::ConstrId) = get_bounds(m.pbdata_raw.constrs[i])
