@@ -3,7 +3,31 @@ module TLPLinearAlgebra
 using LinearAlgebra
 using SparseArrays
 
-export factor_normaleq, factor_normaleq!, symbolic_cholesky
+export factor_normaleq, factor_normaleq!, symbolic_cholesky, construct_matrix
+
+
+"""
+    construct_matrix
+
+"""
+function construct_matrix(
+    ::Type{Matrix}, m::Int, n::Int,
+    aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{Tv}
+) where{Tv<:Real}
+
+    A = zeros(Tv, m, n)
+    for(i, j, v) in zip(aI, aJ, aV)
+        A[i, j] = v
+    end
+    return A
+end
+
+construct_matrix(
+    ::Type{SparseMatrixCSC}, m::Int, n::Int,
+    aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{Tv}
+) where{Tv<:Real} = sparse(aI, aJ, aV, m, n)
+
+
 
 """
     symbolic_cholesky
@@ -37,7 +61,7 @@ function factor_normaleq(
     if !issuccess(F)
         
         # add regularization and try factor again.
-        F = LinearAlgebra.cholesky!(F, Symmetric(S + 1e-6I), check=false)
+        F = LinearAlgebra.cholesky(Symmetric(S + 1e-6I), check=false)
 
         issuccess(F) || throw(PosDefException(2))
     end
@@ -45,10 +69,10 @@ function factor_normaleq(
 end
 
 function factor_normaleq!(
-    A::AbstractMatrix,
-    d::AbstractVector,
-    F
-) where{Ta<:Real}
+    A::AbstractMatrix{Tv},
+    d::Vector{Tv},
+    F::Factorization{Tv}
+) where{Tv<:Real}
     # update Cholesky factor
     S = (A*Diagonal(d)*A')
 
@@ -63,6 +87,23 @@ function factor_normaleq!(
     end
     return F
 end
+
+
+function factor_normaleq!(A::Matrix{Tv}, d::Vector{Tv}, F_::Factorization{Tv}) where{Tv<:Real}
+    S = (A*Diagonal(d)*A')
+    
+    F = LinearAlgebra.cholesky(Symmetric(S), check=false)
+    if !issuccess(F)
+        
+        # add regularization and try factor again.
+        F = LinearAlgebra.cholesky(Symmetric(S + 1e-6I), check=false)
+
+        # If factorization failed, throw error
+        issuccess(F) || throw(PosDefException(2))
+    end
+    return F
+end
+
 
 """
     addcolumn!(A, c)

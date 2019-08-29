@@ -14,9 +14,9 @@ but no result (e.g. certificate of infeasibility) is available.
 """
 @enum(TerminationStatus,
     Trm_Unknown,
-    Trm_Success,
-    Trm_PrimalInfeasibleNoResult,
-    Trm_DualInfeasibleNoResult,
+    Trm_Optimal,
+    Trm_PrimalInfeasible,
+    Trm_DualInfeasible,
     Trm_IterationLimit,
     Trm_TimeLimit,
     Trm_MemoryLimit,
