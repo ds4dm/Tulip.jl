@@ -57,4 +57,15 @@ add_constraint!(
 add_constraint!(
     m::Model{Tv},
     name::String, obj::Real, lb::Real, ub::Real
-) where{Tv<:Real} = add_constraint!(m, name, obj, lb, ub, VarrId[], Tv[])
+) where{Tv<:Real} = add_constraint!(m, name, obj, lb, ub, VarId[], Tv[])
+
+
+# =================================
+#       QUERY CONSTRAINT INFO
+# =================================
+
+get_num_constr(m::Model) = get_num_constr(m.pbdata_raw)
+
+get_constr_name(m::Model, i::ConstrId) = get_name(m.pbdata_raw.vars[i])
+
+get_constr_bounds(m::Model, i::ConstrId) = get_bounds(m.pbdata_raw.constrs[i])
