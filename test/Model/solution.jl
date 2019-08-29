@@ -54,6 +54,16 @@ function run_tests_solution(::Tv) where{Tv<:Real}
     end
 
     # TODO: query dual solution
+    @testset "Dual" begin
+        m = TLP.Model{Tv}()
+        x = TLP.add_variable!(m, "x", 1.0, 0.0, Inf)
+        con = TLP.add_constraint!(m, "con", 1.0, 1.0, [x], [1.0])
+        TLP.optimize!(m)
+
+        @test_broken @inferred TLP.get_dual_value(m, con)
+        @test TLP.get_dual_value(m, con) ≈ Tv(1)
+
+    end
 end
 
 @testset "Solution API" begin
