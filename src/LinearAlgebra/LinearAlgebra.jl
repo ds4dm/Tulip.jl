@@ -61,7 +61,7 @@ function factor_normaleq(
     if !issuccess(F)
         
         # add regularization and try factor again.
-        F = LinearAlgebra.cholesky!(F, Symmetric(S + 1e-6I), check=false)
+        F = LinearAlgebra.cholesky(Symmetric(S + 1e-6I), check=false)
 
         issuccess(F) || throw(PosDefException(2))
     end
@@ -92,11 +92,11 @@ end
 function factor_normaleq!(A::Matrix{Tv}, d::Vector{Tv}, F_::Factorization{Tv}) where{Tv<:Real}
     S = (A*Diagonal(d)*A')
     
-    F = LinearAlgebra.cholesky!(Symmetric(S), check=false)
+    F = LinearAlgebra.cholesky(Symmetric(S), check=false)
     if !issuccess(F)
         
         # add regularization and try factor again.
-        F = LinearAlgebra.cholesky!(Symmetric(S + 1e-6I), check=false)
+        F = LinearAlgebra.cholesky(Symmetric(S + 1e-6I), check=false)
 
         # If factorization failed, throw error
         issuccess(F) || throw(PosDefException(2))
