@@ -6,4 +6,5 @@ using Test
     include("./pbdata.jl")
     include("./api.jl")
     include("./standardform.jl")
+    include("./solution.jl")
 end

@@ -73,41 +73,6 @@ function run_tests_api(::Tv) where{Tv<:Real}
 
     end
 
-    # TODO
-    # Separate tests by category
-
-    # TODO: build standard form and solve model
-    # Do no include tests here yet
-    # These will be functional tests for later
-    #=
-    ncons, nvars, aI, aJ, aV, b, c, uind, uval, con2idx, var2idx, idx2con, idx2var = TLP.convert_to_standard_form(m.pbdata_raw)
-
-    A = sparse(aI, aJ, aV, ncons, nvars)
-    F = TLP.symbolic_cholesky(A)
-
-    m.pbdata_std = TLP.StandardForm(A, b, c, uind, uval)
-
-    pt = TLP.Solvers.Point(
-        ncons, nvars, length(uind),
-        zeros(Tv, nvars), zeros(Tv, length(uind)), zero(Tv),
-        zeros(Tv, ncons), zeros(Tv, nvars), zeros(Tv, length(uind)), zero(Tv), zero(Tv)
-    )
-    res = TLP.Solvers.Residuals(
-        zeros(Tv, ncons), zeros(Tv, length(uind)), zeros(Tv, nvars), zero(Tv),
-        zero(Tv), zero(Tv), zero(Tv), zero(Tv)
-    )
-
-    hsd = TLP.Solvers.HSDSolver(m.pbdata_std,
-        0, TLP.TerminationStatus(0), TLP.SolutionStatus(0), TLP.SolutionStatus(0),
-        pt, res, F
-    )
-
-    env[:verbose] = 1
-    env[:barrier_iter_max] = 10
-
-    @time TLP.Solvers.optimize!(hsd, env)
-    =#
-
     return nothing
 end
 
