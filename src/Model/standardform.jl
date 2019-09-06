@@ -20,6 +20,8 @@ mutable struct StandardForm{Tv<:Real}
     nvar::Int  # Number of variables
     nupb::Int  # Number of upper-bounded variables
 
+    obj_sense::ObjSense
+
     A::AbstractMatrix{Tv}  # Constraint matrix
     b::Vector{Tv}          # Right-hand side
     c::Vector{Tv}          # Objective
@@ -49,6 +51,8 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
 
     m0 = get_num_constr(pb)  # number of original variables
     n0 = get_num_var(pb)  # number of original constraints
+
+    obj_sense = pb.obj_sense
 
     # Keep track of indices
     con2idx = Dict{ConstrId, Int}()
@@ -305,9 +309,14 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
     # Done.
     A = construct_matrix(Ta, ncons, nvars, aI, aJ, aV)
 
+    # If maximize, negate objective vector
+    if obj_sense == TLP_MAX
+        c .*= -oneunit(Tv)
+    end
+    
     # return ncons, nvars, aI, aJ, aV, b, c, uind, uval, con2idx, var2idx, idx2con, idx2var
     return StandardForm(
-        ncons, nvars, length(uind),
+        ncons, nvars, length(uind), obj_sense,
         A, b, c, uind, uval,
         con2idx, var2idx, idx2var, idx2con
     )

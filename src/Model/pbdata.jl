@@ -18,6 +18,10 @@ mutable struct ProblemData{Tv<:Real}
     constr_cnt::Int  # Counter for constraints
     var_cnt::Int     # Counter for variables
 
+    # Objective sense
+    # (true is minimize, false is maximize)
+    obj_sense::ObjSense
+
     # Coefficients of the constraint matrix
     coeffs::Dict{Tuple{VarId, ConstrId}, Tv}
     var2con::Dict{VarId, OrderedSet{ConstrId}}
@@ -32,7 +36,7 @@ mutable struct ProblemData{Tv<:Real}
     # Only allow empty problems to be instantiated for now
     function ProblemData{Tv}() where {Tv<:Real}
         return new{Tv}(
-            0, 0,
+            0, 0, TLP_MIN,
             Dict{Tuple{VarId, ConstrId}, Tv}(),
             Dict{VarId, OrderedSet{ConstrId}}(),
             Dict{ConstrId, OrderedSet{VarId}}(),

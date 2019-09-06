@@ -1,6 +1,18 @@
 import DataStructures:
     OrderedSet, OrderedDict
 
+"""
+    ObjSense
+
+"""
+@enum ObjSense begin
+    TLP_MIN  # Minimize
+    TLP_MAX  # Maximize
+end
+
+import Base.*
+*(s::ObjSense, x::Real) = (s == TLP_MIN) ? x : -x
+
 include("./constraint.jl")
 include("./variable.jl")
 
@@ -44,6 +56,16 @@ function empty!(m::Model{Tv}) where{Tv<:Real}
     m.solver = nothing
 
     return m
+end
+
+function is_empty(m::Model)
+    res = (
+        length(m.pbdata_raw.vars) == 0
+        && length(m.pbdata_raw.constrs) == 0
+        && length(m.pbdata_raw.coeffs) == 0
+    )
+    
+    return res
 end
 
 include("API/api.jl")
