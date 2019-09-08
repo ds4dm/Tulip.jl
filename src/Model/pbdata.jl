@@ -29,9 +29,11 @@ mutable struct ProblemData{Tv<:Real}
 
     # Variables
     vars::OrderedDict{VarId, Variable{Tv}}
+    name2var::Dict{String, VarId}  # Matches variable name to index
 
     # Constraints
     constrs::OrderedDict{ConstrId, LinearConstraint{Tv}}
+    name2con::Dict{String, ConstrId}  # Matches constraint name to index
 
     # Only allow empty problems to be instantiated for now
     function ProblemData{Tv}() where {Tv<:Real}
@@ -41,7 +43,9 @@ mutable struct ProblemData{Tv<:Real}
             Dict{VarId, OrderedSet{ConstrId}}(),
             Dict{ConstrId, OrderedSet{VarId}}(),
             OrderedDict{VarId, Variable{Tv}}(),
-            OrderedDict{ConstrId, LinearConstraint{Tv}}()
+            Dict{String, VarId}(),
+            OrderedDict{ConstrId, LinearConstraint{Tv}}(),
+            Dict{String, ConstrId}()
         )
     end
 end
@@ -94,9 +98,11 @@ Add variable `v` to problem `pb`. Raises an error if `v` is already in the model
 """
 function add_variable!(pb::ProblemData{Tv}, v::Variable{Tv}) where {Tv<:Real}
     !haskey(pb.vars, v.id) || error("Variable $(v.id.uuid) already exists.")
+    !haskey(pb.name2var, v.dat.name) || error("Variable name $(v.dat.name) already exists.")
 
     pb.vars[v.id] = v
     pb.var2con[v.id] = OrderedSet{ConstrId}()
+    pb.name2var[v.dat.name] = v.id
     return nothing
 end
 
@@ -111,6 +117,7 @@ function add_constraint!(pb::ProblemData{Tv}, c::LinearConstraint{Tv}) where{Tv<
     
     pb.constrs[c.id] = c
     pb.con2var[c.id] = OrderedSet{VarId}()
+    pb.name2con[c.dat.name] = c.id
     return nothing
 end
 

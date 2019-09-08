@@ -135,8 +135,8 @@ SUPPORTED_MODEL_ATTR = Union{
     MOI.RawSolver,
     MOI.ResultCount,
     MOI.TerminationStatus,
-    # MOI.PrimalStatus,  # TODO
-    # MOI.DualStatus  # TODO
+    # MOI.PrimalStatus,
+    # MOI.DualStatus
 }
 
 MOI.supports(::Optimizer, ::A) where{A<:SUPPORTED_MODEL_ATTR} = true
@@ -295,9 +295,12 @@ function MOI.get(m::Optimizer, ::MOI.TerminationStatus)
     return MOITerminationStatus(st)
 end
 
-# TODO: MOI.get(m::Optimizer, ::MOI.PrimalStatus)
+# function MOI.get(m::Optimizer, ::MOI.PrimalStatus)
+#     pst = m.inner.solver.primal_status
+#     return
+# end
 
-# TODO: MOI.get(m::Optimizer, ::MOI.DualStatus)
+# MOI.get(m::Optimizer, ::MOI.DualStatus)
 
 
 # ==============================================================================
@@ -316,6 +319,8 @@ SUPPORTED_VARIABLE_ATTR = Union{
     # MOI.VariablePrimalStart,
     MOI.VariablePrimal
 }
+
+MOI.supports(::Optimizer, ::MOI.VariableName, ::MOI.VariableIndex) = true
 
 function MOI.add_variable(m::Optimizer{Tv}) where{Tv<:Real}
     # By default, we create a variable as follows:
@@ -349,7 +354,20 @@ end
 # function MOI.delete(m::Optimizer{Tv}, v::MOI.VariableIndex) where{Tv<:Real} end
 
 # TODO: query variable by name
-# function MOI.get(m::Optimizer{Tv}, ::Type{MOI.VariableIndex}, name::String) where{Tv<:Real} end
+function MOI.get(
+    m::Optimizer{Tv},
+    ::Type{MOI.VariableIndex},
+    name::String
+) where{Tv<:Real}
+    if haskey(m.inner.pbdata_raw.name2var, name)
+        vidx = m.inner.pbdata_raw.name2var[name]
+        return MOI.VariableIndex(vidx.uuid)
+    else    
+        # TODO: returning nothing is not type-stable.
+        # Raise the issue in MOI
+        return nothing
+    end
+end
 
 function MOI.get(m::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex)
     MOI.is_valid(m, v) || throw(MOI.InvalidIndex(v))
