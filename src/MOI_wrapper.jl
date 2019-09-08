@@ -29,6 +29,25 @@ function MOITerminationStatus(st::TerminationStatus)::MOI.TerminationStatusCode
 end
 
 """
+    MOISolutionStatus(st::SolutionStatus)
+
+Convert a Tulip `SolutionStatus` into a `MOI.ResultStatusCode`.
+"""
+function MOISolutionStatus(st::SolutionStatus)::MOI.ResultStatusCode
+    if st == Sln_Unknown
+        return MOI.UNKNOWN_RESULT_STATUS
+    elseif st == Sln_Optimal || Sln_FeasiblePoint
+        return MOI.FEASIBLE_POINT
+    elseif st == Sln_InfeasiblePoint
+        return MOI.INFEASIBLE_POINT
+    elseif st == Sln_InfeasibilityCertificate
+        return MOI.INFEASIBILITY_CERTIFICATE
+    else
+        return MOI.OTHER_RESULT_STATUS
+    end
+end
+
+"""
     _bounds(s)
 
 """
@@ -135,8 +154,8 @@ SUPPORTED_MODEL_ATTR = Union{
     MOI.RawSolver,
     MOI.ResultCount,
     MOI.TerminationStatus,
-    # MOI.PrimalStatus,
-    # MOI.DualStatus
+    MOI.PrimalStatus,
+    MOI.DualStatus
 }
 
 MOI.supports(::Optimizer, ::A) where{A<:SUPPORTED_MODEL_ATTR} = true
@@ -295,12 +314,9 @@ function MOI.get(m::Optimizer, ::MOI.TerminationStatus)
     return MOITerminationStatus(st)
 end
 
-# function MOI.get(m::Optimizer, ::MOI.PrimalStatus)
-#     pst = m.inner.solver.primal_status
-#     return
-# end
+MOI.get(m::Optimizer, ::MOI.PrimalStatus) = MOISolutionStatus(m.inner.solver.primal_status)
 
-# MOI.get(m::Optimizer, ::MOI.DualStatus)
+MOI.get(m::Optimizer, ::MOI.DualStatus) = MOISolutionStatus(m.inner.solver.dual_status)
 
 
 # ==============================================================================

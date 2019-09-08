@@ -27,27 +27,20 @@ but no result (e.g. certificate of infeasibility) is available.
     SolutionStatus
 
 Solution Status code
-- `Unknown`: Unknown status
-- `Optimal`: A proven optimal solution is available.
-- `PrimalFeasible`: A feasible primal solution is available.
-- `DualFeasible`: A feasible dual solution is available.
-- `PrimalDualFeasible`: A feasible primal-dual solution pair is available.
-- `PrimalInfeasible`: Problem was proved to be primal infeasible, and an infeasibility
-    certificate is available.
-- `DualInfeasible`: Problem was proved to be dual infeasible, and an infeasibility
-    certificate is available.
-- `PrimalDualInfeasible`: Both primal and dual are infeasible, and both infeasiblity
-    certificate are available.
+- `Sln_Unknown`: Unknown status
+- `Sln_Optimal`: The current solution is optimal.
+- `Sln_FeasiblePoint`: The current solution is feasible.
+- `Sln_InfeasiblePoint`: The current solution is not feasible.
+- `Sln_InfeasibilityCertificate`: The current solution is a certificate of 
+    infeasibility. The primal solution is a certificate of dual infeasibility, 
+    while the dual solution is a certificate of primal infeasibility.
 """
 @enum(SolutionStatus,
     Sln_Unknown,
     Sln_Optimal,
-    Sln_PrimalFeasible,
-    Sln_DualFeasible,
-    Sln_PrimalDualFeasible,
-    Sln_PrimalInfeasible,
-    Sln_DualInfeasible,
-    Sln_PrimalDualInfeasible
+    Sln_FeasiblePoint,
+    Sln_InfeasiblePoint,
+    Sln_InfeasibilityCertificate
 )
 
 """

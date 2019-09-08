@@ -156,6 +156,22 @@ function update_solver_status!(
     ϵp, ϵd, ϵg, ϵi
 ) where{Tv<:Real}
     hsd.solver_status = TerminationStatus(0)
+
+    # Check for feasibility
+    if (
+        res.rp_nrm     <= ϵp * pt.t * (oneunit(Tv) + norm(b, Inf))
+        && res.ru_nrm  <= ϵp * pt.t * (oneunit(Tv) + norm(uval, Inf))
+    )
+        hsd.primal_status = Sln_FeasiblePoint
+    else
+        hsd.primal_status = Sln_InfeasiblePoint
+    end
+
+    if res.rd_nrm <= ϵd * pt.t * (oneunit(Tv) + norm(c, Inf))
+        hsd.dual_status = Sln_FeasiblePoint
+    else
+        hsd.dual_status = Sln_InfeasiblePoint
+    end
     
     # Check for optimal solution
     if (
@@ -165,6 +181,8 @@ function update_solver_status!(
         && (abs(hsd.primal_bound_unscaled - hsd.dual_bound_unscaled) / (pt.t + abs(hsd.dual_bound_unscaled))) <= ϵg
     )
         # Optimality reached
+        hsd.primal_status = Sln_Optimal
+        hsd.dual_status   = Sln_Optimal
         hsd.solver_status = TerminationStatus(1)
         return nothing
     end
@@ -174,11 +192,13 @@ function update_solver_status!(
         # Check for primal or dual infeasibility
         if dot(c, pt.x) < -ϵi
             # Dual infeasible
+            hsd.primal_status = Sln_InfeasibilityCertificate
             hsd.solver_status = TerminationStatus(3)
             return nothing
         
         elseif (-dot(b, pt.y) - dot(uval, pt.z)) < -ϵi
             # Primal infeasible
+            hsd.dual_status = Sln_InfeasibilityCertificate
             hsd.solver_status = TerminationStatus(2)
             return nothing
         else
