@@ -391,11 +391,18 @@ function MOI.get(m::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex)
 end
 
 function MOI.set(m::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex, name::String)
+    # Check that variable does exist
     MOI.is_valid(m, v) || throw(MOI.InvalidIndex(v))
 
-    # TODO: add a helper function at the ProblemData level
-    var = m.inner.pbdata_raw.vars[VarId(v.value)]
+    # Check that name is unique
+    !haskey(m.inner.pbdata_raw.name2var, name) || error("Variable $name already exists.")
+
+    # TODO: add a function at the ProblemData level
+    vidx = VarId(v.value)
+    var = m.inner.pbdata_raw.vars[vidx]
     set_name!(var, name)
+    # Update name in dict
+    m.inner.pbdata_raw.name2var[name] = vidx
     return nothing
 end
 
