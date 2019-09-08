@@ -1,32 +1,6 @@
 import MathOptInterface
 const MOI = MathOptInterface
 
-"""
-    Optimizer{Tv<:Real}
-
-Wrapper for MOI.
-"""
-mutable struct Optimizer{Tv<:Real} <: MOI.AbstractOptimizer
-    inner::Model{Tv}
-
-    # TODO: keep track of bound constraints
-
-    function Optimizer{Tv}() where{Tv<:Real}
-        return new{Tv}(Model{Tv}())
-    end
-end
-
-# TODO: set parameters via kw arguments
-Optimizer() = Optimizer{Float64}()
-
-MOI.empty!(m::Optimizer) = empty!(m.inner)
-
-MOI.is_empty(m::Optimizer) = is_empty(m.inner)
-
-MOI.optimize!(m::Optimizer) = optimize!(m.inner)
-
-
-
 # ==============================================================================
 #           HELPER FUNCTIONS
 # ==============================================================================
@@ -70,6 +44,8 @@ const SCALAR_SETS{Tv} = Union{
     MOI.Interval{Tv}
 } where{Tv<:Real}
 
+
+
 # ==============================================================================
 # ==============================================================================
 #
@@ -78,6 +54,34 @@ const SCALAR_SETS{Tv} = Union{
 # ==============================================================================
 # ==============================================================================
 
+"""
+    Optimizer{Tv<:Real}
+
+Wrapper for MOI.
+"""
+mutable struct Optimizer{Tv<:Real} <: MOI.AbstractOptimizer
+    inner::Model{Tv}
+
+    # Keep track of names of variable bound constraints
+    # Should go away in future MOI release
+    var_bounds_name::Dict{MOI.ConstraintIndex{MOI.SingleVariable, <:SCALAR_SETS{Tv}}, String}
+
+    function Optimizer{Tv}() where{Tv<:Real}
+        return new{Tv}(
+            Model{Tv}(),
+            Dict{MOI.ConstraintIndex{MOI.SingleVariable, <:SCALAR_SETS{Tv}}, String}()
+        )
+    end
+end
+
+# TODO: set parameters via kw arguments
+Optimizer() = Optimizer{Float64}()
+
+MOI.empty!(m::Optimizer) = empty!(m.inner)
+
+MOI.is_empty(m::Optimizer) = is_empty(m.inner)
+
+MOI.optimize!(m::Optimizer) = optimize!(m.inner)
 
 # ==============================================================================
 #           I. Optimizer attributes
@@ -685,6 +689,34 @@ end
 
 function MOI.get(
     m::Optimizer{Tv}, ::MOI.ConstraintName,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    
+    MOI.is_valid(m, c) || throw(MOI.InvalidIndex(c))
+
+    # Get constraint name for dict directly
+    if !haskey(m.var_bounds_name, c)
+        return ""
+    else
+        return m.var_bounds_name[c]
+    end
+end
+
+function MOI.set(
+    m::Optimizer{Tv}, ::MOI.ConstraintName,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, S},
+    name::String
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+
+    MOI.is_valid(m, c) || throw(MOI.InvalidIndex(c))
+
+    # Set constraint name in dict directly
+    m.var_bounds_name[c] = name
+    return nothing
+end
+
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintName,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}
 ) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
     
@@ -711,9 +743,9 @@ function MOI.set(
 end
 
 
-# =======================
-#   5. Objective
-# =======================
+# ==============================================================================
+#           V. Objective
+# ==============================================================================
 
 function MOI.supports(
     ::Optimizer,

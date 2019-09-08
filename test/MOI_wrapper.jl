@@ -11,14 +11,14 @@ const CONFIG = MOIT.TestConfig()
     # MOIT.modificationtest(OPTIMIZER, CONFIG)
 end
 
-@testset "Linear tests" begin
-    @testset "Default Solver"  begin
-        MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis = true), [
-            # This requires an infeasiblity certificate for a variable bound.
-            "linear12"
-        ])
-    end
-    @testset "No certificate" begin
-        MOIT.linear12test(OPTIMIZER, MOIT.TestConfig(infeas_certificates=false))
-    end
-end
+# @testset "Linear tests" begin
+#     @testset "Default Solver"  begin
+#         MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis = true), [
+#             # This requires an infeasiblity certificate for a variable bound.
+#             "linear12"
+#         ])
+#     end
+#     @testset "No certificate" begin
+#         MOIT.linear12test(OPTIMIZER, MOIT.TestConfig(infeas_certificates=false))
+#     end
+# end
