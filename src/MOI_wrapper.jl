@@ -336,7 +336,7 @@ SUPPORTED_VARIABLE_ATTR = Union{
     MOI.VariablePrimal
 }
 
-MOI.supports(::Optimizer, ::MOI.VariableName, ::MOI.VariableIndex) = true
+MOI.supports(::Optimizer, ::MOI.VariableName, ::Type{MOI.VariableIndex}) = true
 
 function MOI.add_variable(m::Optimizer{Tv}) where{Tv<:Real}
     # By default, we create a variable as follows:
