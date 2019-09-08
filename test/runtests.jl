@@ -22,7 +22,13 @@ const test_files = [
     "examples"
 ]
 
-for f in test_files
-    tp = joinpath(testdir, "$(f).jl")
-    include(tp)
+@testset "Tulip Tests" begin 
+    for f in test_files
+        tp = joinpath(testdir, "$(f).jl")
+        include(tp)
+    end
+end  # testset
+
+@testset "MathOptInterface Tests" begin
+    include("MOI_wrapper.jl")
 end
