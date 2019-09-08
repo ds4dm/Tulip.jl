@@ -98,11 +98,13 @@ Add variable `v` to problem `pb`. Raises an error if `v` is already in the model
 """
 function add_variable!(pb::ProblemData{Tv}, v::Variable{Tv}) where {Tv<:Real}
     !haskey(pb.vars, v.id) || error("Variable $(v.id.uuid) already exists.")
-    !haskey(pb.name2var, v.dat.name) || error("Variable name $(v.dat.name) already exists.")
+    name = v.dat.name
+    # Ignore name if empty
+    (name != "") || !haskey(pb.name2var, name) || error("Variable name $(name) already exists.")
 
     pb.vars[v.id] = v
     pb.var2con[v.id] = OrderedSet{ConstrId}()
-    pb.name2var[v.dat.name] = v.id
+    (name != "") && (pb.name2var[name] = v.id)
     return nothing
 end
 
@@ -114,10 +116,13 @@ Create a new linear constraint, add it to the model, and return its ID.
 """
 function add_constraint!(pb::ProblemData{Tv}, c::LinearConstraint{Tv}) where{Tv<:Real}
     !haskey(pb.constrs, c.id) || error("Constraint $(c.id.uuid) already exists.")
-    
+    name = c.dat.name
+    # Ignore name if empty
+    (name == "") || !haskey(pb.name2var, name) || error("Variable name $(name) already exists.")
+
     pb.constrs[c.id] = c
     pb.con2var[c.id] = OrderedSet{VarId}()
-    pb.name2con[c.dat.name] = c.id
+    (name != "") && (pb.name2con[name] = c.id)
     return nothing
 end
 
