@@ -868,7 +868,38 @@ end
     #   IV.7 ConstraintFunction
     # ============================================= 
 
-# TODO
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintFunction,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    MOI.throw_if_not_valid(m, c)  # Sanity check
+
+    return MOI.SingleVariable(MOI.VariableIndex(c.value))
+end
+
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintFunction,
+    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    MOI.throw_if_not_valid(m, c)  # Sanity check
+
+    # Get constraint index
+    cidx = ConstrId(c.value)
+    con = m.inner.pbdata_raw.constrs[cidx]
+
+    # Extract constraint coefficients
+    terms = MOI.ScalarAffineTerm{Tv}[]
+    for vidx in m.inner.pbdata_raw.con2var[cidx]
+        # get corresponding coeff
+        t = MOI.ScalarAffineTerm(
+            m.inner.pbdata_raw.coeffs[vidx, cidx],
+            MOI.VariableIndex(vidx.uuid)
+        )
+        push!(terms, t)
+    end
+
+    return MOI.ScalarAffineFunction(terms, zero(Tv))
+end
 
     # =============================================
     #   IV.8 ConstraintSet
