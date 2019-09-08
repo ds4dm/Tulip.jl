@@ -83,12 +83,19 @@ mutable struct Optimizer{Tv<:Real} <: MOI.AbstractOptimizer
 
     # Keep track of names of variable bound constraints
     # Should go away in future MOI release
-    var_bounds_name::Dict{MOI.ConstraintIndex{MOI.SingleVariable, <:SCALAR_SETS{Tv}}, String}
-
+    bnd2name::Dict{MOI.ConstraintIndex{MOI.SingleVariable, <:SCALAR_SETS{Tv}}, String}
+    name2bnd_LT::Dict{String, MOI.VariableIndex}
+    name2bnd_GT::Dict{String, MOI.VariableIndex}
+    name2bnd_ET::Dict{String, MOI.VariableIndex}
+    name2bnd_IT::Dict{String, MOI.VariableIndex}
     function Optimizer{Tv}() where{Tv<:Real}
         return new{Tv}(
             Model{Tv}(),
-            Dict{MOI.ConstraintIndex{MOI.SingleVariable, <:SCALAR_SETS{Tv}}, String}()
+            Dict{MOI.ConstraintIndex{MOI.SingleVariable, <:SCALAR_SETS{Tv}}, String}(),
+            Dict{String, MOI.VariableIndex}(),
+            Dict{String, MOI.VariableIndex}(),
+            Dict{String, MOI.VariableIndex}(),
+            Dict{String, MOI.VariableIndex}()
         )
     end
 end
@@ -418,6 +425,10 @@ end
 #           IV. Constraints
 # ==============================================================================
 
+    # =============================================
+    #   IV.1 Supported attributes and constraints
+    # =============================================
+
 """
     SUPPORTED_CONSTR_ATTR
 
@@ -437,78 +448,25 @@ SUPPORTED_CONSTR_ATTR = Union{
 
 MOI.supports(::Optimizer, ::A, ::Type{<:MOI.ConstraintIndex}) where{A<:SUPPORTED_CONSTR_ATTR} = true
 
-
 # Variable bounds
-# TODO: change MOI convention to handle explicit bounds
+# Hopefully, MOI conventions will change and we can get rid of all the extra code
+# for SingleVariable-In-LessThan/GreaterThan/EqualTo/Interval constraints
 function MOI.supports_constraint(
     ::Optimizer, ::Type{MOI.SingleVariable}, ::Type{S}
 ) where {Tv<:Real, S<:SCALAR_SETS{Tv}}
     return true
 end
 
-function MOI.is_valid(
-    m::Optimizer{Tv},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Tv}}
-) where{Tv<:Real}
-    # get index of variable
-    vidx = VarId(c.value)
-
-    # Check if variable exists in model
-    if haskey(m.inner.pbdata_raw.vars, vidx)
-        bt, lb, ub = get_var_bounds(m.inner, vidx)
-        return bt == TLP_UP || bt == TLP_UL
-    end
-
-    return false
+# General linear constraints
+function MOI.supports_constraint(
+    ::Optimizer, ::Type{MOI.ScalarAffineFunction{Tv}}, ::Type{S}
+) where {Tv<:Real, S<:SCALAR_SETS{Tv}}
+    return true
 end
 
-function MOI.is_valid(
-    m::Optimizer{Tv},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Tv}}
-) where{Tv<:Real}
-    # get index of variable
-    vidx = VarId(c.value)
-
-    # Check if variable exists in model
-    if haskey(m.inner.pbdata_raw.vars, vidx)
-        bt, lb, ub = get_var_bounds(m.inner, vidx)
-        return bt == TLP_LO || bt == TLP_UL
-    end
-
-    return false
-end
-
-function MOI.is_valid(
-    m::Optimizer{Tv},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Tv}}
-) where{Tv<:Real}
-    # get index of variable
-    vidx = VarId(c.value)
-
-    # Check if variable exists in model
-    if haskey(m.inner.pbdata_raw.vars, vidx)
-        bt, lb, ub = get_var_bounds(m.inner, vidx)
-        return bt == TLP_RG
-    end
-
-    return false
-end
-
-function MOI.is_valid(
-    m::Optimizer{Tv},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Tv}}
-) where{Tv<:Real}
-    # get index of variable
-    vidx = VarId(c.value)
-
-    # Check if variable exists in model
-    if haskey(m.inner.pbdata_raw.vars, vidx)
-        bt, lb, ub = get_var_bounds(m.inner, vidx)
-        return bt == TLP_FX
-    end
-
-    return false
-end
+    # =============================================
+    #   IV.2 Adding constraints
+    # =============================================
 
 # TODO: make it clear that only finite bounds can be given in input.
 # To relax variable bounds, one needs to delete the associated bound constraint.
@@ -669,36 +627,7 @@ function MOI.add_constraint(
     return cidx
 end
 
-# Linear constraints
-function MOI.supports_constraint(
-    ::Optimizer, ::Type{MOI.ScalarAffineFunction{Tv}}, ::Type{S}
-) where {Tv<:Real, S<:SCALAR_SETS{Tv}}
-    return true
-end
-
-function MOI.is_valid(
-    m::Optimizer{Tv},
-    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}
-) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
-    # Get constraint index
-    cidx = ConstrId(c.value)
-
-    # Check if constraint exists in model
-    if !haskey(m.inner.pbdata_raw.constrs, cidx)
-        # Constraint does not exist in model
-        return false
-    end
-
-    # Check that bound type matches that of `c`
-    bt, lb, ub = get_constr_bounds(m.inner, cidx)
-    return (
-           (S == MOI.LessThan{Tv}       && bt == TLP_UP)
-        || (S == MOI.GreaterThan{Tv}    && bt == TLP_LO)
-        || (S == MOI.EqualTo{Tv}        && bt == TLP_FX)
-        || (S == MOI.Interval{Tv}       && bt == TLP_RG)
-    )
-end
-
+# General linear constraints
 function MOI.add_constraint(
     m::Optimizer,
     f::MOI.ScalarAffineFunction{Tv},
@@ -728,6 +657,102 @@ function MOI.add_constraint(
     return MOI.ConstraintIndex{typeof(f), S}(cidx.uuid)
 end
 
+    # =============================================
+    #   IV.3 Index checking
+    # =============================================
+
+function MOI.is_valid(
+    m::Optimizer{Tv},
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Tv}}
+) where{Tv<:Real}
+    # get index of variable
+    vidx = VarId(c.value)
+
+    # Check if variable exists in model
+    if haskey(m.inner.pbdata_raw.vars, vidx)
+        bt, lb, ub = get_var_bounds(m.inner, vidx)
+        return bt == TLP_UP || bt == TLP_UL
+    end
+
+    return false
+end
+
+function MOI.is_valid(
+    m::Optimizer{Tv},
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Tv}}
+) where{Tv<:Real}
+    # get index of variable
+    vidx = VarId(c.value)
+
+    # Check if variable exists in model
+    if haskey(m.inner.pbdata_raw.vars, vidx)
+        bt, lb, ub = get_var_bounds(m.inner, vidx)
+        return bt == TLP_LO || bt == TLP_UL
+    end
+
+    return false
+end
+    
+function MOI.is_valid(
+    m::Optimizer{Tv},
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Tv}}
+) where{Tv<:Real}
+    # get index of variable
+    vidx = VarId(c.value)
+
+    # Check if variable exists in model
+    if haskey(m.inner.pbdata_raw.vars, vidx)
+        bt, lb, ub = get_var_bounds(m.inner, vidx)
+        return bt == TLP_RG
+    end
+
+    return false
+end
+
+function MOI.is_valid(
+    m::Optimizer{Tv},
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Tv}}
+) where{Tv<:Real}
+    # get index of variable
+    vidx = VarId(c.value)
+
+    # Check if variable exists in model
+    if haskey(m.inner.pbdata_raw.vars, vidx)
+        bt, lb, ub = get_var_bounds(m.inner, vidx)
+        return bt == TLP_FX
+    end
+
+    return false
+end
+
+function MOI.is_valid(
+    m::Optimizer{Tv},
+    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    # Get constraint index
+    cidx = ConstrId(c.value)
+
+    # Check if constraint exists in model
+    if !haskey(m.inner.pbdata_raw.constrs, cidx)
+        # Constraint does not exist in model
+        return false
+    end
+
+    # Check that bound type matches that of `c`
+    bt, lb, ub = get_constr_bounds(m.inner, cidx)
+    return (
+           (S == MOI.LessThan{Tv}       && bt == TLP_UP)
+        || (S == MOI.GreaterThan{Tv}    && bt == TLP_LO)
+        || (S == MOI.EqualTo{Tv}        && bt == TLP_FX)
+        || (S == MOI.Interval{Tv}       && bt == TLP_RG)
+    )
+end
+
+    # =============================================
+    #   IV.4 ConstraintName
+    # =============================================  
+
+# Get name from constraint index
 function MOI.get(
     m::Optimizer{Tv}, ::MOI.ConstraintName,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S}
@@ -736,24 +761,11 @@ function MOI.get(
     MOI.is_valid(m, c) || throw(MOI.InvalidIndex(c))
 
     # Get constraint name for dict directly
-    if !haskey(m.var_bounds_name, c)
+    if !haskey(m.bnd2name, c)
         return ""
     else
-        return m.var_bounds_name[c]
+        return m.bnd2name[c]
     end
-end
-
-function MOI.set(
-    m::Optimizer{Tv}, ::MOI.ConstraintName,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, S},
-    name::String
-) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
-
-    MOI.is_valid(m, c) || throw(MOI.InvalidIndex(c))
-
-    # Set constraint name in dict directly
-    m.var_bounds_name[c] = name
-    return nothing
 end
 
 function MOI.get(
@@ -766,6 +778,63 @@ function MOI.get(
     # Get constraint index
     cidx = ConstrId(c.value)
     return get_constr_name(m.inner, cidx)
+end
+
+# Get constraint index from name
+function MOI.get(
+    m::Optimizer{Tv},
+    ::Type{MOI.ConstraintIndex{MOI.SingleVariable, S}},
+    name::String
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    # check if name exists
+    if S == MOI.LessThan{Tv}
+        haskey(m.name2bnd_LT, name) || return nothing
+        vid = m.name2bnd_LT[name]
+
+    elseif S == MOI.GreaterThan{Tv}
+        haskey(m.name2bnd_GT, name) || return nothing
+        vid = m.name2bnd_GT[name]
+
+    elseif S == MOI.Equalto{Tv}
+        haskey(m.name2bnd_ET, name) || return nothing
+        vid = m.name2bnd_ET[name]
+
+    elseif S == MOI.Interval{Tv}
+        haskey(m.name2bnd_IT, name) || return nothing
+        vid = m.name2bnd_IT[name]
+
+    else
+        return nothing
+    end
+
+    return MOI.ConstraintIndex{MOI.SingleVariable, S}(vid.value)
+
+end
+
+# Set name from constraint index
+function MOI.set(
+    m::Optimizer{Tv}, ::MOI.ConstraintName,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, S},
+    name::String
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+
+    MOI.is_valid(m, c) || throw(MOI.InvalidIndex(c))
+
+    # Set constraint name in dict directly
+    m.bnd2name[c] = name
+    if S == MOI.LessThan{Tv}
+        m.name2bnd_LT[name] = MOI.VariableIndex(c.value)
+
+    elseif S == MOI.GreaterThan{Tv}
+        m.name2bnd_GT[name] = MOI.VariableIndex(c.value)
+
+    elseif S == MOI.EqualTo{Tv}
+        m.name2bnd_ET[name] = MOI.VariableIndex(c.value)
+
+    elseif S == MOI.Interval{Tv}
+        m.name2bnd_IT[name] = MOI.VariableIndex(c.value)
+    end
+    return nothing
 end
 
 function MOI.set(
@@ -781,6 +850,101 @@ function MOI.set(
     con = m.inner.pbdata_raw.constrs[cidx]
     con.dat.name = name
     return nothing
+end
+
+    # =============================================
+    #   IV.5 ConstraintPrimal
+    # ============================================= 
+
+# TODO
+
+    # =============================================
+    #   IV.6 ConstraintDual
+    # ============================================= 
+
+# TODO
+
+    # =============================================
+    #   IV.7 ConstraintFunction
+    # ============================================= 
+
+# TODO
+
+    # =============================================
+    #   IV.8 ConstraintSet
+    # ============================================= 
+
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintSet,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Tv}}
+) where{Tv<:Real}
+    MOI.throw_if_not_valid(m, c)  # Sanity check
+
+    # Get variable bounds
+    vidx = VarId(c.value)
+    bt, lb, ub = get_var_bounds(m.inner, vidx)
+
+    return MOI.LessThan(ub)
+end
+
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintSet,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Tv}}
+) where{Tv<:Real}
+    MOI.throw_if_not_valid(m, c)  # Sanity check
+
+    # Get variable bounds
+    vidx = VarId(c.value)
+    bt, lb, ub = get_var_bounds(m.inner, vidx)
+
+    return MOI.GreaterThan(lb)
+end
+
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintSet,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Tv}}
+) where{Tv<:Real}
+    MOI.throw_if_not_valid(m, c)  # Sanity check
+
+    # Get variable bounds
+    vidx = VarId(c.value)
+    bt, lb, ub = get_var_bounds(m.inner, vidx)
+
+    return MOI.EqualTo(lb)
+end
+
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintSet,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Tv}}
+) where{Tv<:Real}
+    MOI.throw_if_not_valid(m, c)  # Sanity check
+
+    # Get variable bounds
+    vidx = VarId(c.value)
+    bt, lb, ub = get_var_bounds(m.inner, vidx)
+
+    return MOI.Interval(lb, ub)
+end
+
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintSet,
+    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    MOI.throw_if_not_valid(m, c)  # Sanity check
+
+    # Get constraint
+    cidx = ConstrId(c.value)
+    bt, lb, ub = get_constr_bounds(m.inner, cidx)
+
+    if S == MOI.LessThan{Tv}
+        return MOI.LessThan(ub)
+    elseif S == MOI.GreaterThan{Tv}
+        return MOI.GreaterThan(lb)
+    elseif S == MOI.EqualTo{Tv}
+        return MOI.EqualTo(lb)
+    elseif S == MOI.Interval{Tv}
+        return MOI.Interval(lb, ub)
+    end
 end
 
 
