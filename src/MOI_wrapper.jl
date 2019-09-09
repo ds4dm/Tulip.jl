@@ -141,6 +141,10 @@ end
 #           II. Model attributes
 # ==============================================================================
 
+    # =============================================
+    #   II.1 Supported attributes
+    # =============================================
+
 SUPPORTED_MODEL_ATTR = Union{
     MOI.Name,
     MOI.ObjectiveSense,
@@ -159,6 +163,7 @@ SUPPORTED_MODEL_ATTR = Union{
     MOI.SimplexIterations,
     MOI.BarrierIterations,
     MOI.RawSolver,
+    MOI.RawStatusString,
     MOI.ResultCount,
     MOI.TerminationStatus,
     MOI.PrimalStatus,
@@ -992,6 +997,18 @@ end
 
 function MOI.set(
     m::Optimizer{Tv},
+    ::MOI.ObjectiveFunction{MOI.SingleVariable},
+    f::MOI.SingleVariable
+) where{Tv<:Real}
+    return MOI.set(
+        m,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}}(),
+        convert(MOI.ScalarAffineFunction{Tv}, f)
+    )
+end
+
+function MOI.set(
+    m::Optimizer{Tv},
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}},
     f::MOI.ScalarAffineFunction{T}
 ) where{T<:Real, Tv<:Real}
@@ -1005,9 +1022,12 @@ function MOI.set(
     end
 
     # Update new coefficients
+    # Since there may be dupplicate terms in objective function,
+    # we update 
     for t in f.terms
         var = m.inner.pbdata_raw.vars[VarId(t.variable_index.value)]
-        set_obj_coeff!(var, t.coefficient)
+        c = get_obj_coeff(var)
+        set_obj_coeff!(var, c + t.coefficient)
     end
 
     return nothing
