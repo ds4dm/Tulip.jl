@@ -46,10 +46,12 @@ function run_tests_hsd(::Tv) where{Tv<:Real}
         ])
         b = Vector{Tv}([1.0, 0.0])
         c = Vector{Tv}([1.0, -1.0])
+        c0 = zero(Tv)
         uind = [1, 2]
         uval = Vector{Tv}([2.0, 2.0])
 
-        hsd = TLP.HSDSolver{Tv}(m, n, p, A, b, c, uind, uval)
+
+        hsd = TLP.HSDSolver{Tv}(m, n, p, A, b, c, c0, uind, uval)
 
         # Primal-dual optimal solution
         # x1 = x2 = 0.5; w1 = w2 = 1.5; t = 1
@@ -92,10 +94,11 @@ function run_tests_hsd(::Tv) where{Tv<:Real}
         ])
         b = Vector{Tv}([1.0, 0.0])
         c = Vector{Tv}([1.0, -1.0])
+        c0 = zero(Tv)
         uind = [1, 2]
         uval = Vector{Tv}([2.0, 2.0])
 
-        hsd = TLP.HSDSolver{Tv}(m, n, p, A, b, c, uind, uval)
+        hsd = TLP.HSDSolver{Tv}(m, n, p, A, b, c, c0, uind, uval)
 
         # Primal-dual optimal solution
         # x1 = x2 = 0.5; w1 = w2 = 1.5; t = 1

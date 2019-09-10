@@ -21,6 +21,7 @@ mutable struct ProblemData{Tv<:Real}
     # Objective sense
     # (true is minimize, false is maximize)
     obj_sense::ObjSense
+    obj_const::Tv  # Constant objective offset
 
     # Coefficients of the constraint matrix
     coeffs::Dict{Tuple{VarId, ConstrId}, Tv}
@@ -38,7 +39,7 @@ mutable struct ProblemData{Tv<:Real}
     # Only allow empty problems to be instantiated for now
     function ProblemData{Tv}() where {Tv<:Real}
         return new{Tv}(
-            0, 0, TLP_MIN,
+            0, 0, TLP_MIN, zero(Tv),
             Dict{Tuple{VarId, ConstrId}, Tv}(),
             Dict{VarId, OrderedSet{ConstrId}}(),
             Dict{ConstrId, OrderedSet{VarId}}(),

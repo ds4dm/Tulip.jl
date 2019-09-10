@@ -14,6 +14,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     A::AbstractMatrix{Tv}  # Constraint matrix
     b::Vector{Tv}  # Right-hand side
     c::Vector{Tv}  # Objective coefficients
+    c0::Tv  # Objective offset
     uind::Vector{Int}  # Indices of upper-bounded variables
     uval::Vector{Tv}   # Upper-bounds on variables
 
@@ -44,7 +45,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
 
     # TODO: Constructor
     function HSDSolver{Tv}(ncon::Int, nvar::Int, nupb::Int,
-        A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv},
+        A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv}, c0::Tv,
         uind::Vector{Int}, uval::Vector{Tv}
     ) where{Tv<:Real}
         hsd = new{Tv}()
@@ -55,6 +56,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         hsd.A = A
         hsd.b = b
         hsd.c = c
+        hsd.c0 = c0
         hsd.uind = uind
         hsd.uval = uval
 
