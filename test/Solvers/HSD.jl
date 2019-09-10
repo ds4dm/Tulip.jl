@@ -67,8 +67,8 @@ function run_tests_hsd(::Tv) where{Tv<:Real}
             zero(Tv), zero(Tv), zero(Tv), zero(Tv)
         )
 
-        @inferred TLP.compute_residuals!(hsd, res, pt, A, b, c, uind, uval)
-        TLP.compute_residuals!(hsd, res, pt, A, b, c, uind, uval)
+        @inferred TLP.compute_residuals!(hsd, res, pt, A, b, c, c0, uind, uval)
+        TLP.compute_residuals!(hsd, res, pt, A, b, c, c0, uind, uval)
         
         @test res.rp_nrm == zero(Tv)
         @test res.ru_nrm == zero(Tv)
@@ -113,10 +113,10 @@ function run_tests_hsd(::Tv) where{Tv<:Real}
             zeros(Tv, m), zeros(Tv, p), zeros(Tv, n), zero(Tv),
             zero(Tv), zero(Tv), zero(Tv), zero(Tv)
         )
-        TLP.compute_residuals!(hsd, res, pt, A, b, c, uind, uval)
+        TLP.compute_residuals!(hsd, res, pt, A, b, c, c0, uind, uval)
 
         hsd.solver_status = TLP.Trm_Unknown
-        TLP.update_solver_status!(hsd, pt, res, A, b, c, uind, uval,
+        TLP.update_solver_status!(hsd, pt, res, A, b, c, c0, uind, uval,
             Tv(1e-8), Tv(1e-8), Tv(1e-8), Tv(1e-8)
         )
         @test hsd.solver_status == TLP.Trm_Optimal

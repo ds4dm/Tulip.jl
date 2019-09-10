@@ -102,7 +102,7 @@ In-place computation of primal-dual residuals at point `pt`.
 function compute_residuals!(
     hsd::HSDSolver{Tv},
     res::Residuals{Tv}, pt::Point{Tv},
-    A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv},
+    A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv}, c0::Tv,
     uind::Vector{Int}, uval::Vector{Tv}
 ) where{Tv<:Real}
 
@@ -137,10 +137,10 @@ function compute_residuals!(
     res.rg_nrm = norm(res.rg, Inf)
 
     # Compute primal and dual bounds
-    hsd.primal_bound_unscaled = dot(c, pt.x)
-    hsd.primal_bound_scaled   = hsd.primal_bound_unscaled / pt.t
-    hsd.dual_bound_unscaled   = dot(b, pt.y) - dot(uval, pt.z)
-    hsd.dual_bound_scaled     = hsd.dual_bound_unscaled / pt.t
+    hsd.primal_bound_unscaled = dot(c, pt.x) + pt.t * c0
+    hsd.primal_bound_scaled   = hsd.primal_bound_unscaled / pt.t + c0
+    hsd.dual_bound_unscaled   = dot(b, pt.y) - dot(uval, pt.z) + pt.t * c0
+    hsd.dual_bound_scaled     = hsd.dual_bound_unscaled / pt.t + c0
 
     return nothing
 end
@@ -154,7 +154,7 @@ Update status and return true if solver should stop.
 function update_solver_status!(
     hsd::HSDSolver{Tv},
     pt::Point{Tv}, res::Residuals{Tv},
-    A, b, c, uind, uval,
+    A, b, c, c0, uind, uval,
     ϵp, ϵd, ϵg, ϵi
 ) where{Tv<:Real}
     hsd.solver_status = TerminationStatus(0)
@@ -261,7 +261,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
         compute_residuals!(
             hsd,
             hsd.res, hsd.pt,
-            hsd.A, hsd.b, hsd.c, hsd.uind, hsd.uval
+            hsd.A, hsd.b, hsd.c, hsd.c0, hsd.uind, hsd.uval
         )
 
         update_mu!(hsd.pt)
@@ -274,8 +274,8 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
             @printf "%4d" hsd.niter
             
             # Objectives
-            @printf "  %+16.7e" dot(hsd.c, hsd.pt.x) / hsd.pt.t
-            @printf "%+16.7e" (dot(hsd.b, hsd.pt.y) - dot(hsd.uval, hsd.pt.z)) / hsd.pt.t
+            @printf "  %+16.7e" dot(hsd.c, hsd.pt.x) / hsd.pt.t + hsd.c0
+            @printf "%+16.7e" (dot(hsd.b, hsd.pt.y) - dot(hsd.uval, hsd.pt.z)) / hsd.pt.t + hsd.c0
             
             # Residuals
             @printf " %9.2e" max(hsd.res.rp_nrm, hsd.res.ru_nrm)
@@ -298,7 +298,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
         # we want to report optimal, not user limits)
         update_solver_status!(
             hsd, hsd.pt, hsd.res,
-            hsd.A, hsd.b, hsd.c, hsd.uind, hsd.uval,
+            hsd.A, hsd.b, hsd.c, hsd.c0, hsd.uind, hsd.uval,
             env.barrier_tol_pfeas,
             env.barrier_tol_dfeas,
             env.barrier_tol_conv,
