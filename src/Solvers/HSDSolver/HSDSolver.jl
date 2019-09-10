@@ -138,9 +138,9 @@ function compute_residuals!(
 
     # Compute primal and dual bounds
     hsd.primal_bound_unscaled = dot(c, pt.x) + pt.t * c0
-    hsd.primal_bound_scaled   = hsd.primal_bound_unscaled / pt.t + c0
+    hsd.primal_bound_scaled   = hsd.primal_bound_unscaled / pt.t
     hsd.dual_bound_unscaled   = dot(b, pt.y) - dot(uval, pt.z) + pt.t * c0
-    hsd.dual_bound_scaled     = hsd.dual_bound_unscaled / pt.t + c0
+    hsd.dual_bound_scaled     = hsd.dual_bound_unscaled / pt.t
 
     return nothing
 end
