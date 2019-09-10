@@ -84,7 +84,7 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
             con2idx[cidx] = ncons
             push!(idx2con, cidx)
             b[ncons] = con.dat.ub
-        elseif con.dat.bt == TLP_RG
+        elseif con.dat.bt == TLP_RG || con.dat.bt == TLP_UL
             # Range constraint: add a bounded slack
             ncons += 1
             nslack += 1
@@ -210,7 +210,7 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
                 push!(aV, -v)
             end
 
-        elseif var.dat.bt == TLP_RG
+        elseif var.dat.bt == TLP_RG || var.dat.bt == TLP_UL
             # Ranged variable
             # Shift right-hand side
             # update upper-bounds vectors
@@ -283,7 +283,7 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
             push!(aJ, vind)
             push!(aV, oneunit(Tv))
 
-        elseif con.dat.bt == TLP_RG
+        elseif con.dat.bt == TLP_RG || con.dat.bt == TLP_UL
             # l <= a'x <= u
             # change to a'x - s = l, 0 <= s <= u-l
             nvars += 1
