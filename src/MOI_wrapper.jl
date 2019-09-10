@@ -1116,3 +1116,18 @@ end
     # =============================================
     #   V.3 Modify objective
     # ============================================= 
+function MOI.modify(
+    m::Optimizer{Tv},
+    c::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}},
+    chg::MOI.ScalarCoefficientChange{Tv}
+) where{Tv<:Real}
+    # get index of variable to change
+    vidx = VarId(chg.variable.value)
+
+    # Set new coeff
+    # TODO: use Tulip API
+    var = m.inner.pbdata_raw.vars[vidx]
+    set_obj_coeff!(var, chg.new_coefficient)
+
+    return nothing
+end
