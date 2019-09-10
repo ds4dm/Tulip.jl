@@ -113,6 +113,9 @@ MOI.optimize!(m::Optimizer) = optimize!(m.inner)
 #           I. Optimizer attributes
 # ==============================================================================
 
+    # =============================================
+    #   I.1 Supported attributes
+    # =============================================
 SUPPORTED_OPTIMIZER_ATTR = Union{
     MOI.SolverName,
     MOI.Silent,
@@ -121,8 +124,18 @@ SUPPORTED_OPTIMIZER_ATTR = Union{
 
 MOI.supports(::Optimizer, ::A) where{A<:SUPPORTED_OPTIMIZER_ATTR} = true
 
+    # =============================================
+    #   I.2 Get/set optimizer attributes
+    # =============================================
+
+# =============================================
+#   SolverName
+# =============================================
 MOI.get(::Optimizer, ::MOI.SolverName) = "Tulip"
 
+# =============================================
+#   Silent
+# =============================================
 MOI.get(m::Optimizer, ::MOI.Silent) = iszero(m.inner.env.verbose)
 
 function MOI.set(m::Optimizer, ::MOI.Silent, flag::Bool)
@@ -130,6 +143,9 @@ function MOI.set(m::Optimizer, ::MOI.Silent, flag::Bool)
     return nothing
 end
 
+# =============================================
+#   TimeLimitSec
+# =============================================
 MOI.get(m::Optimizer, ::MOI.TimeLimitSec) = m.inner.env.time_limit
 
 function MOI.set(m::Optimizer, ::MOI.TimeLimitSec, t)
@@ -153,7 +169,6 @@ SUPPORTED_MODEL_ATTR = Union{
     MOI.ListOfConstraintIndices,
     MOI.NumberOfConstraints,
     # ListOfConstraints,  # TODO
-    MOI.ObjectiveFunction{MOI.ScalarAffineFunction},
     MOI.ObjectiveFunctionType,
     MOI.ObjectiveValue,
     MOI.DualObjectiveValue,

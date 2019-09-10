@@ -72,24 +72,23 @@ include("API/api.jl")
 
 function optimize!(m::Model{Tv}) where{Tv<:Real}
 
-    # if isa(m.pbdata_std, Nothing)
-        # convert to standard form
-        sf = convert_to_standard_form(m.env.matrix_type, m.pbdata_raw)
-        m.pbdata_std = sf
-    # end
+    # Convert to standard form
+    # TODO: only re-compute what is necessary
+    sf = convert_to_standard_form(m.env.matrix_type, m.pbdata_raw)
+    m.pbdata_std = sf
 
-    # if isa(m.solver, Nothing)
-        # Instantiate HSD solver
-        hsd = HSDSolver{Tv}(
-            m.pbdata_std.ncon, m.pbdata_std.nvar, m.pbdata_std.nupb,
-            m.pbdata_std.A, m.pbdata_std.b, m.pbdata_std.c,
-            m.pbdata_std.uind, m.pbdata_std.uval
-        )
-        m.solver = hsd
-    # end
+    # Instantiate HSD solver
+    # TODO: only re-compute what is necessary`
+    hsd = HSDSolver{Tv}(
+        m.pbdata_std.ncon, m.pbdata_std.nvar, m.pbdata_std.nupb,
+        m.pbdata_std.A, m.pbdata_std.b, m.pbdata_std.c,
+        m.pbdata_std.uind, m.pbdata_std.uval
+    )
+    m.solver = hsd
 
     # Solve problem
-    # TODO: un-crunch solution after optimization
     optimize!(m.solver, m.env)
+
+    # TODO: post-crush solution
     return m.solver.solver_status
 end
