@@ -1108,8 +1108,7 @@ function MOI.set(
     f::MOI.ScalarAffineFunction{T}
 ) where{T<:Real, Tv<:Real}
 
-    # Check that constant term is zero
-    iszero(f.constant) || error("Objective constant must be zero.")
+    isfinite(f.constant) || error("Objective constant term must be finite.")
 
     # First, set objective to zero
     for (vidx, var) in m.inner.pbdata_raw.vars
@@ -1124,6 +1123,9 @@ function MOI.set(
         c = get_obj_coeff(var)
         set_obj_coeff!(var, c + t.coefficient)
     end
+
+    # Update objective offset
+    m.inner.pbdata_raw.obj_const = f.constant
 
     return nothing
 end
