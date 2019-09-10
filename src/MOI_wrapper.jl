@@ -172,6 +172,14 @@ SUPPORTED_MODEL_ATTR = Union{
 
 MOI.supports(::Optimizer, ::A) where{A<:SUPPORTED_MODEL_ATTR} = true
 
+# =============================================
+#   Name
+# =============================================
+MOI.get(m::Optimizer, ::MOI.Name) = m.inner.name
+
+# =============================================
+#   ObjectiveSense
+# =============================================
 function MOI.get(m::Optimizer, ::MOI.ObjectiveSense)
     s = m.inner.pbdata_raw.obj_sense
     if s == TLP_MIN
@@ -194,10 +202,14 @@ function MOI.set(m::Optimizer, ::MOI.ObjectiveSense, s::MOI.OptimizationSense)
     return nothing
 end
 
-MOI.get(m::Optimizer, ::MOI.Name) = m.inner.name
-
+# =============================================
+#   NumberOfVariable
+# =============================================
 MOI.get(m::Optimizer, ::MOI.NumberOfVariables) = get_num_var(m.inner)
 
+# =============================================
+#   ListOfVariableIndices
+# =============================================
 function MOI.get(m::Optimizer, ::MOI.ListOfVariableIndices)
     return [
         MOI.VariableIndex(vidx.uuid)
@@ -205,26 +217,9 @@ function MOI.get(m::Optimizer, ::MOI.ListOfVariableIndices)
     ]
 end
 
-function MOI.get(
-    m::Optimizer{Tv},
-    ::MOI.NumberOfConstraints{MOI.SingleVariable, S}
-) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
-    ncon = 0
-
-    for (vidx, var) in m.inner.pbdata_raw.vars
-        bt, lb, ub = get_bounds(var)
-        if (
-            (S == MOI.LessThan{Tv} && (bt == TLP_UP || bt == TLP_UL))
-            || (S == MOI.GreaterThan{Tv} && (bt == TLP_LO || bt == TLP_UL))
-            || (S == MOI.EqualTo{Tv} && (bt == TLP_FX))
-            || (S == MOI.Interval{Tv} && (bt == TLP_RG))
-        )
-            ncon += 1
-        end
-    end
-    return ncon
-end
-
+# =============================================
+#   ListOfConstraintIndices
+# =============================================
 function MOI.get(
     m::Optimizer{Tv},
     ::MOI.ListOfConstraintIndices{MOI.SingleVariable, S}
@@ -247,26 +242,6 @@ end
 
 function MOI.get(
     m::Optimizer{Tv},
-    ::MOI.NumberOfConstraints{MOI.ScalarAffineFunction{Tv}, S}
-) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
-    ncon = 0
-
-    for (cidx, con) in m.inner.pbdata_raw.constrs
-        bt, lb, ub = get_bounds(con)
-        if (
-            (S == MOI.LessThan{Tv} && (bt == TLP_UP))
-            || (S == MOI.GreaterThan{Tv} && (bt == TLP_LO))
-            || (S == MOI.EqualTo{Tv} && (bt == TLP_FX))
-            || (S == MOI.Interval{Tv} && (bt == TLP_RG))
-        )
-            ncon += 1
-        end
-    end
-    return ncon
-end
-
-function MOI.get(
-    m::Optimizer{Tv},
     ::MOI.ListOfConstraintIndices{MOI.ScalarAffineFunction{Tv}, S}
 ) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
     indices = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}[]
@@ -285,20 +260,75 @@ function MOI.get(
     return indices
 end
 
+# =============================================
+#   NumberOfConstraints
+# =============================================
+function MOI.get(
+    m::Optimizer{Tv},
+    ::MOI.NumberOfConstraints{MOI.SingleVariable, S}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    ncon = 0
+
+    for (vidx, var) in m.inner.pbdata_raw.vars
+        bt, lb, ub = get_bounds(var)
+        if (
+            (S == MOI.LessThan{Tv} && (bt == TLP_UP || bt == TLP_UL))
+            || (S == MOI.GreaterThan{Tv} && (bt == TLP_LO || bt == TLP_UL))
+            || (S == MOI.EqualTo{Tv} && (bt == TLP_FX))
+            || (S == MOI.Interval{Tv} && (bt == TLP_RG))
+        )
+            ncon += 1
+        end
+    end
+    return ncon
+end
+
+function MOI.get(
+    m::Optimizer{Tv},
+    ::MOI.NumberOfConstraints{MOI.ScalarAffineFunction{Tv}, S}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    ncon = 0
+
+    for (cidx, con) in m.inner.pbdata_raw.constrs
+        bt, lb, ub = get_bounds(con)
+        if (
+            (S == MOI.LessThan{Tv} && (bt == TLP_UP))
+            || (S == MOI.GreaterThan{Tv} && (bt == TLP_LO))
+            || (S == MOI.EqualTo{Tv} && (bt == TLP_FX))
+            || (S == MOI.Interval{Tv} && (bt == TLP_RG))
+        )
+            ncon += 1
+        end
+    end
+    return ncon
+end
+
+# =============================================
+#   ObjectiveFunctionType
+# =============================================
 MOI.get(
     m::Optimizer{Tv}, ::MOI.ObjectiveFunctionType
 ) where{Tv<:Real} = MOI.ScalarAffineFunction{Tv}
 
+# =============================================
+#   ObjectiveValue
+# =============================================
 function MOI.get(m::Optimizer{Tv}, ::MOI.ObjectiveValue) where{Tv<:Real}
     # TODO: dispatch a function call on m.inner
     return m.inner.solver.primal_bound_scaled
 end
 
+# =============================================
+#   DualObjectiveValue
+# =============================================
 function MOI.get(m::Optimizer{Tv}, ::MOI.DualObjectiveValue) where{Tv<:Real}
     # TODO: dispatch a function call on m.inner
     return m.inner.solver.dual_bound_scaled
 end
 
+# =============================================
+#   RelativeGap
+# =============================================
 function MOI.get(m::Optimizer{Tv}, ::MOI.RelativeGap) where{Tv<:Real}
     # TODO: dispatch a function call on m.inner
     zp = m.inner.solver.primal_bound_scaled
@@ -306,17 +336,35 @@ function MOI.get(m::Optimizer{Tv}, ::MOI.RelativeGap) where{Tv<:Real}
     return (abs(zp - zd) / (Tv(1e-10) + abs(zd)))
 end
 
+# =============================================
+#   SolveTime
+# =============================================
 # TODO: MOI.get(m::Optimizer, ::MOI.SolveTime)
 
+# =============================================
+#   SimplexIterations
+# =============================================
 MOI.get(::Optimizer, ::MOI.SimplexIterations) = 0
 
+# =============================================
+#   BarrierIterations
+# =============================================
 # TODO: dispatch function call on m.inner
 MOI.get(m::Optimizer, ::MOI.BarrierIterations) = m.inner.solver.niter
 
+# =============================================
+#   RawSolver
+# =============================================
 MOI.get(m::Optimizer, ::MOI.RawSolver) = m.inner
 
+# =============================================
+#   ResultCount
+# =============================================
 MOI.get(::Optimizer, ::MOI.ResultCount) = 1
 
+# =============================================
+#   TerminationStatus
+# =============================================
 function MOI.get(m::Optimizer, ::MOI.TerminationStatus)
     # TODO: dispatch function call on m.inner
     isa(m.inner.solver, Nothing) && return MOI.OPTIMIZE_NOT_CALLED
@@ -326,8 +374,14 @@ function MOI.get(m::Optimizer, ::MOI.TerminationStatus)
     return MOITerminationStatus(st)
 end
 
+# =============================================
+#   PrimalStatus
+# =============================================
 MOI.get(m::Optimizer, ::MOI.PrimalStatus) = MOISolutionStatus(m.inner.solver.primal_status)
 
+# =============================================
+#   DualStatus
+# =============================================
 MOI.get(m::Optimizer, ::MOI.DualStatus) = MOISolutionStatus(m.inner.solver.dual_status)
 
 
@@ -335,6 +389,9 @@ MOI.get(m::Optimizer, ::MOI.DualStatus) = MOISolutionStatus(m.inner.solver.dual_
 #           III. Variables
 # ==============================================================================
 
+    # =============================================
+    #   III.1 Supported variable attributes
+    # =============================================
 """
     SUPPORTED_VARIABLE_ATTR
 
@@ -350,6 +407,9 @@ SUPPORTED_VARIABLE_ATTR = Union{
 
 MOI.supports(::Optimizer, ::MOI.VariableName, ::Type{MOI.VariableIndex}) = true
 
+    # =============================================
+    #   III.2 Add variables
+    # =============================================
 function MOI.add_variable(m::Optimizer{Tv}) where{Tv<:Real}
     # By default, we create a variable as follows:
     # * empty name
@@ -378,10 +438,19 @@ function MOI.is_valid(m::Optimizer, v::MOI.VariableIndex)
     return haskey(m.inner.pbdata_raw.vars, VarId(v.value))
 end
 
+    # =============================================
+    #   III.3 Delete variables
+    # =============================================
 # TODO: delete variable (and multiple variables)
 # function MOI.delete(m::Optimizer{Tv}, v::MOI.VariableIndex) where{Tv<:Real} end
 
-# TODO: query variable by name
+    # =============================================
+    #   III.4 Get/set variable attributes
+    # =============================================
+
+# =============================================
+#   VariableIndex
+# =============================================
 function MOI.get(
     m::Optimizer{Tv},
     ::Type{MOI.VariableIndex},
@@ -397,6 +466,9 @@ function MOI.get(
     end
 end
 
+# =============================================
+#   VariableName
+# =============================================
 function MOI.get(m::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex)
     MOI.is_valid(m, v) || throw(MOI.InvalidIndex(v))
     return get_var_name(m.inner, VarId(v.value))
@@ -418,6 +490,9 @@ function MOI.set(m::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex, name::S
     return nothing
 end
 
+# =============================================
+#   VariablePrimal
+# =============================================
 function MOI.get(
     m::Optimizer{Tv}, ::MOI.VariablePrimal, x::MOI.VariableIndex
 ) where{Tv<:Real}
@@ -470,7 +545,7 @@ function MOI.supports_constraint(
 end
 
     # =============================================
-    #   IV.2 Adding constraints
+    #   IV.2 Add constraints
     # =============================================
 
 # TODO: make it clear that only finite bounds can be given in input.
@@ -754,10 +829,20 @@ function MOI.is_valid(
 end
 
     # =============================================
-    #   IV.4 ConstraintName
+    #   IV.4 Delete constraints
     # =============================================  
 
-# Get name from constraint index
+    # =============================================
+    #   IV.5 Modify constraints
+    # =============================================
+
+    # =============================================
+    #   IV.4 Get/set constraint attributes
+    # ============================================= 
+
+# =============================================
+#   ConstraintName
+# =============================================
 function MOI.get(
     m::Optimizer{Tv}, ::MOI.ConstraintName,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S}
@@ -783,37 +868,6 @@ function MOI.get(
     # Get constraint index
     cidx = ConstrId(c.value)
     return get_constr_name(m.inner, cidx)
-end
-
-# Get constraint index from name
-function MOI.get(
-    m::Optimizer{Tv},
-    ::Type{MOI.ConstraintIndex{MOI.SingleVariable, S}},
-    name::String
-) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
-    # check if name exists
-    if S == MOI.LessThan{Tv}
-        haskey(m.name2bnd_LT, name) || return nothing
-        vid = m.name2bnd_LT[name]
-
-    elseif S == MOI.GreaterThan{Tv}
-        haskey(m.name2bnd_GT, name) || return nothing
-        vid = m.name2bnd_GT[name]
-
-    elseif S == MOI.Equalto{Tv}
-        haskey(m.name2bnd_ET, name) || return nothing
-        vid = m.name2bnd_ET[name]
-
-    elseif S == MOI.Interval{Tv}
-        haskey(m.name2bnd_IT, name) || return nothing
-        vid = m.name2bnd_IT[name]
-
-    else
-        return nothing
-    end
-
-    return MOI.ConstraintIndex{MOI.SingleVariable, S}(vid.value)
-
 end
 
 # Set name from constraint index
@@ -857,22 +911,55 @@ function MOI.set(
     return nothing
 end
 
-    # =============================================
-    #   IV.5 ConstraintPrimal
-    # ============================================= 
+# =============================================
+#   ConstraintIndex
+# =============================================
+# Get constraint index from name
+function MOI.get(
+    m::Optimizer{Tv},
+    ::Type{MOI.ConstraintIndex{MOI.SingleVariable, S}},
+    name::String
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    # check if name exists
+    if S == MOI.LessThan{Tv}
+        haskey(m.name2bnd_LT, name) || return nothing
+        vid = m.name2bnd_LT[name]
+
+    elseif S == MOI.GreaterThan{Tv}
+        haskey(m.name2bnd_GT, name) || return nothing
+        vid = m.name2bnd_GT[name]
+
+    elseif S == MOI.Equalto{Tv}
+        haskey(m.name2bnd_ET, name) || return nothing
+        vid = m.name2bnd_ET[name]
+
+    elseif S == MOI.Interval{Tv}
+        haskey(m.name2bnd_IT, name) || return nothing
+        vid = m.name2bnd_IT[name]
+
+    else
+        return nothing
+    end
+
+    return MOI.ConstraintIndex{MOI.SingleVariable, S}(vid.value)
+
+end
+    
+# =============================================
+#   ConstraintPrimal
+# ============================================= 
 
 # TODO
 
-    # =============================================
-    #   IV.6 ConstraintDual
-    # ============================================= 
+# =============================================
+#   ConstraintDual
+# ============================================= 
 
 # TODO
 
-    # =============================================
-    #   IV.7 ConstraintFunction
-    # ============================================= 
-
+# =============================================
+#   ConstraintFunction
+# ============================================= 
 function MOI.get(
     m::Optimizer{Tv}, ::MOI.ConstraintFunction,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S}
@@ -906,10 +993,9 @@ function MOI.get(
     return MOI.ScalarAffineFunction(terms, zero(Tv))
 end
 
-    # =============================================
-    #   IV.8 ConstraintSet
-    # ============================================= 
-
+# =============================================
+#   ConstraintSet
+# ============================================= 
 function MOI.get(
     m::Optimizer{Tv}, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Tv}}
@@ -987,7 +1073,10 @@ end
 # ==============================================================================
 #           V. Objective
 # ==============================================================================
-
+    
+    # =============================================
+    #   V.1 Supported objectives
+    # =============================================  
 function MOI.supports(
     ::Optimizer,
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}}
@@ -995,6 +1084,9 @@ function MOI.supports(
     return true
 end
 
+    # =============================================
+    #   V.2 Set objective function
+    # =============================================
 function MOI.set(
     m::Optimizer{Tv},
     ::MOI.ObjectiveFunction{MOI.SingleVariable},
@@ -1006,7 +1098,7 @@ function MOI.set(
         convert(MOI.ScalarAffineFunction{Tv}, f)
     )
 end
-
+    
 function MOI.set(
     m::Optimizer{Tv},
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}},
@@ -1032,3 +1124,6 @@ function MOI.set(
 
     return nothing
 end
+    # =============================================
+    #   V.3 Modify objective
+    # ============================================= 
