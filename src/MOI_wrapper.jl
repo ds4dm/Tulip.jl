@@ -1086,19 +1086,7 @@ end
 
     # =============================================
     #   V.2 Set objective function
-    # =============================================
-function MOI.set(
-    m::Optimizer{Tv},
-    ::MOI.ObjectiveFunction{MOI.SingleVariable},
-    f::MOI.SingleVariable
-) where{Tv<:Real}
-    return MOI.set(
-        m,
-        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}}(),
-        convert(MOI.ScalarAffineFunction{Tv}, f)
-    )
-end
-    
+    # =============================================  
 function MOI.set(
     m::Optimizer{Tv},
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}},
@@ -1124,6 +1112,7 @@ function MOI.set(
 
     return nothing
 end
+
     # =============================================
     #   V.3 Modify objective
     # ============================================= 
