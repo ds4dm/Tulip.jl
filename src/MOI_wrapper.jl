@@ -522,7 +522,7 @@ SUPPORTED_CONSTR_ATTR = Union{
     # MOI.ConstraintPrimalStart,
     # MOI.ConstraintDualStart, # once dual warm-start is supported 
     # MOI.ConstraintBasisStatus,  # once cross-over is supported
-    # MOI.ConstraintFunction,  # TODO
+    MOI.ConstraintFunction,
     MOI.ConstraintSet
 }
 
