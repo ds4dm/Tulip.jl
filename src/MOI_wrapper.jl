@@ -337,7 +337,11 @@ MOI.get(
 # =============================================
 function MOI.get(m::Optimizer{Tv}, ::MOI.ObjectiveValue) where{Tv<:Real}
     # TODO: dispatch a function call on m.inner
-    return m.inner.solver.primal_bound_scaled
+    if m.inner.pbdata_raw.obj_sense == TLP_MIN
+        return m.inner.solver.primal_bound_scaled
+    elseif m.inner.pbdata_raw.obj_sense == TLP_MAX
+        return - m.inner.solver.primal_bound_scaled
+    end
 end
 
 # =============================================
@@ -345,7 +349,11 @@ end
 # =============================================
 function MOI.get(m::Optimizer{Tv}, ::MOI.DualObjectiveValue) where{Tv<:Real}
     # TODO: dispatch a function call on m.inner
-    return m.inner.solver.dual_bound_scaled
+    if m.inner.pbdata_raw.obj_sense == TLP_MIN
+        return m.inner.solver.dual_bound_scaled
+    elseif m.inner.pbdata_raw.obj_sense == TLP_MAX
+        return - m.inner.solver.primal_bound_scaled
+    end
 end
 
 # =============================================

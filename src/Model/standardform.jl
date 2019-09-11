@@ -327,9 +327,10 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
     # Done.
     A = construct_matrix(Ta, ncons, nvars, aI, aJ, aV)
 
-    # If maximize, negate objective vector
+    # If maximize, negate objective
     if obj_sense == TLP_MAX
         c .*= -oneunit(Tv)
+        c0 = -c0
     end
     
     # return ncons, nvars, aI, aJ, aV, b, c, uind, uval, con2idx, var2idx, idx2con, idx2var

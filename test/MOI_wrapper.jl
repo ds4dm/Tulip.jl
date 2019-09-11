@@ -3,7 +3,7 @@ const MOIT = MOI.Test
 
 const OPTIMIZER = TLP.Optimizer()
 
-const CONFIG = MOIT.TestConfig()
+const CONFIG = MOIT.TestConfig(basis=false)
 
 @testset "Unit Tests" begin
     MOIT.basic_constraint_tests(OPTIMIZER, CONFIG; delete=false)
@@ -16,17 +16,15 @@ const CONFIG = MOIT.TestConfig()
         "solve_zero_one_with_bounds_3",     # Requires binary variables
         "solve_affine_deletion_edge_cases", # Requires VectorAffineFunction-in-Nonpositives
     ])
-    # MOIT.modificationtest(OPTIMIZER, CONFIG)
+    MOIT.modificationtest(OPTIMIZER, CONFIG)
 end
 
-# @testset "Linear tests" begin
-#     @testset "Default Solver"  begin
-#         MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis = false), String[
-#             # This requires an infeasiblity certificate for a variable bound.
-#             # "linear12"
-#         ])
-#     end
-#     @testset "No certificate" begin
-#         MOIT.linear12test(OPTIMIZER, MOIT.TestConfig(infeas_certificates=false))
-#     end
-# end
+@testset "Linear tests" begin
+    @testset "Default Solver"  begin
+        MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis=false, atol=1e-6, rtol=1e-6), String[
+            "linear7"   # Requires `VectorAffineFunction` and `Nonnegatives`/`Nonpositives`
+            "linear15"  # Requires `VectorAffineFunction` and `Zeros`
+            "partial_start_test"  # Requires `VariablePrimalStart`
+        ])
+    end
+end
