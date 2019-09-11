@@ -1066,7 +1066,93 @@ end
 
 # =============================================
 #   ConstraintDual
-# ============================================= 
+# =============================================
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintDual,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Tv}}
+) where{Tv<:Real}
+    MOI.throw_if_not_valid(m, c)  # Sanity check
+
+    # Get variable index
+    vidx = VarId(c.value)
+
+    # Get variable bounds
+    bt, lb, ub = get_var_bounds(m.inner, vidx)
+    # Get index in standard form
+    vind = m.inner.pbdata_std.var2idx[vidx]
+
+    if bt == TLP_UP
+        # x_i <= u was transformed into -x_i >= -u
+        # Therefore, we need to return -s_i
+
+        # Get corresponding dual
+        s = m.inner.solver.pt.s[vind] / m.inner.solver.pt.t
+        return -s
+    elseif bt == TLP_UL
+        # l <= x <= u
+        # We need to return the index that corresponds to the upper-bound constraint
+
+        # Get index of upper-bound constraint
+        # TODO: have a more convenient way of doing this
+        for (i, j) in enumerate(m.inner.pbdata_std.uind)
+            if j == vind
+                # bingo
+                s = m.inner.solver.pt.z[i] / m.inner.solver.pt.t
+                return -s
+            end
+        end
+    end
+    error("Could not find dual for upper-bound on variable $vind.")
+end
+
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintDual,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Tv}}
+) where{Tv<:Real}
+    MOI.throw_if_not_valid(m, c)  # Sanity check
+
+    # Get variable index
+    vidx = VarId(c.value)
+    
+    # Get index in standard form
+    vind = m.inner.pbdata_std.var2idx[vidx]
+
+    # Get corresponding dual
+    s = m.inner.solver.pt.s[vind] / m.inner.solver.pt.t
+    return s
+end
+
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintDual,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
+) where{Tv<:Real, S<:Union{MOI.EqualTo{Tv}, MOI.Interval{Tv}}}
+    MOI.throw_if_not_valid(m, c)  # Sanity check
+
+    # Constraint is l <= x <= u
+    # The corresponding dual is s_l - s_u
+
+    # Get variable index
+    vidx = VarId(c.value)
+
+    # Get index in standard form
+    vind = m.inner.pbdata_std.var2idx[vidx]
+
+    # Get s_l
+    s_l = m.inner.solver.pt.s[vind] / m.inner.solver.pt.t
+
+    # Get s_u
+    s_u = zero(Tv)
+    for (i, j) in enumerate(m.inner.pbdata_std.uind)
+        if j == vind
+            # bingo
+            s_u = m.inner.solver.pt.z[i] / m.inner.solver.pt.t
+            break
+        end
+    end
+
+    return s_l - s_u
+end
+
 function MOI.get(
     m::Optimizer{Tv}, ::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}
