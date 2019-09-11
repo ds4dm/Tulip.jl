@@ -857,7 +857,22 @@ end
     # =============================================
     #   IV.5 Modify constraints
     # =============================================
+function MOI.modify(
+    m::Optimizer{Tv},
+    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S},
+    chg::MOI.ScalarCoefficientChange{Tv}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    MOI.is_valid(m, c) || throw(MOI.InvalidIndex(c))
+    MOI.is_valid(m, chg.variable) || throw(MOI.InvalidIndex(chg.variable))
 
+    set_coeff!(
+        m.inner.pbdata_raw,
+        VarId(chg.variable.value),
+        ConstrId(c.value),
+        chg.new_coefficient
+    )
+    return nothing
+end
     # =============================================
     #   IV.4 Get/set constraint attributes
     # ============================================= 
