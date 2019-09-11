@@ -15,16 +15,16 @@ const CONFIG = MOIT.TestConfig(basis=false)
         "solve_zero_one_with_bounds_2",     # Requires binary variables
         "solve_zero_one_with_bounds_3",     # Requires binary variables
         "solve_affine_deletion_edge_cases", # Requires VectorAffineFunction-in-Nonpositives
+        "solve_objbound_edge_cases"         # Requires integer variables
+        "solve_duplicate_terms_vector_affine",  # Requires `VectorAffineFunction`
     ])
     MOIT.modificationtest(OPTIMIZER, CONFIG)
 end
 
 @testset "Linear tests" begin
-    @testset "Default Solver"  begin
-        MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis=false, atol=1e-6, rtol=1e-6), String[
-            "linear7"   # Requires `VectorAffineFunction` and `Nonnegatives`/`Nonpositives`
-            "linear15"  # Requires `VectorAffineFunction` and `Zeros`
-            "partial_start_test"  # Requires `VariablePrimalStart`
-        ])
-    end
+    MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis=false, atol=1e-6, rtol=1e-6), String[
+        "linear7"   # Requires `VectorAffineFunction` and `Nonnegatives`/`Nonpositives`
+        "linear15"  # Requires `VectorAffineFunction` and `Zeros`
+        "partial_start_test"  # Requires `VariablePrimalStart`
+    ])
 end
