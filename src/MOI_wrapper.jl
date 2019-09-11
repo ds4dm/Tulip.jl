@@ -103,7 +103,14 @@ end
 # TODO: set parameters via kw arguments
 Optimizer() = Optimizer{Float64}()
 
-MOI.empty!(m::Optimizer) = empty!(m.inner)
+function MOI.empty!(m::Optimizer{Tv}) where{Tv<:Real}
+    empty!(m.inner)
+    m.bnd2name = Dict{MOI.ConstraintIndex{MOI.SingleVariable, <:SCALAR_SETS{Tv}}, String}()
+    m.name2bnd_LT = Dict{String, MOI.VariableIndex}()
+    m.name2bnd_GT = Dict{String, MOI.VariableIndex}()
+    m.name2bnd_ET = Dict{String, MOI.VariableIndex}()
+    m.name2bnd_IT = Dict{String, MOI.VariableIndex}()
+end
 
 MOI.is_empty(m::Optimizer) = is_empty(m.inner)
 
@@ -932,6 +939,53 @@ end
 # Get constraint index from name
 function MOI.get(
     m::Optimizer{Tv},
+    ::Type{MOI.ConstraintIndex},
+    name::String
+) where{Tv<:Real}
+    for S in [MOI.LessThan{Tv}, MOI.GreaterThan{Tv}, MOI.EqualTo{Tv}, MOI.Interval{Tv}]
+        # Check in linear constraints.
+        cidx = MOI.get(m, MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}, name)
+        isa(cidx, Nothing) || return cidx
+
+        # Check in bound constraints
+        cidx = MOI.get(m, MOI.ConstraintIndex{MOI.SingleVariable, S}, name)
+        isa(cidx, Nothing) || return cidx
+    end
+
+    # Could not find name anywhere
+    return nothing
+end
+
+function MOI.get(
+    m::Optimizer{Tv},
+    ::Type{MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}},
+    name::String
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    if haskey(m.inner.pbdata_raw.name2con, name)
+        # Extract MOI index and return
+        cidx = m.inner.pbdata_raw.name2con[name]
+
+        # check bound
+        bt, lb, ub = get_constr_bounds(m.inner, cidx)
+
+        if bt == TLP_UP && S == MOI.LessThan{Tv}
+            return MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}(cidx.uuid)
+        elseif bt == TLP_LO && S == MOI.GreaterThan{Tv}
+            return MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}(cidx.uuid)
+        elseif bt == TLP_FX && S == MOI.EqualTo{Tv}
+            return MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}(cidx.uuid)
+        elseif bt == TLP_RG && S == MOI.Interval{Tv}
+            return MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}(cidx.uuid)
+        else
+            error("Unsupported bound type: $bt.")
+        end
+    else
+        return nothing
+    end
+end
+
+function MOI.get(
+    m::Optimizer{Tv},
     ::Type{MOI.ConstraintIndex{MOI.SingleVariable, S}},
     name::String
 ) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
@@ -944,7 +998,7 @@ function MOI.get(
         haskey(m.name2bnd_GT, name) || return nothing
         vid = m.name2bnd_GT[name]
 
-    elseif S == MOI.Equalto{Tv}
+    elseif S == MOI.EqualTo{Tv}
         haskey(m.name2bnd_ET, name) || return nothing
         vid = m.name2bnd_ET[name]
 
