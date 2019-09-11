@@ -960,6 +960,9 @@ function MOI.set(
     cidx = ConstrId(c.value)
     con = m.inner.pbdata_raw.constrs[cidx]
     con.dat.name = name
+
+    # Update name in dict
+    m.inner.pbdata_raw.name2var[name] = cidx
     return nothing
 end
 
@@ -1047,8 +1050,14 @@ end
 # =============================================
 #   ConstraintPrimal
 # ============================================= 
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintPrimal,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    MOI.throw_if_not_valid(m, c)
 
-# TODO
+    return MOI.get(m, MOI.VariablePrimal(), MOI.VariableIndex(c.value))
+end
 
 # =============================================
 #   ConstraintDual
