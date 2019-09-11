@@ -962,7 +962,7 @@ function MOI.set(
     con.dat.name = name
 
     # Update name in dict
-    m.inner.pbdata_raw.name2var[name] = cidx
+    m.inner.pbdata_raw.name2con[name] = cidx
     return nothing
 end
 
@@ -1001,16 +1001,14 @@ function MOI.get(
         # check bound
         bt, lb, ub = get_constr_bounds(m.inner, cidx)
 
-        if bt == TLP_UP && S == MOI.LessThan{Tv}
+        if (bt == TLP_UP || bt == TLP_UL) && S == MOI.LessThan{Tv}
             return MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}(cidx.uuid)
-        elseif bt == TLP_LO && S == MOI.GreaterThan{Tv}
+        elseif (bt == TLP_LO || bt == TLP_UL) && S == MOI.GreaterThan{Tv}
             return MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}(cidx.uuid)
         elseif bt == TLP_FX && S == MOI.EqualTo{Tv}
             return MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}(cidx.uuid)
         elseif bt == TLP_RG && S == MOI.Interval{Tv}
             return MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}(cidx.uuid)
-        else
-            error("Unsupported bound type: $bt.")
         end
     else
         return nothing
@@ -1057,6 +1055,13 @@ function MOI.get(
     MOI.throw_if_not_valid(m, c)
 
     return MOI.get(m, MOI.VariablePrimal(), MOI.VariableIndex(c.value))
+end
+
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintPrimal,
+    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    return MOI.Utilities.get_fallback(m, MOI.ConstraintPrimal(), c)
 end
 
 # =============================================
