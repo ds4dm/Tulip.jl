@@ -23,7 +23,7 @@ function get_value(m::Model{Tv}, j::VarId) where{Tv<:Real}
 
     # Post-crush the solution
     # TODO: instead, perform a systematic post-crush after optimization is done
-    if bt == TLP_LO || bt == TLP_FX || bt == TLP_RG
+    if bt == TLP_LO || bt == TLP_FX || bt == TLP_RG || bt == TLP_UL
         return x + lb
     elseif bt == TLP_UP
         return -(x - ub)
