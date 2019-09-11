@@ -116,6 +116,13 @@ MOI.is_empty(m::Optimizer) = is_empty(m.inner)
 
 MOI.optimize!(m::Optimizer) = optimize!(m.inner)
 
+MOI.Utilities.supports_default_copy_to(::Optimizer, ::Bool) = true
+
+function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike; kwargs...)
+    return MOI.Utilities.automatic_copy_to(dest, src; kwargs...)
+end
+
+
 # ==============================================================================
 #           I. Optimizer attributes
 # ==============================================================================
