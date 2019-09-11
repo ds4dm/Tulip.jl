@@ -1053,8 +1053,14 @@ end
 # =============================================
 #   ConstraintDual
 # ============================================= 
+function MOI.get(
+    m::Optimizer{Tv}, ::MOI.ConstraintDual,
+    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    MOI.throw_if_not_valid(m, c)  # Sanity check
 
-# TODO
+    return get_dual_value(m.inner, ConstrId(c.value))
+end
 
 # =============================================
 #   ConstraintFunction
