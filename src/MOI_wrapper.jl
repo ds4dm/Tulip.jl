@@ -36,7 +36,7 @@ Convert a Tulip `SolutionStatus` into a `MOI.ResultStatusCode`.
 function MOISolutionStatus(st::SolutionStatus)::MOI.ResultStatusCode
     if st == Sln_Unknown
         return MOI.UNKNOWN_RESULT_STATUS
-    elseif st == Sln_Optimal || Sln_FeasiblePoint
+    elseif st == Sln_Optimal || st == Sln_FeasiblePoint
         return MOI.FEASIBLE_POINT
     elseif st == Sln_InfeasiblePoint
         return MOI.INFEASIBLE_POINT
