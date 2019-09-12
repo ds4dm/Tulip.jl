@@ -111,6 +111,40 @@ end
 
 
 """
+    delete_variable!(pb::ProblemData{Tv}, vid::VarId)
+
+Delete variable `vid` from the problem.
+"""
+function delete_variable!(pb::ProblemData{Tv}, vid::VarId) where{Tv<:Real}
+    var = pb.vars[vid]  # to get variable name
+
+    # Delete this column's coefficients
+    cons = pb.var2con[vid]
+    for cid in cons
+        delete!(pb.coeffs, (vid, cid))
+    end
+    # Delete links in corresponding rows
+    for cid in cons
+        cols = pb.con2var[cid]
+        delete!(cols, vid)
+    end
+
+    # Delete variable from var2con
+    delete!(pb.var2con, vid)
+
+    # Delete variable from name2var
+    # Nothing to delete if name was empty
+    if var.dat.name != ""
+        delete!(pb.name2var, var.dat.name)
+    end
+
+    # Finally, delete variable from list of variables
+    delete!(pb.vars, vid)
+
+    return nothing
+end
+
+"""
     add_constraint!(pb::ProblemData, c::LinearConstraint{Tv})
 
 Create a new linear constraint, add it to the model, and return its ID.
