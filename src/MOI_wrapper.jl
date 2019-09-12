@@ -1174,6 +1174,14 @@ function MOI.get(
     return MOI.SingleVariable(MOI.VariableIndex(c.value))
 end
 
+function MOI.set(
+    m::Optimizer{Tv}, ::MOI.ConstraintFunction,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, S},
+    ::MOI.SingleVariable
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    return throw(MOI.SettingSingleVariableFunctionNotAllowed())
+end
+
 function MOI.get(
     m::Optimizer{Tv}, ::MOI.ConstraintFunction,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}
