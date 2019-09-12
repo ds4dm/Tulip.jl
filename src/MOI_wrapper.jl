@@ -478,8 +478,13 @@ end
     # =============================================
     #   III.3 Delete variables
     # =============================================
-# TODO: delete variable (and multiple variables)
-# function MOI.delete(m::Optimizer{Tv}, v::MOI.VariableIndex) where{Tv<:Real} end
+function MOI.delete(m::Optimizer{Tv}, v::MOI.VariableIndex) where{Tv<:Real}
+    MOI.throw_if_not_valid(m, v)
+
+    vidx = VarId(v.value)
+
+    delete_variable!(m.inner.pbdata_raw, vidx)
+end
 
     # =============================================
     #   III.4 Get/set variable attributes
