@@ -873,6 +873,16 @@ end
     # =============================================
     #   IV.4 Delete constraints
     # =============================================  
+function MOI.delete(
+    m::Optimizer{Tv},
+    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    MOI.throw_if_not_valid(m, c)
+
+    cidx = ConstrId(c.value)
+
+    delete_constraint!(m.inner.pbdata_raw, cidx)
+end
 
     # =============================================
     #   IV.5 Modify constraints
