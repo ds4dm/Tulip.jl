@@ -1430,8 +1430,28 @@ function MOI.supports(
 end
 
     # =============================================
-    #   V.2 Set objective function
-    # =============================================  
+    #   V.2 Get/set objective function
+    # =============================================
+function MOI.get(
+    m::Optimizer{Tv},
+    ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}}
+) where{Tv<:Real}
+    
+    # Objective coeffs
+    terms = MOI.ScalarAffineTerm{Tv}[]
+    for (vid, var) in m.inner.pbdata_raw.vars
+        c = var.dat.obj
+        if !iszero(c)
+            push!(terms, MOI.ScalarAffineTerm{Tv}(c, MOI.VariableIndex(vid.uuid)))
+        end
+    end
+
+    # Constant term
+    c0 = m.inner.pbdata_raw.obj_const
+
+    return MOI.ScalarAffineFunction{Tv}(terms, c0)
+end
+
 function MOI.set(
     m::Optimizer{Tv},
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}},
