@@ -1338,3 +1338,12 @@ function MOI.modify(
 
     return nothing
 end
+
+function MOI.modify(
+    m::Optimizer{Tv},
+    ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}},
+    chg::MOI.ScalarConstantChange{Tv}
+) where{Tv<:Real}
+    m.inner.pbdata_raw.obj_const = chg.new_constant
+    return nothing
+end
