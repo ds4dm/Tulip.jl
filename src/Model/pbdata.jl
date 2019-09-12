@@ -144,6 +144,7 @@ function delete_variable!(pb::ProblemData{Tv}, vid::VarId) where{Tv<:Real}
     return nothing
 end
 
+
 """
     add_constraint!(pb::ProblemData, c::LinearConstraint{Tv})
 
@@ -158,6 +159,41 @@ function add_constraint!(pb::ProblemData{Tv}, c::LinearConstraint{Tv}) where{Tv<
     pb.constrs[c.id] = c
     pb.con2var[c.id] = OrderedSet{VarId}()
     (name != "") && (pb.name2con[name] = c.id)
+    return nothing
+end
+
+
+"""
+    delete_constraint!(pb::ProblemData{Tv}, cid::ConstrId)
+
+Delete constraint `cid` from the problem.
+"""
+function delete_constraint!(pb::ProblemData{Tv}, cid::ConstrId) where{Tv<:Real}
+    con = pb.constrs[cid]  # to get constraint name
+
+    # Delete this row's coefficients
+    vars = pb.con2var[cid]
+    for vid in vars
+        delete!(pb.coeffs, (vid, cid))
+    end
+    # Delete links in corresponding columns
+    for vid in vars
+        rows = pb.var2con[vid]
+        delete!(rows, cid)
+    end
+
+    # Delete constraint from con2var
+    delete!(pb.con2var, cid)
+
+    # Delete variable from name2con
+    # Nothing to delete if name was empty
+    if con.dat.name != ""
+        delete!(pb.name2con, con.dat.name)
+    end
+
+    # Finally, delete constraint from list of constraints
+    delete!(pb.constrs, cid)
+
     return nothing
 end
 
