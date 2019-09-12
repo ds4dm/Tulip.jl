@@ -15,7 +15,7 @@ const CONFIG = MOIT.TestConfig(basis=false)
         "solve_zero_one_with_bounds_2",     # Requires binary variables
         "solve_zero_one_with_bounds_3",     # Requires binary variables
         "solve_affine_deletion_edge_cases", # Requires VectorAffineFunction-in-Nonpositives
-        "solve_objbound_edge_cases"         # Requires integer variables
+        "solve_objbound_edge_cases",         # Requires integer variables
         "solve_duplicate_terms_vector_affine",  # Requires `VectorAffineFunction`
     ])
     MOIT.modificationtest(OPTIMIZER, CONFIG)
