@@ -875,6 +875,123 @@ end
     # =============================================  
 function MOI.delete(
     m::Optimizer{Tv},
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Tv}}
+) where{Tv<:Real}
+    MOI.throw_if_not_valid(m, c)
+
+    # Check if constraint had a name. If so, it will need to be deleted.
+    name = MOI.get(m, MOI.ConstraintName(), c)
+
+    # Get bounds
+    var = m.inner.pbdata_raw.vars[VarId(c.value)]
+    bt, lb, ub = get_bounds(var)
+
+    if bt == TLP_UP
+        # Variable becomes free
+        set_bounds!(var, Tv(-Inf), Tv(Inf))
+
+    elseif bt == TLP_UL
+        # Variable becomes lower-bounded
+        set_bounds!(var, lb, Tv(Inf))
+
+    else
+        error("Unexpected bound type with MOI.LessThan: $bt.")
+    end
+
+    # Delete bound constraint name
+    delete!(m.bnd2name, c)
+    if name != ""
+        delete!(m.name2bnd_LT, MOI.VariableIndex(c.value))
+    end
+
+    return nothing
+end
+
+function MOI.delete(
+    m::Optimizer{Tv},
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Tv}}
+) where{Tv<:Real}
+    MOI.throw_if_not_valid(m, c)
+
+    # Check if constraint had a name. If so, it will need to be deleted.
+    name = MOI.get(m, MOI.ConstraintName(), c)
+
+    # Get bounds
+    var = m.inner.pbdata_raw.vars[VarId(c.value)]
+    bt, lb, ub = get_bounds(var)
+
+    if bt == TLP_LO
+        # Variable becomes free
+        set_bounds!(var, Tv(-Inf), Tv(Inf))
+
+    elseif bt == TLP_UP
+        # Variable becomes upper-bounded
+        set_bounds!(var, Tv(-Inf), ub)
+
+    else
+        error("Unexpected bound type with MOI.LessThan: $bt.")
+    end
+
+    # Delete bound constraint name
+    delete!(m.bnd2name, c)
+    if name != ""
+        delete!(m.name2bnd_GT, MOI.VariableIndex(c.value))
+    end
+
+    return nothing
+end
+
+function MOI.delete(
+    m::Optimizer{Tv},
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Tv}}
+) where{Tv<:Real}
+    MOI.throw_if_not_valid(m, c)
+
+    # Check if constraint had a name. If so, it will need to be deleted.
+    name = MOI.get(m, MOI.ConstraintName(), c)
+
+    # Get bounds
+    var = m.inner.pbdata_raw.vars[VarId(c.value)]
+    
+    # Variable becomes free
+    set_bounds!(var, Tv(-Inf), Tv(Inf))
+
+    # Delete bound constraint name
+    delete!(m.bnd2name, c)
+    if name != ""
+        delete!(m.name2bnd_ET, MOI.VariableIndex(c.value))
+    end
+
+    return nothing
+end
+
+function MOI.delete(
+    m::Optimizer{Tv},
+    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Tv}}
+) where{Tv<:Real}
+    MOI.throw_if_not_valid(m, c)
+
+    # Check if constraint had a name. If so, it will need to be deleted.
+    name = MOI.get(m, MOI.ConstraintName(), c)
+
+    # Get bounds
+    var = m.inner.pbdata_raw.vars[VarId(c.value)]
+    bt, lb, ub = get_bounds(var)
+
+    # Variable becomes free
+    set_bounds!(var, Tv(-Inf), Tv(Inf))
+
+    # Delete bound constraint name
+    delete!(m.bnd2name, c)
+    if name != ""
+        delete!(m.name2bnd_IT, MOI.VariableIndex(c.value))
+    end
+
+    return nothing
+end
+
+function MOI.delete(
+    m::Optimizer{Tv},
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}
 ) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
     MOI.throw_if_not_valid(m, c)
