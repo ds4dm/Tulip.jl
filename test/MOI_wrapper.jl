@@ -25,6 +25,6 @@ end
     MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis=false, atol=1e-6, rtol=1e-6), String[
         "linear7"   # Requires `VectorAffineFunction` and `Nonnegatives`/`Nonpositives`
         "linear15"  # Requires `VectorAffineFunction` and `Zeros`
-        "partial_start_test"  # Requires `VariablePrimalStart`
+        "partial_start"  # Requires `VariablePrimalStart`
     ])
 end
