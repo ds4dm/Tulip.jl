@@ -1416,6 +1416,37 @@ end
 
 function MOI.set(
     m::Optimizer{Tv}, ::MOI.ConstraintSet,
+    c::MOI.ConstraintIndex{MOI.SingleVariable, S},
+    s::S
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    MOI.throw_if_not_valid(m, c)
+
+    # Get variable
+    vidx = VarId(c.value)
+    var = m.inner.pbdata_raw.vars[vidx]
+
+    # Get current bounds
+    bt, lb, ub = get_bounds(var)
+
+    # Update upper bound
+    # Bound key does not need to be updated
+    if S == MOI.LessThan{Tv}
+        set_bounds!(var, lb, s.upper)
+    elseif S == MOI.GreaterThan{Tv}
+        set_bounds!(var, s.lower, ub)
+    elseif S == MOI.EqualTo{Tv}
+        set_bounds!(var, s.value, s.value)
+    elseif S == MOI.Interval{Tv}
+        set_bounds!(var, s.lower, s.upper)
+    else
+        error("Unknown type for ConstraintSet: $S.")
+    end
+
+    return nothing
+end
+
+function MOI.set(
+    m::Optimizer{Tv}, ::MOI.ConstraintSet,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S},
     s::S
 ) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
