@@ -242,7 +242,7 @@ MOI.get(m::Optimizer, ::MOI.NumberOfVariables) = get_num_var(m.inner)
 function MOI.get(m::Optimizer, ::MOI.ListOfVariableIndices)
     return [
         MOI.VariableIndex(vidx.uuid)
-        for vidx in keys(m.pbdata_raw.vars)
+        for vidx in keys(m.inner.pbdata_raw.vars)
     ]
 end
 
