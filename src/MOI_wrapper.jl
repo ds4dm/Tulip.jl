@@ -81,6 +81,8 @@ Wrapper for MOI.
 mutable struct Optimizer{Tv<:Real} <: MOI.AbstractOptimizer
     inner::Model{Tv}
 
+    is_feas::Bool  # Model is feasibility problem if true
+
     # Keep track of names of variable bound constraints
     # Should go away in future MOI release
     bnd2name::Dict{MOI.ConstraintIndex{MOI.SingleVariable, <:SCALAR_SETS{Tv}}, String}
@@ -90,7 +92,7 @@ mutable struct Optimizer{Tv<:Real} <: MOI.AbstractOptimizer
     name2bnd_IT::Dict{String, MOI.VariableIndex}
     function Optimizer{Tv}() where{Tv<:Real}
         return new{Tv}(
-            Model{Tv}(),
+            Model{Tv}(), false,
             Dict{MOI.ConstraintIndex{MOI.SingleVariable, <:SCALAR_SETS{Tv}}, String}(),
             Dict{String, MOI.VariableIndex}(),
             Dict{String, MOI.VariableIndex}(),
@@ -210,6 +212,8 @@ MOI.get(m::Optimizer, ::MOI.Name) = m.inner.name
 #   ObjectiveSense
 # =============================================
 function MOI.get(m::Optimizer, ::MOI.ObjectiveSense)
+    m.is_feas && return MOI.FEASIBILITY_SENSE
+
     s = m.inner.pbdata_raw.obj_sense
     if s == TLP_MIN
         return MOI.MIN_SENSE
@@ -219,7 +223,8 @@ function MOI.get(m::Optimizer, ::MOI.ObjectiveSense)
 end
 
 function MOI.set(m::Optimizer, ::MOI.ObjectiveSense, s::MOI.OptimizationSense)
-    
+    m.is_feas = (s == MOI.FEASIBILITY_SENSE)
+
     if s == MOI.MIN_SENSE || s == MOI.FEASIBILITY_SENSE
         m.inner.pbdata_raw.obj_sense = TLP_MIN
     elseif s == MOI.MAX_SENSE
