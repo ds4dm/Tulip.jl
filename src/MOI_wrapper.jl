@@ -764,15 +764,18 @@ function MOI.add_constraint(
     # TODO: check that bounds are finite
     lb, ub = _bounds(s)
 
+    # Convert to canonical form
+    f_canon = MOI.Utilities.canonical(f)
     # Create new constraint
     colids = [
         VarId(t.variable_index.value)
-        for t in f.terms
+        for t in f_canon.terms
     ]
     colvals = [
         t.coefficient
-        for t in f.terms
+        for t in f_canon.terms
     ]
+
     cidx = add_constraint!(m.inner, "", lb, ub, colids, colvals)
 
     # Return MOI index
