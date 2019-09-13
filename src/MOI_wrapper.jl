@@ -194,7 +194,7 @@ SUPPORTED_MODEL_ATTR = Union{
     MOI.SimplexIterations,
     MOI.BarrierIterations,
     MOI.RawSolver,
-    MOI.RawStatusString,
+    # MOI.RawStatusString,  # TODO
     MOI.ResultCount,
     MOI.TerminationStatus,
     MOI.PrimalStatus,
@@ -1344,6 +1344,42 @@ function MOI.get(
     end
 
     return MOI.ScalarAffineFunction(terms, zero(Tv))
+end
+
+function MOI.set(
+    m::Optimizer{Tv}, ::MOI.ConstraintFunction,
+    c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S},
+    f::MOI.ScalarAffineFunction{Tv}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    MOI.throw_if_not_valid(m, c)  # Sanity check
+    iszero(f.constant) || throw(
+        MOI.ScalarFunctionConstantNotZero{Tv, typeof(f), S}(f.constant)
+    )
+
+    # Get constraint index
+    cidx = ConstrId(c.value)
+    con = m.inner.pbdata_raw.constrs[cidx]
+
+    # Consolidate duplicate terms and remove zeros
+    f_canon = MOI.Utilities.canonical(f)
+
+    # Set old row to zero
+    f_old = MOI.get(m, MOI.ConstraintFunction(), c)
+    for term in f_old.terms
+        vidx = VarId(term.variable_index.value)
+        set_coeff!(m.inner.pbdata_raw, vidx, cidx, zero(Tv))
+    end
+
+    # Set new coeffs
+    for term in f_canon.terms
+        vidx = VarId(term.variable_index.value)
+        val = term.coefficient
+        set_coeff!(m.inner.pbdata_raw, vidx, cidx, val)
+    end
+
+    # Done
+
+    return nothing
 end
 
 # =============================================
