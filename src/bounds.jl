@@ -5,8 +5,7 @@
 * `TLP_LO`: Lower-bounded variable ``l \\leq x \\leq \\infty``.
 * `TLP_FX`: Fixed variable ``l = x = u``.
 * `TLP_FR`: Free variable ``-\\infty \\leq x \\leq \\infty``.
-* `TLP_RG`: Range variable ``l \\leq x \\leq u``. Both bounds were given simulatenously.
-* `TLP_UL`: Same as `TLP_RG`, except that bounds were added separately.
+* `TLP_RG`: Range variable ``l \\leq x \\leq u``.
 """
 @enum BoundType begin
     TLP_UP  # Upper-bounded
@@ -14,7 +13,6 @@
     TLP_FX  # Fixed
     TLP_FR  # Free
     TLP_RG  # Range
-    TLP_UL  # Upper and lower bounds
 end
 
 
