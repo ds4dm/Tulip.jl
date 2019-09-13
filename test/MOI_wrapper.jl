@@ -16,6 +16,9 @@ const MOI_EXCLUDE = [
     "solve_affine_deletion_edge_cases",     # Requires VectorAffineFunction-in-Nonpositives
     "solve_objbound_edge_cases",            # Requires integer variables
     "solve_duplicate_terms_vector_affine",  # Requires `VectorAffineFunction`
+    "variablenames",                        # TODO, requires to settle the convention on variable names
+    "raw_status_string",                    # TODO
+    "solve_time",                           # TODO
     # Modifications
     "solve_const_vectoraffine_nonpos",      # Requires VectorAffineFunction-in-Nonpositives
     "solve_multirow_vectoraffine_nonpos",   # Requires VectorAffineFunction-in-Nonpositives
