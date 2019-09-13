@@ -3,30 +3,40 @@ const MOIT = MOI.Test
 
 const OPTIMIZER = TLP.Optimizer()
 
-const CONFIG = MOIT.TestConfig(basis=false)
+const CONFIG = MOIT.TestConfig(basis=false, atol=1e-6, rtol=1e-6)
 
-@testset "Unit Tests" begin
-    MOIT.basic_constraint_tests(OPTIMIZER, CONFIG; delete=false)
-    MOIT.unittest(OPTIMIZER, MOIT.TestConfig(atol=1e-6), [
-        "solve_integer_edge_cases",             # Requires integer variables
-        "solve_qcp_edge_cases",                 # Requires quadratic constraints
-        "solve_qp_edge_cases",                  # Requires quadratic objective
-        "solve_zero_one_with_bounds_1",         # Requires binary variables
-        "solve_zero_one_with_bounds_2",         # Requires binary variables
-        "solve_zero_one_with_bounds_3",         # Requires binary variables
-        "solve_affine_deletion_edge_cases",     # Requires VectorAffineFunction-in-Nonpositives
-        "solve_multirow_vectoraffine_nonpos",   # Requires VectorAffineFunction-in-Nonpositives
-        "solve_const_vectoraffine_nonpos",      # Requires VectorAffineFunction-in-Nonpositives
-        "solve_objbound_edge_cases",            # Requires integer variables
-        "solve_duplicate_terms_vector_affine",  # Requires `VectorAffineFunction`
-    ])
-    MOIT.modificationtest(OPTIMIZER, CONFIG)
+const MOI_EXCLUDE = [
+    # Unit tests
+    "solve_integer_edge_cases",             # Requires integer variables
+    "solve_qcp_edge_cases",                 # Requires quadratic constraints
+    "solve_qp_edge_cases",                  # Requires quadratic objective
+    "solve_zero_one_with_bounds_1",         # Requires binary variables
+    "solve_zero_one_with_bounds_2",         # Requires binary variables
+    "solve_zero_one_with_bounds_3",         # Requires binary variables
+    "solve_affine_deletion_edge_cases",     # Requires VectorAffineFunction-in-Nonpositives
+    "solve_objbound_edge_cases",            # Requires integer variables
+    "solve_duplicate_terms_vector_affine",  # Requires `VectorAffineFunction`
+    # Modifications
+    "solve_const_vectoraffine_nonpos",      # Requires VectorAffineFunction-in-Nonpositives
+    "solve_multirow_vectoraffine_nonpos",   # Requires VectorAffineFunction-in-Nonpositives
+    # Linear tests
+    "linear7",                              # Requires `VectorAffineFunction` and `Nonnegatives`/`Nonpositives`
+    "linear15",                             # Requires `VectorAffineFunction` and `Zeros`
+    "partial_start"                         # Requires `VariablePrimalStart`
+]
+
+@testset "MOI Unit Tests" begin
+    @testset "Basic constraint tests" begin
+        MOIT.basic_constraint_tests(OPTIMIZER, CONFIG)
+    end
+    @testset "Other unit tests" begin
+        MOIT.unittest(OPTIMIZER, CONFIG, MOI_EXCLUDE)
+    end
+    @testset "Modifications" begin
+        MOIT.modificationtest(OPTIMIZER, CONFIG, MOI_EXCLUDE)
+    end
 end
 
-@testset "Linear tests" begin
-    MOIT.contlineartest(OPTIMIZER, MOIT.TestConfig(basis=false, atol=1e-6, rtol=1e-6), String[
-        "linear7"   # Requires `VectorAffineFunction` and `Nonnegatives`/`Nonpositives`
-        "linear15"  # Requires `VectorAffineFunction` and `Zeros`
-        "partial_start"  # Requires `VariablePrimalStart`
-    ])
+@testset "MOI Linear tests" begin
+    MOIT.contlineartest(OPTIMIZER, CONFIG, MOI_EXCLUDE)
 end
