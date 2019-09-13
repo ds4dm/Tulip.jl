@@ -1520,6 +1520,14 @@ function MOI.get(
     return MOI.ScalarAffineFunction{Tv}(terms, c0)
 end
 
+function MOI.get(
+    m::Optimizer{Tv},
+    ::MOI.ObjectiveFunction{MOI.ScalarQuadraticFunction{Tv}}
+) where{Tv<:Real}
+    obj = MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}}())
+    return convert(MOI.ScalarQuadraticFunction{Tv}, obj)
+end
+
 function MOI.set(
     m::Optimizer{Tv},
     ::MOI.ObjectiveFunction{MOI.SingleVariable},
