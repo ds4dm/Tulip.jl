@@ -1481,17 +1481,25 @@ end
     
     # =============================================
     #   V.1 Supported objectives
-    # =============================================  
+    # =============================================
 function MOI.supports(
     ::Optimizer,
-    ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}}
-) where {Tv<:Real}
+    ::MOI.ObjectiveFunction{F}
+) where {Tv<:Real, F<:Union{MOI.SingleVariable, MOI.ScalarAffineFunction{Tv}}}
     return true
 end
 
     # =============================================
     #   V.2 Get/set objective function
     # =============================================
+function MOI.get(
+    m::Optimizer{Tv},
+    ::MOI.ObjectiveFunction{MOI.SingleVariable}
+) where{Tv<:Real}
+    obj = MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}}())
+    return convert(MOI.SingleVariable, obj)
+end
+
 function MOI.get(
     m::Optimizer{Tv},
     ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}}
@@ -1510,6 +1518,20 @@ function MOI.get(
     c0 = m.inner.pbdata_raw.obj_const
 
     return MOI.ScalarAffineFunction{Tv}(terms, c0)
+end
+
+function MOI.set(
+    m::Optimizer{Tv},
+    ::MOI.ObjectiveFunction{MOI.SingleVariable},
+    f::MOI.SingleVariable
+) where{Tv<:Real}
+
+    MOI.set(
+        m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}}(),
+        convert(MOI.ScalarAffineFunction{Tv}, f)
+    )
+
+    return nothing
 end
 
 function MOI.set(
