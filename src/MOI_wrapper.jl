@@ -90,6 +90,10 @@ mutable struct Optimizer{Tv<:Real} <: MOI.AbstractOptimizer
     name2bnd_GT::Dict{String, MOI.VariableIndex}
     name2bnd_ET::Dict{String, MOI.VariableIndex}
     name2bnd_IT::Dict{String, MOI.VariableIndex}
+
+    # Keep track of bound constraints
+    var2bndtype::Dict{MOI.VariableIndex, Set{Type{<:MOI.AbstractScalarSet}}}
+
     function Optimizer{Tv}() where{Tv<:Real}
         return new{Tv}(
             Model{Tv}(), false,
@@ -97,7 +101,8 @@ mutable struct Optimizer{Tv<:Real} <: MOI.AbstractOptimizer
             Dict{String, MOI.VariableIndex}(),
             Dict{String, MOI.VariableIndex}(),
             Dict{String, MOI.VariableIndex}(),
-            Dict{String, MOI.VariableIndex}()
+            Dict{String, MOI.VariableIndex}(),
+            Dict{MOI.VariableIndex, Set{Type{<:MOI.AbstractScalarSet}}}()
         )
     end
 end
@@ -112,6 +117,7 @@ function MOI.empty!(m::Optimizer{Tv}) where{Tv<:Real}
     m.name2bnd_GT = Dict{String, MOI.VariableIndex}()
     m.name2bnd_ET = Dict{String, MOI.VariableIndex}()
     m.name2bnd_IT = Dict{String, MOI.VariableIndex}()
+    m.var2bndtype  = Dict{MOI.VariableIndex, Set{MOI.ConstraintIndex}}()
 end
 
 MOI.is_empty(m::Optimizer) = is_empty(m.inner)
@@ -260,15 +266,11 @@ function MOI.get(
 ) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
     indices = MOI.ConstraintIndex{MOI.SingleVariable, S}[]
 
-    for (vidx, var) in m.inner.pbdata_raw.vars
-        bt, lb, ub = get_bounds(var)
-        if (
-            (S == MOI.LessThan{Tv} && (bt == TLP_UP || bt == TLP_UL))
-            || (S == MOI.GreaterThan{Tv} && (bt == TLP_LO || bt == TLP_UL))
-            || (S == MOI.EqualTo{Tv} && (bt == TLP_FX))
-            || (S == MOI.Interval{Tv} && (bt == TLP_RG))
-        )
-            push!(indices, MOI.ConstraintIndex{MOI.SingleVariable, S}(vidx.uuid))
+    var_indices = MOI.get(m, MOI.ListOfVariableIndices())
+
+    for var in var_indices
+        if S ∈ m.var2bndtype[var]
+            push!(indices, MOI.ConstraintIndex{MOI.SingleVariable, S}(var.value))
         end
     end
     return indices
@@ -303,17 +305,10 @@ function MOI.get(
 ) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
     ncon = 0
 
-    for (vidx, var) in m.inner.pbdata_raw.vars
-        bt, lb, ub = get_bounds(var)
-        if (
-            (S == MOI.LessThan{Tv} && (bt == TLP_UP || bt == TLP_UL))
-            || (S == MOI.GreaterThan{Tv} && (bt == TLP_LO || bt == TLP_UL))
-            || (S == MOI.EqualTo{Tv} && (bt == TLP_FX))
-            || (S == MOI.Interval{Tv} && (bt == TLP_RG))
-        )
-            ncon += 1
-        end
+    for v in MOI.get(m, MOI.ListOfVariableIndices())
+        ncon += S ∈ m.var2bndtype[v]
     end
+
     return ncon
 end
 
@@ -460,6 +455,7 @@ function MOI.add_variable(m::Optimizer{Tv}) where{Tv<:Real}
     # * does not appear in any constraint
     # TODO: dispatch a function call to m.inner
     vidx = Tulip.add_variable!(m.inner, "", zero(Tv), Tv(-Inf), Tv(Inf), ConstrId[], Tv[])
+    m.var2bndtype[MOI.VariableIndex(vidx.uuid)] = Set{MOI.ConstraintIndex}()
     return MOI.VariableIndex(vidx.uuid)
 end
 
@@ -486,9 +482,11 @@ end
 function MOI.delete(m::Optimizer{Tv}, v::MOI.VariableIndex) where{Tv<:Real}
     MOI.throw_if_not_valid(m, v)
 
-    vidx = VarId(v.value)
-
-    delete_variable!(m.inner.pbdata_raw, vidx)
+    # Remove variable from model
+    delete_variable!(m.inner.pbdata_raw, VarId(v.value))
+    
+    # Remove bound tracking
+    delete!(m.var2bndtype, v)
 end
 
     # =============================================
@@ -600,45 +598,33 @@ end
 function MOI.add_constraint(
     m::Optimizer{Tv},
     f::MOI.SingleVariable,
-    s::MOI.LessThan{T}
-) where{T<:Real, Tv<:Real}
+    s::MOI.LessThan{Tv}
+) where{Tv<:Real}
 
     # Check that variable exists
-    MOI.is_valid(m, f.variable) || throw(MOI.InvalidIndex(f.variable))
-
+    v = f.variable
+    MOI.throw_if_not_valid(m, v)
+    
     # identify which variable
-    vidx = VarId(f.variable.value)
-    var = m.inner.pbdata_raw.vars[vidx]
-
-    # Get current bounds
-    bt, lb, ub = get_bounds(var)
+    var = m.inner.pbdata_raw.vars[VarId(v.value)]
 
     # Check if upper bound already exists
-    if bt == TLP_UP || bt == TLP_UL
-        S1 = MOI.LessThan{Tv}
-        throw(MOI.UpperBoundAlreadySet{S1, typeof(s)}(vidx))
-    elseif bt == TLP_FX
-        S1 = MOI.EqualTo{Tv}
-        throw(MOI.UpperBoundAlreadySet{S1, typeof(s)}(vidx))
-    elseif bt == TLP_RG
-        S1 = MOI.Interval{Tv}
-        throw(MOI.UpperBoundAlreadySet{S1, typeof(s)}(vidx))
+    if MOI.LessThan{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.UpperBoundAlreadySet{MOI.LessThan{Tv}, MOI.LessThan{Tv}}(v.value))
+    elseif MOI.EqualTo{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.UpperBoundAlreadySet{MOI.EqualTo{Tv}, MOI.LessThan{Tv}}(v.value))
+    elseif MOI.Interval{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.UpperBoundAlreadySet{MOI.Interval{Tv}, MOI.LessThan{Tv}}(v.value))
     end
 
-    # Upper-bound can be added now
-    # Two cases: TLP_UP => TLP_UL; TLP_FR => TLP_UP
-    if bt == TLP_LO
-        # update bounds
-        var.dat.ub = s.upper
-        # update bound key
-        var.dat.bt = TLP_UL
-    elseif bt == TLP_FR
-        var.dat.ub = s.upper
-        var.dat.bt = TLP_UP
-    else
-        error("Unsupported bound type: $bt")
-    end
-    cidx = MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Tv}}(vidx.uuid)
+    # Get current bounds
+    cidx = MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Tv}}(v.value)
+    bt, lb, ub = get_bounds(var)
+
+    # Update upper-bound
+    set_bounds!(var, lb, s.upper)
+    push!(m.var2bndtype[v], MOI.LessThan{Tv})
+    
     return cidx
 end
 
@@ -649,41 +635,29 @@ function MOI.add_constraint(
 ) where{T<:Real, Tv<:Real}
 
     # Check that variable exists
-    MOI.is_valid(m, f.variable) || throw(MOI.InvalidIndex(f.variable))
+    v = f.variable
+    MOI.throw_if_not_valid(m, v)
     
     # identify which variable
-    vidx = VarId(f.variable.value)
-    var = m.inner.pbdata_raw.vars[vidx]
+    var = m.inner.pbdata_raw.vars[VarId(v.value)]
+
+    # Check if lower bound already exists
+    if MOI.GreaterThan{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.LowerBoundAlreadySet{MOI.GreaterThan{Tv}, MOI.GreaterThan{Tv}}(v.value))
+    elseif MOI.EqualTo{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.LowerBoundAlreadySet{MOI.EqualTo{Tv}, MOI.GreaterThan{Tv}}(v.value))
+    elseif MOI.Interval{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.LowerBoundAlreadySet{MOI.Interval{Tv}, MOI.GreaterThan{Tv}}(v.value))
+    end
 
     # Get current bounds
+    cidx = MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Tv}}(v.value)
     bt, lb, ub = get_bounds(var)
 
-    # Check if upper bound already exists
-    if bt == TLP_LO || bt == TLP_UL
-        S1 = MOI.GreaterThan{Tv}
-        throw(MOI.LowerBoundAlreadySet{S1, typeof(s)}(vidx))
-    elseif bt == TLP_FX
-        S1 = MOI.EqualTo{Tv}
-        throw(MOI.LowerBoundAlreadySet{S1, typeof(s)}(vidx))
-    elseif bt == TLP_RG
-        S1 = MOI.Interval{Tv}
-        throw(MOI.LowerBoundAlreadySet{S1, typeof(s)}(vidx))
-    end
+    # Update upper-bound
+    set_bounds!(var, s.lower, ub)
+    push!(m.var2bndtype[v], MOI.GreaterThan{Tv})
 
-    # Upper-bound can be added now
-    # Two cases: TLP_UP => TLP_UL; TLP_FR => TLP_UP
-    if bt == TLP_UP
-        # update bounds
-        var.dat.lb = s.lower
-        # update bound key
-        var.dat.bt = TLP_UL
-    elseif bt == TLP_FR
-        var.dat.lb = s.lower
-        var.dat.bt = TLP_LO
-    else
-        error("Unsupported bound type: $bt")
-    end
-    cidx = MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Tv}}(vidx.uuid)
     return cidx
 end
 
@@ -694,30 +668,29 @@ function MOI.add_constraint(
 ) where{T<:Real, Tv<:Real}
 
     # Check that variable exists
-    MOI.is_valid(m, f.variable) || throw(MOI.InvalidIndex(f.variable))
+    v = f.variable
+    MOI.throw_if_not_valid(m, v)
     
     # identify which variable
-    vidx = VarId(f.variable.value)
-    var = m.inner.pbdata_raw.vars[vidx]
+    var = m.inner.pbdata_raw.vars[VarId(v.value)]
 
-    # Get current bounds
-    bt, lb, ub = get_bounds(var)
-
-    # Check if upper bound already exists
-    if bt == TLP_LO || bt == TLP_UL
-        throw(MOI.LowerBoundAlreadySet{MOI.GreaterThan{Tv}, typeof(s)}(vidx))
-    elseif bt == TLP_UP
-        throw(MOI.UpperBoundAlreadySet{MOI.LessThan{Tv}, typeof(s)}(vidx))
-    elseif bt == TLP_FX
-        throw(MOI.LowerBoundAlreadySet{MOI.EqualTo{Tv}, typeof(s)}(vidx))
-    elseif bt == TLP_RG
-        throw(MOI.LowerBoundAlreadySet{MOI.Interval{Tv}, typeof(s)}(vidx))
+    # Check if a bound already exists
+    if MOI.LessThan{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.UpperBoundAlreadySet{MOI.LessThan{Tv}, MOI.EqualTo{Tv}}(v.value))
+    elseif MOI.GreaterThan{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.LowerBoundAlreadySet{MOI.GreaterThan{Tv}, MOI.EqualTo{Tv}}(v.value))
+    elseif MOI.EqualTo{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.UpperBoundAlreadySet{MOI.EqualTo{Tv}, MOI.EqualTo{Tv}}(v.value))
+    elseif MOI.Interval{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.UpperBoundAlreadySet{MOI.Interval{Tv}, MOI.EqualTo{Tv}}(v.value))
     end
 
-    # Upper-bound can be added now
-    # Two cases: TLP_UP => TLP_UL; TLP_FR => TLP_UP
+    # Update variable bounds
     set_bounds!(var, s.value, s.value)
-    cidx = MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Tv}}(vidx.uuid)
+    push!(m.var2bndtype[v], MOI.EqualTo{Tv})
+
+    cidx = MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Tv}}(v.value)
+
     return cidx
 end
 
@@ -726,31 +699,29 @@ function MOI.add_constraint(
     f::MOI.SingleVariable,
     s::MOI.Interval{T}
 ) where{T<:Real, Tv<:Real}
-
     # Check that variable exists
-    MOI.is_valid(m, f.variable) || throw(MOI.InvalidIndex(f.variable))
+    v = f.variable
+    MOI.throw_if_not_valid(m, v)
     
     # identify which variable
-    vidx = VarId(f.variable.value)
-    var = m.inner.pbdata_raw.vars[vidx]
+    var = m.inner.pbdata_raw.vars[VarId(v.value)]
 
-    # Get current bounds
-    bt, lb, ub = get_bounds(var)
-
-    # Check if upper bound already exists
-    if bt == TLP_LO || bt == TLP_UL
-        throw(MOI.LowerBoundAlreadySet{MOI.GreaterThan{Tv}, typeof(s)}(vidx))
-    elseif bt == TLP_UP
-        throw(MOI.UpperBoundAlreadySet{MOI.LessThan{Tv}, typeof(s)}(vidx))
-    elseif bt == TLP_FX
-        throw(MOI.LowerBoundAlreadySet{MOI.EqualTo{Tv}, typeof(s)}(vidx))
-    elseif bt == TLP_RG
-        throw(MOI.LowerBoundAlreadySet{MOI.Interval{Tv}, typeof(s)}(vidx))
+    # Check if a bound already exists
+    if MOI.LessThan{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.UpperBoundAlreadySet{MOI.LessThan{Tv}, MOI.Interval{Tv}}(v.value))
+    elseif MOI.GreaterThan{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.LowerBoundAlreadySet{MOI.GreaterThan{Tv}, MOI.Interval{Tv}}(v.value))
+    elseif MOI.EqualTo{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.UpperBoundAlreadySet{MOI.EqualTo{Tv}, MOI.Interval{Tv}}(v.value))
+    elseif MOI.Interval{Tv} ∈ m.var2bndtype[v]
+        throw(MOI.UpperBoundAlreadySet{MOI.Interval{Tv}, MOI.Interval{Tv}}(v.value))
     end
 
-    # Set bounds on variable
+    # Update variable bounds
     set_bounds!(var, s.lower, s.upper)
-    cidx = MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Tv}}(vidx.uuid)
+    push!(m.var2bndtype[v], MOI.Interval{Tv})
+
+    cidx = MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Tv}}(v.value)
     return cidx
 end
 
@@ -790,69 +761,15 @@ end
     # =============================================
     #   IV.3 Index checking
     # =============================================
-
 function MOI.is_valid(
     m::Optimizer{Tv},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Tv}}
-) where{Tv<:Real}
-    # get index of variable
-    vidx = VarId(c.value)
-
-    # Check if variable exists in model
-    if haskey(m.inner.pbdata_raw.vars, vidx)
-        bt, lb, ub = get_var_bounds(m.inner, vidx)
-        return bt == TLP_UP || bt == TLP_UL
-    end
-
-    return false
-end
-
-function MOI.is_valid(
-    m::Optimizer{Tv},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Tv}}
-) where{Tv<:Real}
-    # get index of variable
-    vidx = VarId(c.value)
-
-    # Check if variable exists in model
-    if haskey(m.inner.pbdata_raw.vars, vidx)
-        bt, lb, ub = get_var_bounds(m.inner, vidx)
-        return bt == TLP_LO || bt == TLP_UL
-    end
-
-    return false
-end
+    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
+) where{Tv<:Real, S <:SCALAR_SETS{Tv}}
     
-function MOI.is_valid(
-    m::Optimizer{Tv},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Tv}}
-) where{Tv<:Real}
-    # get index of variable
-    vidx = VarId(c.value)
-
-    # Check if variable exists in model
-    if haskey(m.inner.pbdata_raw.vars, vidx)
-        bt, lb, ub = get_var_bounds(m.inner, vidx)
-        return bt == TLP_RG
-    end
-
-    return false
-end
-
-function MOI.is_valid(
-    m::Optimizer{Tv},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Tv}}
-) where{Tv<:Real}
-    # get index of variable
-    vidx = VarId(c.value)
-
-    # Check if variable exists in model
-    if haskey(m.inner.pbdata_raw.vars, vidx)
-        bt, lb, ub = get_var_bounds(m.inner, vidx)
-        return bt == TLP_FX
-    end
-
-    return false
+    v = MOI.VariableIndex(c.value)
+    MOI.is_valid(m, v) || return false
+    
+    return S ∈ m.var2bndtype[v]
 end
 
 function MOI.is_valid(
@@ -883,9 +800,11 @@ end
     # =============================================  
 function MOI.delete(
     m::Optimizer{Tv},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Tv}}
-) where{Tv<:Real}
+    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
+) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
     MOI.throw_if_not_valid(m, c)
+
+    v = MOI.VariableIndex(c.value)
 
     # Check if constraint had a name. If so, it will need to be deleted.
     name = MOI.get(m, MOI.ConstraintName(), c)
@@ -894,106 +813,38 @@ function MOI.delete(
     var = m.inner.pbdata_raw.vars[VarId(c.value)]
     bt, lb, ub = get_bounds(var)
 
-    if bt == TLP_UP
-        # Variable becomes free
-        set_bounds!(var, Tv(-Inf), Tv(Inf))
-
-    elseif bt == TLP_UL
-        # Variable becomes lower-bounded
+    # Update bounds
+    if S == MOI.LessThan{Tv}
+        # Remove upper-bound
         set_bounds!(var, lb, Tv(Inf))
-
-    else
-        error("Unexpected bound type with MOI.LessThan: $bt.")
-    end
-
-    # Delete bound constraint name
-    delete!(m.bnd2name, c)
-    if name != ""
-        delete!(m.name2bnd_LT, MOI.VariableIndex(c.value))
-    end
-
-    return nothing
-end
-
-function MOI.delete(
-    m::Optimizer{Tv},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Tv}}
-) where{Tv<:Real}
-    MOI.throw_if_not_valid(m, c)
-
-    # Check if constraint had a name. If so, it will need to be deleted.
-    name = MOI.get(m, MOI.ConstraintName(), c)
-
-    # Get bounds
-    var = m.inner.pbdata_raw.vars[VarId(c.value)]
-    bt, lb, ub = get_bounds(var)
-
-    if bt == TLP_LO
-        # Variable becomes free
-        set_bounds!(var, Tv(-Inf), Tv(Inf))
-
-    elseif bt == TLP_UP
-        # Variable becomes upper-bounded
+    elseif S == MOI.GreaterThan{Tv}
+        # Remove lower bound
         set_bounds!(var, Tv(-Inf), ub)
-
     else
-        error("Unexpected bound type with MOI.LessThan: $bt.")
+        # Set variable to free
+        set_bounds!(var, Tv(-Inf), Tv(Inf))
     end
 
     # Delete bound constraint name
     delete!(m.bnd2name, c)
     if name != ""
-        delete!(m.name2bnd_GT, MOI.VariableIndex(c.value))
+        if S == MOI.LessThan{Tv}
+            delete!(m.name2bnd_LT, v)
+
+        elseif S == MOI.GreaterThan{Tv}
+            delete!(m.name2bnd_GT, v)
+
+        elseif S == MOI.EqualTo{Tv}
+            delete!(m.name2bnd_ET, v)
+
+        elseif S == MOI.Interval{Tv}
+            delete!(m.name2bnd_IT, v)
+        end
+
     end
 
-    return nothing
-end
-
-function MOI.delete(
-    m::Optimizer{Tv},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{Tv}}
-) where{Tv<:Real}
-    MOI.throw_if_not_valid(m, c)
-
-    # Check if constraint had a name. If so, it will need to be deleted.
-    name = MOI.get(m, MOI.ConstraintName(), c)
-
-    # Get bounds
-    var = m.inner.pbdata_raw.vars[VarId(c.value)]
-    
-    # Variable becomes free
-    set_bounds!(var, Tv(-Inf), Tv(Inf))
-
-    # Delete bound constraint name
-    delete!(m.bnd2name, c)
-    if name != ""
-        delete!(m.name2bnd_ET, MOI.VariableIndex(c.value))
-    end
-
-    return nothing
-end
-
-function MOI.delete(
-    m::Optimizer{Tv},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{Tv}}
-) where{Tv<:Real}
-    MOI.throw_if_not_valid(m, c)
-
-    # Check if constraint had a name. If so, it will need to be deleted.
-    name = MOI.get(m, MOI.ConstraintName(), c)
-
-    # Get bounds
-    var = m.inner.pbdata_raw.vars[VarId(c.value)]
-    bt, lb, ub = get_bounds(var)
-
-    # Variable becomes free
-    set_bounds!(var, Tv(-Inf), Tv(Inf))
-
-    # Delete bound constraint name
-    delete!(m.bnd2name, c)
-    if name != ""
-        delete!(m.name2bnd_IT, MOI.VariableIndex(c.value))
-    end
+    # Delete tracking of bounds
+    delete!(m.var2bndtype[v], S)
 
     return nothing
 end
@@ -1028,6 +879,7 @@ function MOI.modify(
     )
     return nothing
 end
+
     # =============================================
     #   IV.4 Get/set constraint attributes
     # ============================================= 
@@ -1141,9 +993,9 @@ function MOI.get(
         # check bound
         bt, lb, ub = get_constr_bounds(m.inner, cidx)
 
-        if (bt == TLP_UP || bt == TLP_UL) && S == MOI.LessThan{Tv}
+        if bt == TLP_UP && S == MOI.LessThan{Tv}
             return MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}(cidx.uuid)
-        elseif (bt == TLP_LO || bt == TLP_UL) && S == MOI.GreaterThan{Tv}
+        elseif bt == TLP_LO && S == MOI.GreaterThan{Tv}
             return MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}(cidx.uuid)
         elseif bt == TLP_FX && S == MOI.EqualTo{Tv}
             return MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}(cidx.uuid)
@@ -1215,20 +1067,21 @@ function MOI.get(
 
     # Get variable index
     vidx = VarId(c.value)
+    v = MOI.VariableIndex(c.value)
 
     # Get variable bounds
     bt, lb, ub = get_var_bounds(m.inner, vidx)
     # Get index in standard form
     vind = m.inner.pbdata_std.var2idx[vidx]
 
-    if bt == TLP_UP
+    if (MOI.LessThan{Tv} ∈ m.var2bndtype[v]) && (MOI.GreaterThan{Tv} ∉ m.var2bndtype[v])
         # x_i <= u was transformed into -x_i >= -u
         # Therefore, we need to return -s_i
 
         # Get corresponding dual
         s = m.inner.solver.pt.s[vind] / m.inner.solver.pt.t
         return -s
-    elseif bt == TLP_UL
+    elseif (MOI.LessThan{Tv} ∈ m.var2bndtype[v]) && (MOI.GreaterThan{Tv} ∈ m.var2bndtype[v])
         # l <= x <= u
         # We need to return the index that corresponds to the upper-bound constraint
 
