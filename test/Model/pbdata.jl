@@ -42,9 +42,61 @@ function run_tests_pbdata(::Tv) where{Tv<:Real}
         @test_throws ErrorException TLP.add_constraint!(pb, c)
     end
 
-    @testset "Getters" begin
-        
+    @testset "Delete variables" begin
+        pb = TLP.ProblemData{Tv}()
+
+        # Add variable
+        vidx = TLP.new_variable_index!(pb)
+        vdat = TLP.VarData{Tv}("x", zero(Tv), zero(Tv), Tv(Inf))
+        v = TLP.Variable(vidx, vdat)
+        TLP.add_variable!(pb, v)
+
+        # Add one constraint
+        cidx = TLP.new_constraint_index!(pb)
+        cdat = TLP.LinConstrData{Tv}("c1", zero(Tv), zero(Tv))
+        c = TLP.LinearConstraint(cidx, cdat)
+        TLP.add_constraint!(pb, c)
+
+        TLP.set_coeff!(pb, vidx, cidx, oneunit(Tv))
+
+        # delete variable
+        TLP.delete_variable!(pb, vidx)
+
+        # Checks
+        @test length(pb.vars) == 0
+        @test length(pb.name2var) == 0
+        @test length(pb.var2con) == 0
+        @test !in(vidx, pb.con2var[cidx])
+        @test !haskey(pb.coeffs, (vidx, cidx))
     end
+
+    @testset "Delete constraint" begin
+    pb = TLP.ProblemData{Tv}()
+
+    # Add variable
+    vidx = TLP.new_variable_index!(pb)
+    vdat = TLP.VarData{Tv}("x", zero(Tv), zero(Tv), Tv(Inf))
+    v = TLP.Variable(vidx, vdat)
+    TLP.add_variable!(pb, v)
+
+    # Add one constraint
+    cidx = TLP.new_constraint_index!(pb)
+    cdat = TLP.LinConstrData{Tv}("c1", zero(Tv), zero(Tv))
+    c = TLP.LinearConstraint(cidx, cdat)
+    TLP.add_constraint!(pb, c)
+
+    TLP.set_coeff!(pb, vidx, cidx, oneunit(Tv))
+
+    # delete constraint
+    TLP.delete_constraint!(pb, cidx)
+
+    # Checks
+    @test length(pb.constrs) == 0
+    @test length(pb.name2con) == 0
+    @test length(pb.con2var) == 0
+    @test !in(cidx, pb.var2con[vidx])
+    @test !haskey(pb.coeffs, (vidx, cidx))
+end
 
 end
 

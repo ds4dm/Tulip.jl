@@ -46,10 +46,12 @@ function run_tests_hsd(::Tv) where{Tv<:Real}
         ])
         b = Vector{Tv}([1.0, 0.0])
         c = Vector{Tv}([1.0, -1.0])
+        c0 = zero(Tv)
         uind = [1, 2]
         uval = Vector{Tv}([2.0, 2.0])
 
-        hsd = TLP.HSDSolver{Tv}(m, n, p, A, b, c, uind, uval)
+
+        hsd = TLP.HSDSolver{Tv}(m, n, p, A, b, c, c0, uind, uval)
 
         # Primal-dual optimal solution
         # x1 = x2 = 0.5; w1 = w2 = 1.5; t = 1
@@ -65,8 +67,8 @@ function run_tests_hsd(::Tv) where{Tv<:Real}
             zero(Tv), zero(Tv), zero(Tv), zero(Tv)
         )
 
-        @inferred TLP.compute_residuals!(hsd, res, pt, A, b, c, uind, uval)
-        TLP.compute_residuals!(hsd, res, pt, A, b, c, uind, uval)
+        @inferred TLP.compute_residuals!(hsd, res, pt, A, b, c, c0, uind, uval)
+        TLP.compute_residuals!(hsd, res, pt, A, b, c, c0, uind, uval)
         
         @test res.rp_nrm == zero(Tv)
         @test res.ru_nrm == zero(Tv)
@@ -92,10 +94,11 @@ function run_tests_hsd(::Tv) where{Tv<:Real}
         ])
         b = Vector{Tv}([1.0, 0.0])
         c = Vector{Tv}([1.0, -1.0])
+        c0 = zero(Tv)
         uind = [1, 2]
         uval = Vector{Tv}([2.0, 2.0])
 
-        hsd = TLP.HSDSolver{Tv}(m, n, p, A, b, c, uind, uval)
+        hsd = TLP.HSDSolver{Tv}(m, n, p, A, b, c, c0, uind, uval)
 
         # Primal-dual optimal solution
         # x1 = x2 = 0.5; w1 = w2 = 1.5; t = 1
@@ -110,10 +113,10 @@ function run_tests_hsd(::Tv) where{Tv<:Real}
             zeros(Tv, m), zeros(Tv, p), zeros(Tv, n), zero(Tv),
             zero(Tv), zero(Tv), zero(Tv), zero(Tv)
         )
-        TLP.compute_residuals!(hsd, res, pt, A, b, c, uind, uval)
+        TLP.compute_residuals!(hsd, res, pt, A, b, c, c0, uind, uval)
 
         hsd.solver_status = TLP.Trm_Unknown
-        TLP.update_solver_status!(hsd, pt, res, A, b, c, uind, uval,
+        TLP.update_solver_status!(hsd, pt, res, A, b, c, c0, uind, uval,
             Tv(1e-8), Tv(1e-8), Tv(1e-8), Tv(1e-8)
         )
         @test hsd.solver_status == TLP.Trm_Optimal

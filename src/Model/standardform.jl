@@ -20,9 +20,12 @@ mutable struct StandardForm{Tv<:Real}
     nvar::Int  # Number of variables
     nupb::Int  # Number of upper-bounded variables
 
+    obj_sense::ObjSense
+
     A::AbstractMatrix{Tv}  # Constraint matrix
     b::Vector{Tv}          # Right-hand side
     c::Vector{Tv}          # Objective
+    c0::Tv  # Constant objective offset
     uind::Vector{Int}      # Indices of upper-bounded variables
     uval::Vector{Tv}       # Finite upper bounds on variables
 
@@ -49,6 +52,9 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
 
     m0 = get_num_constr(pb)  # number of original variables
     n0 = get_num_var(pb)  # number of original constraints
+
+    obj_sense = pb.obj_sense
+    c0 = pb.obj_const
 
     # Keep track of indices
     con2idx = Dict{ConstrId, Int}()
@@ -116,6 +122,9 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
             push!(uind, vind)
             push!(uval, zero(Tv))
 
+            # Update objective constant term
+            c0 += var.dat.obj * var.dat.lb
+
             for cidx in pb.var2con[vidx]
                 # add coeffs to A
                 v = pb.coeffs[vidx, cidx]
@@ -125,7 +134,7 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
                 push!(aJ, vind)
                 push!(aV, v)
 
-                # Update riht-hand side
+                # Update right-hand side
                 b[cind] -= v * var.dat.lb
             end
             
@@ -138,7 +147,12 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
             push!(c, -var.dat.obj)
             var2idx[vidx] = nvars
             push!(idx2var, vidx)
-    
+
+            # Update objective constant
+            # Here we create a variable ``x' >= 0`` such that ``x = u - x'``
+            # Objective becomes c*x = c*u - c*x'
+            c0 += var.dat.obj * var.dat.ub
+
             vind = nvars
             for cidx in pb.var2con[vidx]
                 # add coeffs to A
@@ -158,11 +172,15 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
             # Lower-bounded variable x >= l
 
             # Shift right-hand side
+            # I.e., write x = l + x', x' >= 0
             nvars += 1
             push!(c, var.dat.obj)
             var2idx[vidx] = nvars
             push!(idx2var, vidx)
             vind = nvars
+
+            # Update objective constant term
+            c0 += var.dat.obj * var.dat.lb
 
             for cidx in pb.var2con[vidx]
                 # add coeffs to A
@@ -215,6 +233,10 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
             var2idx[vidx] = nvars
             push!(idx2var, vidx)
             vind = nvars
+
+            # Update objective offset
+            # x = l + x', 0 <= x' <= (u-b)
+            c0 += var.dat.obj * var.dat.lb
 
             for cidx in pb.var2con[vidx]
                 # add coeffs to A
@@ -305,10 +327,16 @@ function convert_to_standard_form(Ta::Type, pb::ProblemData{Tv}) where {Tv<:Real
     # Done.
     A = construct_matrix(Ta, ncons, nvars, aI, aJ, aV)
 
+    # If maximize, negate objective
+    if obj_sense == TLP_MAX
+        c .*= -oneunit(Tv)
+        c0 = -c0
+    end
+    
     # return ncons, nvars, aI, aJ, aV, b, c, uind, uval, con2idx, var2idx, idx2con, idx2var
     return StandardForm(
-        ncons, nvars, length(uind),
-        A, b, c, uind, uval,
+        ncons, nvars, length(uind), obj_sense,
+        A, b, c, c0, uind, uval,
         con2idx, var2idx, idx2var, idx2con
     )
 end

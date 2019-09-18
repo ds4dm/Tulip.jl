@@ -14,6 +14,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     A::AbstractMatrix{Tv}  # Constraint matrix
     b::Vector{Tv}  # Right-hand side
     c::Vector{Tv}  # Objective coefficients
+    c0::Tv  # Objective offset
     uind::Vector{Int}  # Indices of upper-bounded variables
     uval::Vector{Tv}   # Upper-bounds on variables
 
@@ -44,7 +45,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
 
     # TODO: Constructor
     function HSDSolver{Tv}(ncon::Int, nvar::Int, nupb::Int,
-        A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv},
+        A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv}, c0::Tv,
         uind::Vector{Int}, uval::Vector{Tv}
     ) where{Tv<:Real}
         hsd = new{Tv}()
@@ -55,6 +56,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         hsd.A = A
         hsd.b = b
         hsd.c = c
+        hsd.c0 = c0
         hsd.uind = uind
         hsd.uval = uval
 
@@ -100,7 +102,7 @@ In-place computation of primal-dual residuals at point `pt`.
 function compute_residuals!(
     hsd::HSDSolver{Tv},
     res::Residuals{Tv}, pt::Point{Tv},
-    A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv},
+    A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv}, c0::Tv,
     uind::Vector{Int}, uval::Vector{Tv}
 ) where{Tv<:Real}
 
@@ -135,9 +137,9 @@ function compute_residuals!(
     res.rg_nrm = norm(res.rg, Inf)
 
     # Compute primal and dual bounds
-    hsd.primal_bound_unscaled = dot(c, pt.x)
+    hsd.primal_bound_unscaled = dot(c, pt.x) + pt.t * c0
     hsd.primal_bound_scaled   = hsd.primal_bound_unscaled / pt.t
-    hsd.dual_bound_unscaled   = dot(b, pt.y) - dot(uval, pt.z)
+    hsd.dual_bound_unscaled   = dot(b, pt.y) - dot(uval, pt.z) + pt.t * c0
     hsd.dual_bound_scaled     = hsd.dual_bound_unscaled / pt.t
 
     return nothing
@@ -152,10 +154,26 @@ Update status and return true if solver should stop.
 function update_solver_status!(
     hsd::HSDSolver{Tv},
     pt::Point{Tv}, res::Residuals{Tv},
-    A, b, c, uind, uval,
+    A, b, c, c0, uind, uval,
     ϵp, ϵd, ϵg, ϵi
 ) where{Tv<:Real}
     hsd.solver_status = TerminationStatus(0)
+
+    # Check for feasibility
+    if (
+        res.rp_nrm     <= ϵp * pt.t * (oneunit(Tv) + norm(b, Inf))
+        && res.ru_nrm  <= ϵp * pt.t * (oneunit(Tv) + norm(uval, Inf))
+    )
+        hsd.primal_status = Sln_FeasiblePoint
+    else
+        hsd.primal_status = Sln_InfeasiblePoint
+    end
+
+    if res.rd_nrm <= ϵd * pt.t * (oneunit(Tv) + norm(c, Inf))
+        hsd.dual_status = Sln_FeasiblePoint
+    else
+        hsd.dual_status = Sln_InfeasiblePoint
+    end
     
     # Check for optimal solution
     if (
@@ -165,6 +183,8 @@ function update_solver_status!(
         && (abs(hsd.primal_bound_unscaled - hsd.dual_bound_unscaled) / (pt.t + abs(hsd.dual_bound_unscaled))) <= ϵg
     )
         # Optimality reached
+        hsd.primal_status = Sln_Optimal
+        hsd.dual_status   = Sln_Optimal
         hsd.solver_status = TerminationStatus(1)
         return nothing
     end
@@ -174,11 +194,13 @@ function update_solver_status!(
         # Check for primal or dual infeasibility
         if dot(c, pt.x) < -ϵi
             # Dual infeasible
+            hsd.primal_status = Sln_InfeasibilityCertificate
             hsd.solver_status = TerminationStatus(3)
             return nothing
         
         elseif (-dot(b, pt.y) - dot(uval, pt.z)) < -ϵi
             # Primal infeasible
+            hsd.dual_status = Sln_InfeasibilityCertificate
             hsd.solver_status = TerminationStatus(2)
             return nothing
         else
@@ -239,7 +261,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
         compute_residuals!(
             hsd,
             hsd.res, hsd.pt,
-            hsd.A, hsd.b, hsd.c, hsd.uind, hsd.uval
+            hsd.A, hsd.b, hsd.c, hsd.c0, hsd.uind, hsd.uval
         )
 
         update_mu!(hsd.pt)
@@ -252,8 +274,8 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
             @printf "%4d" hsd.niter
             
             # Objectives
-            @printf "  %+16.7e" dot(hsd.c, hsd.pt.x) / hsd.pt.t
-            @printf "%+16.7e" (dot(hsd.b, hsd.pt.y) - dot(hsd.uval, hsd.pt.z)) / hsd.pt.t
+            @printf "  %+16.7e" dot(hsd.c, hsd.pt.x) / hsd.pt.t + hsd.c0
+            @printf "%+16.7e" (dot(hsd.b, hsd.pt.y) - dot(hsd.uval, hsd.pt.z)) / hsd.pt.t + hsd.c0
             
             # Residuals
             @printf " %9.2e" max(hsd.res.rp_nrm, hsd.res.ru_nrm)
@@ -276,7 +298,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
         # we want to report optimal, not user limits)
         update_solver_status!(
             hsd, hsd.pt, hsd.res,
-            hsd.A, hsd.b, hsd.c, hsd.uind, hsd.uval,
+            hsd.A, hsd.b, hsd.c, hsd.c0, hsd.uind, hsd.uval,
             env.barrier_tol_pfeas,
             env.barrier_tol_dfeas,
             env.barrier_tol_conv,

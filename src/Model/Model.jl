@@ -1,6 +1,18 @@
 import DataStructures:
     OrderedSet, OrderedDict
 
+"""
+    ObjSense
+
+"""
+@enum ObjSense begin
+    TLP_MIN  # Minimize
+    TLP_MAX  # Maximize
+end
+
+import Base.*
+*(s::ObjSense, x::Real) = (s == TLP_MIN) ? x : -x
+
 include("./constraint.jl")
 include("./variable.jl")
 
@@ -46,28 +58,37 @@ function empty!(m::Model{Tv}) where{Tv<:Real}
     return m
 end
 
+function is_empty(m::Model)
+    res = (
+        length(m.pbdata_raw.vars) == 0
+        && length(m.pbdata_raw.constrs) == 0
+        && length(m.pbdata_raw.coeffs) == 0
+    )
+    
+    return res
+end
+
 include("API/api.jl")
 
 function optimize!(m::Model{Tv}) where{Tv<:Real}
 
-    if isa(m.pbdata_std, Nothing)
-        # convert to standard form
-        sf = convert_to_standard_form(m.env.matrix_type, m.pbdata_raw)
-        m.pbdata_std = sf
-    end
+    # Convert to standard form
+    # TODO: only re-compute what is necessary
+    sf = convert_to_standard_form(m.env.matrix_type, m.pbdata_raw)
+    m.pbdata_std = sf
 
-    if isa(m.solver, Nothing)
-        # Instantiate HSD solver
-        hsd = HSDSolver{Tv}(
-            m.pbdata_std.ncon, m.pbdata_std.nvar, m.pbdata_std.nupb,
-            m.pbdata_std.A, m.pbdata_std.b, m.pbdata_std.c,
-            m.pbdata_std.uind, m.pbdata_std.uval
-        )
-        m.solver = hsd
-    end
+    # Instantiate HSD solver
+    # TODO: only re-compute what is necessary`
+    hsd = HSDSolver{Tv}(
+        m.pbdata_std.ncon, m.pbdata_std.nvar, m.pbdata_std.nupb,
+        m.pbdata_std.A, m.pbdata_std.b, m.pbdata_std.c, m.pbdata_std.c0,
+        m.pbdata_std.uind, m.pbdata_std.uval
+    )
+    m.solver = hsd
 
     # Solve problem
-    # TODO: un-crunch solution after optimization
     optimize!(m.solver, m.env)
+
+    # TODO: post-crush solution
     return m.solver.solver_status
 end

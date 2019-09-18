@@ -20,4 +20,7 @@ include("./Solvers/Solvers.jl")
 include("./Model/Model.jl")
 include("./Utils/readmps.jl")
 
+# MOI interface
+include("./MOI_wrapper.jl")
+
 end # module
