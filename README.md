@@ -9,6 +9,8 @@ It uses a standard Primal-Dual Predictor-Corrector algorithm to solve Linear Pro
 
 [![codecov.io](http://codecov.io/github/ds4dm/Tulip.jl/coverage.svg?branch=master)](http://codecov.io/github/ds4dm/Tulip.jl?branch=master)
 
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://ds4dm.github.io/Tulip.jl/dev/)
+
 # Overview
 
 Tulip solves LPs of the form:
