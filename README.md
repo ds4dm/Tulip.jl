@@ -7,8 +7,6 @@ It uses a standard Primal-Dual Predictor-Corrector algorithm to solve Linear Pro
 
 [![Build Status](https://travis-ci.org/ds4dm/Tulip.jl.svg?branch=master)](https://travis-ci.org/ds4dm/Tulip.jl)
 
-[![Coverage Status](https://coveralls.io/repos/ds4dm/Tulip.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/ds4dm/Tulip.jl?branch=master)
-
 [![codecov.io](http://codecov.io/github/ds4dm/Tulip.jl/coverage.svg?branch=master)](http://codecov.io/github/ds4dm/Tulip.jl?branch=master)
 
 # Overview
