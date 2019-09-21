@@ -1,17 +1,17 @@
-
-
 # Tulip
 
-Tulip is an Interior-Point solver  written entirely in Julia.
-It uses a standard Primal-Dual Predictor-Corrector algorithm to solve Linear Programs (LPs).
+| **Documentation** | **Build Status** | **Coverage** |
+|:-----------------:|:----------------:|:----------:|
+| [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://ds4dm.github.io/Tulip.jl/dev/) | [![Build Status](https://travis-ci.org/ds4dm/Tulip.jl.svg?branch=master)](https://travis-ci.org/ds4dm/Tulip.jl) | [![codecov.io](https://codecov.io/github/ds4dm/Tulip.jl/coverage.svg?branch=master)](http://codecov.io/github/ds4dm/Tulip.jl?branch=master)
 
-[![Build Status](https://travis-ci.org/ds4dm/Tulip.jl.svg?branch=master)](https://travis-ci.org/ds4dm/Tulip.jl)
 
-[![codecov.io](http://codecov.io/github/ds4dm/Tulip.jl/coverage.svg?branch=master)](http://codecov.io/github/ds4dm/Tulip.jl?branch=master)
+## Overview
+Tulip is an open-source interior-point solver for linear optimization, written in pure Julia.
+It implements the homogeneous primal-dual interior-point algorithm with multiple centrality corrections, and therefore handles unbounded and infeasible problems.
+Tulip’s main feature is that its algorithmic framework is disentangled from linear algebra implementations.
+This allows to seamlessly integrate specialized routines for structured problems.
 
-[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://ds4dm.github.io/Tulip.jl/dev/)
-
-# Overview
+## Usage
 
 Tulip solves LPs of the form:
 
