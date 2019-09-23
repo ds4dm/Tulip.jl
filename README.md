@@ -51,3 +51,19 @@ model = Tulip.Optimizer{Float64}()   # Create a model in Float64 precision
 model = Tulip.Optimizer()            # Defaults to the above call
 model = Tulip.Optimizer{BigFloat}()  # Create a model in BigFloat precision
 ```
+
+## Citing `Tulip.jl`
+
+If you use Tulip in your work, we kindly ask that you cite the following reference.
+The PDF is freely available [here](https://www.gerad.ca/fr/papers/G-2019-36/view), and serves as a user manual for advanced users.
+
+```
+@TechReport{Tulip.jl,
+    title = {{Tulip}.jl: an open-source interior-point linear optimization
+    solver with abstract linear algebra},
+    url = {https://www.gerad.ca/fr/papers/G-2019-36},
+    Journal = {Les Cahiers du Gerad},
+    Author = {Anjos, Miguel F. and Lodi, Andrea and Tanneau, Mathieu},
+    year = {2019}
+}
+```
