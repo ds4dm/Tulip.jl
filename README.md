@@ -11,6 +11,14 @@ It implements the homogeneous primal-dual interior-point algorithm with multiple
 Tulip’s main feature is that its algorithmic framework is disentangled from linear algebra implementations.
 This allows to seamlessly integrate specialized routines for structured problems.
 
+## Installation
+
+Just install like any Julia package
+
+```julia
+] add Tulip
+```
+
 ## Usage
 
 Tulip solves LPs of the form:
