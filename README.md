@@ -21,19 +21,33 @@ Just install like any Julia package
 
 ## Usage
 
-Tulip solves LPs of the form:
+The recommended way of using Tulip is through [JuMP](https://github.com/JuliaOpt/JuMP.jl) and/or [MathOptInterface](https://github.com/JuliaOpt/MathOptInterface.jl) (MOI).
 
-$$
-    \begin{array}{rrl}
-    (P) \ \ \ 
-    \displaystyle \min_{x} & c^{T}x\\
-    s.t.
-    & Ax &=b\\
-    & x & \leq u\\
-    & x & \geq 0\\
-    \end{array}
-$$
-where $x, c, u \in \mathbb{R}^{n}$, $A \in \mathbb{R}^{m \times n}$ and $b \in \mathbb{R}^{m}$.
-Some $u_{i}$ may may take infinite value, i.e., the corresponding variable $x_{i}$ has no upper bound.
+The low-level interface is still under development and will change in the future.
+The user-exposed MOI interface is more stable.
 
-It uses a primal-dual predictor-corrector interior point.
+### Using with JuMP
+Tulip follows the syntax convention `PackageName.Optimizer`:
+
+```julia
+using JuMP
+import Tulip
+
+model = Model(with_optimizer(Tulip.Optimizer))
+```
+
+### Using with MOI
+
+The type `Tulip.Optimizer` is parametrized by the type of numerical data.
+This allows to solve problem in higher numerical precision.
+See the documentation for more details.
+
+```julia
+import MathOptInterface
+MOI = MathOptInterface
+import Tulip
+
+model = Tulip.Optimizer{Float64}()   # Create a model in Float64 precision
+model = Tulip.Optimizer()            # Defaults to the above call
+model = Tulip.Optimizer{BigFloat}()  # Create a model in BigFloat precision
+```
