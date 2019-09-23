@@ -4,22 +4,27 @@ CurrentModule = Tulip
 
 # Tulip.jl
 
-```@contents
-```
+
+## Overview
+
+Tulip is an open-source interior-point solver for linear programming.
+
 
 ## Installation
 
-As of now, `Tulip.jl` is still un-registered, so to install it simply do
+Tulip is 100% Julia, so install it just like any Julia package:
 ```julia
-]
-add https://github.com/ds4dm/Tulip.jl
+julia> ]
+pkg> add Tulip
 ```
 
-## Basic usage
+No additional building step is required.
 
-Coming soon.
 
 ## Citing `Tulip.jl`
+
+If you use Tulip in your work, we kindly ask that you cite the following reference.
+The PDF is freely available [here](https://www.gerad.ca/fr/papers/G-2019-36/view), and serves as a user manual for advanced users.
 
 ```
 @TechReport{Tulip.jl,
