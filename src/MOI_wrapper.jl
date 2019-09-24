@@ -95,7 +95,7 @@ mutable struct Optimizer{Tv<:Real} <: MOI.AbstractOptimizer
     var2bndtype::Dict{MOI.VariableIndex, Set{Type{<:MOI.AbstractScalarSet}}}
 
     function Optimizer{Tv}() where{Tv<:Real}
-        return new{Tv}(
+        m = new{Tv}(
             Model{Tv}(), false,
             Dict{MOI.ConstraintIndex{MOI.SingleVariable, <:SCALAR_SETS{Tv}}, String}(),
             Dict{String, MOI.VariableIndex}(),
@@ -104,6 +104,12 @@ mutable struct Optimizer{Tv<:Real} <: MOI.AbstractOptimizer
             Dict{String, MOI.VariableIndex}(),
             Dict{MOI.VariableIndex, Set{Type{<:MOI.AbstractScalarSet}}}()
         )
+
+        if Tv != Float64
+            m.inner.env.matrix_type = Matrix
+        end
+
+        return m
     end
 end
 
