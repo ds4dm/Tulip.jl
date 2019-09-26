@@ -231,7 +231,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
         hsd.F = symbolic_cholesky(hsd.A)
     catch err
 
-        if isa(err, PosDefException)
+        if isa(err, PosDefException) || isa(err, SingularException)
             # Numerical trouble while computing the factorization
             hsd.solver_status = Trm_NumericalProblem
 
@@ -348,7 +348,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
             compute_step!(hsd, env)
         catch err
 
-            if isa(err, PosDefException)
+            if isa(err, PosDefException) || isa(err, SingularException)
                 # Numerical trouble while computing the factorization
                 hsd.solver_status = Trm_NumericalProblem
     
