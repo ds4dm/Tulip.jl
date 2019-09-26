@@ -227,7 +227,28 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
     hsd.niter = 0
 
     # TODO: allocate space for factorization
-    hsd.F = symbolic_cholesky(hsd.A)
+    try
+        hsd.F = symbolic_cholesky(hsd.A)
+    catch err
+
+        if isa(err, PosDefException)
+            # Numerical trouble while computing the factorization
+            hsd.solver_status = Trm_NumericalProblem
+
+        elseif isa(err, OutOfMemoryError)
+            # Out of memory
+            hsd.solver_status = Trm_MemoryLimit
+
+        elseif isa(err, InterruptException)
+            hsd.solver_status = Trm_Unknown
+        else
+            # Unknown error: rethrow
+            rethrow(err)
+        end
+
+        env.verbose == 1 && println("Solver exited with status $((hsd.solver_status))")
+        return nothing
+    end
 
     # IPM LOG
     if env.verbose != 0
@@ -323,7 +344,27 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
         # TODO: step
         # For now, include the factorization in the step function
         # Q: should we use more arguments here?
-        compute_step!(hsd, env)
+        try
+            compute_step!(hsd, env)
+        catch err
+
+            if isa(err, PosDefException)
+                # Numerical trouble while computing the factorization
+                hsd.solver_status = Trm_NumericalProblem
+    
+            elseif isa(err, OutOfMemoryError)
+                # Out of memory
+                hsd.solver_status = Trm_MemoryLimit
+
+            elseif isa(err, InterruptException)
+                hsd.solver_status = Trm_Unknown
+            else
+                # Unknown error: rethrow
+                rethrow(err)
+            end
+
+            break
+        end
 
         hsd.niter += 1
 
