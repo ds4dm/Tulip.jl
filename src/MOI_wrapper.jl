@@ -139,9 +139,10 @@ end
     #   I.1 Supported attributes
     # =============================================
 SUPPORTED_OPTIMIZER_ATTR = Union{
+    MOI.NumberOfThreads,
     MOI.SolverName,
     MOI.Silent,
-    MOI.TimeLimitSec
+    MOI.TimeLimitSec,
 }
 
 MOI.supports(::Optimizer, ::A) where{A<:SUPPORTED_OPTIMIZER_ATTR} = true
@@ -149,6 +150,16 @@ MOI.supports(::Optimizer, ::A) where{A<:SUPPORTED_OPTIMIZER_ATTR} = true
     # =============================================
     #   I.2 Get/set optimizer attributes
     # =============================================
+
+# =============================================
+#   NumberOfThreads
+# =============================================
+MOI.get(m::Optimizer, ::MOI.NumberOfThreads) = m.inner.env.threads
+
+function MOI.set(m::Optimizer, ::MOI.NumberOfThreads, n::Int)
+    m.inner.env.threads = n
+    return nothing
+end
 
 # =============================================
 #   SolverName
