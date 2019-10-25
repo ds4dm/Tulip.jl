@@ -1,5 +1,7 @@
-const MOI = Tulip.MOI
+using Test, MathOptInterface
+const MOI = MathOptInterface
 const MOIT = MOI.Test
+const MOIU = MOI.Utilities
 
 const OPTIMIZER = TLP.Optimizer()
 
@@ -7,6 +9,9 @@ const CONFIG = MOIT.TestConfig(basis=false, atol=1e-6, rtol=1e-6)
 
 const MOI_EXCLUDE = [
     # Unit tests
+    "delete_nonnegative_variables",         # Requires Vector-Of-Variables
+    "update_dimension_nonnegative_variables",
+    "delete_soc_variables",
     "solve_integer_edge_cases",             # Requires integer variables
     "solve_qcp_edge_cases",                 # Requires quadratic constraints
     "solve_qp_edge_cases",                  # Requires quadratic objective
