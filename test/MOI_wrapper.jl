@@ -48,3 +48,24 @@ end
 @testset "MOI Linear tests" begin
     MOIT.contlineartest(OPTIMIZER, CONFIG, MOI_EXCLUDE)
 end
+
+MOI.empty!(OPTIMIZER)
+const BRIDGED = MOI.Bridges.full_bridge_optimizer(OPTIMIZER, Float64)
+MOI.set(BRIDGED, MOI.Silent(), true)
+
+@testset "Bridged tests" begin
+    MOIT.unittest(BRIDGED, CONFIG, [
+        "delete_soc_variables",                 # Requires SOC constraints
+        "solve_integer_edge_cases",             # Requires integer variables
+        "solve_qcp_edge_cases",                 # Requires quadratic constraints
+        "solve_qp_edge_cases",                  # Requires quadratic objective
+        "solve_zero_one_with_bounds_1",         # Requires binary variables
+        "solve_zero_one_with_bounds_2",         # Requires binary variables
+        "solve_zero_one_with_bounds_3",         # Requires binary variables
+        "solve_objbound_edge_cases",            # Requires integer variables
+        "variablenames",                        # TODO, requires to settle the convention on variable names
+        "raw_status_string",                    # TODO
+        "solve_time",                           # TODO
+    ])
+    MOIT.contlineartest(BRIDGED, CONFIG, ["partial_start"])
+end
