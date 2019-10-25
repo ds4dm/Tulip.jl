@@ -1,7 +1,5 @@
 import Tulip: HSDSolver, optimize!
 
-using Random
-
 function run_tests_hsd(::Tv) where{Tv<:Real}
     @testset "step length" begin
         m, n, p = 2, 2, 1
