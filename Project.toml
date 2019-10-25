@@ -1,7 +1,7 @@
 name = "Tulip"
 uuid = "6dd1b50a-3aae-11e9-10b5-ef983d2400fa"
 authors = ["Mathieu Tanneau <mathieu.tanneau@gmail.com>"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
@@ -12,7 +12,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-MathOptInterface = "~0.9"
+MathOptInterface = "~0.9.5"
 julia = "1"
 
 [extras]
