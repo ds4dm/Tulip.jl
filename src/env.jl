@@ -34,6 +34,7 @@ mutable struct Env{Tv<:Real}
     =======================================================#
 
     verbose::Int           # 0 means no output, 1 means normal
+    threads::Int           # Number of threads. Should be > 0
     
     # create environment with default values
     # user can over-ride these values afterwards
@@ -44,6 +45,7 @@ mutable struct Env{Tv<:Real}
         env.matrix_type = SparseMatrixCSC
         
         env.verbose = 0
+        env.threads = 1
         env.barrier_iter_max = 100
         env.time_limit = Inf
 

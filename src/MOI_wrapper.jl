@@ -139,9 +139,10 @@ end
     #   I.1 Supported attributes
     # =============================================
 SUPPORTED_OPTIMIZER_ATTR = Union{
+    MOI.NumberOfThreads,
     MOI.SolverName,
     MOI.Silent,
-    MOI.TimeLimitSec
+    MOI.TimeLimitSec,
 }
 
 MOI.supports(::Optimizer, ::A) where{A<:SUPPORTED_OPTIMIZER_ATTR} = true
@@ -149,6 +150,16 @@ MOI.supports(::Optimizer, ::A) where{A<:SUPPORTED_OPTIMIZER_ATTR} = true
     # =============================================
     #   I.2 Get/set optimizer attributes
     # =============================================
+
+# =============================================
+#   NumberOfThreads
+# =============================================
+MOI.get(m::Optimizer, ::MOI.NumberOfThreads) = m.inner.env.threads
+
+function MOI.set(m::Optimizer, ::MOI.NumberOfThreads, n::Int)
+    m.inner.env.threads = n
+    return nothing
+end
 
 # =============================================
 #   SolverName
@@ -342,7 +353,9 @@ MOI.get(
 # =============================================
 #   ObjectiveValue
 # =============================================
-function MOI.get(m::Optimizer{Tv}, ::MOI.ObjectiveValue) where{Tv<:Real}
+function MOI.get(m::Optimizer{Tv}, attr::MOI.ObjectiveValue) where{Tv<:Real}
+    MOI.check_result_index_bounds(m, attr)
+
     # TODO: dispatch a function call on m.inner
     if m.inner.pbdata_raw.obj_sense == TLP_MIN
         return m.inner.solver.primal_bound_scaled
@@ -354,7 +367,9 @@ end
 # =============================================
 #   DualObjectiveValue
 # =============================================
-function MOI.get(m::Optimizer{Tv}, ::MOI.DualObjectiveValue) where{Tv<:Real}
+function MOI.get(m::Optimizer{Tv}, attr::MOI.DualObjectiveValue) where{Tv<:Real}
+    MOI.check_result_index_bounds(m, attr)
+    
     # TODO: dispatch a function call on m.inner
     if m.inner.pbdata_raw.obj_sense == TLP_MIN
         return m.inner.solver.dual_bound_scaled
@@ -397,7 +412,18 @@ MOI.get(m::Optimizer, ::MOI.RawSolver) = m.inner
 # =============================================
 #   ResultCount
 # =============================================
-MOI.get(::Optimizer, ::MOI.ResultCount) = 1
+function MOI.get(m::Optimizer, ::MOI.ResultCount)
+    st = MOI.get(m, MOI.TerminationStatus())
+
+    if (
+        st == MOI.OPTIMIZE_NOT_CALLED
+        || st == MOI.OTHER_ERROR
+        || st == MOI.MEMORY_LIMIT
+    )
+        return 0
+    end
+    return 1
+end
 
 # =============================================
 #   TerminationStatus
@@ -414,12 +440,20 @@ end
 # =============================================
 #   PrimalStatus
 # =============================================
-MOI.get(m::Optimizer, ::MOI.PrimalStatus) = MOISolutionStatus(m.inner.solver.primal_status)
+function MOI.get(m::Optimizer, attr::MOI.PrimalStatus)
+    attr.N == 1 || return MOI.NO_SOLUTION
+
+    return MOISolutionStatus(m.inner.solver.primal_status)
+end
 
 # =============================================
 #   DualStatus
 # =============================================
-MOI.get(m::Optimizer, ::MOI.DualStatus) = MOISolutionStatus(m.inner.solver.dual_status)
+function MOI.get(m::Optimizer, attr::MOI.DualStatus)
+    attr.N == 1 || return MOI.NO_SOLUTION
+    
+    return MOISolutionStatus(m.inner.solver.dual_status)
+end
 
 
 # ==============================================================================
@@ -539,9 +573,14 @@ end
 #   VariablePrimal
 # =============================================
 function MOI.get(
-    m::Optimizer{Tv}, ::MOI.VariablePrimal, x::MOI.VariableIndex
+    m::Optimizer{Tv}, attr::MOI.VariablePrimal,
+    x::MOI.VariableIndex
 ) where{Tv<:Real}
-    MOI.is_valid(m, x) || throw(MOI.InvalidIndex(x))
+    MOI.throw_if_not_valid(m, x)
+
+    # Check result index
+    MOI.check_result_index_bounds(m, attr)
+
     return get_value(m.inner, VarId(x.value))
 end
 
@@ -1041,18 +1080,24 @@ end
 #   ConstraintPrimal
 # ============================================= 
 function MOI.get(
-    m::Optimizer{Tv}, ::MOI.ConstraintPrimal,
+    m::Optimizer{Tv}, attr::MOI.ConstraintPrimal,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S}
 ) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
     MOI.throw_if_not_valid(m, c)
+
+    # Check result index
+    MOI.check_result_index_bounds(m, attr)
 
     return MOI.get(m, MOI.VariablePrimal(), MOI.VariableIndex(c.value))
 end
 
 function MOI.get(
-    m::Optimizer{Tv}, ::MOI.ConstraintPrimal,
+    m::Optimizer{Tv}, attr::MOI.ConstraintPrimal,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}
 ) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
+    MOI.throw_if_not_valid(m, c)
+    MOI.check_result_index_bounds(m, attr)
+
     return MOI.Utilities.get_fallback(m, MOI.ConstraintPrimal(), c)
 end
 
@@ -1060,10 +1105,11 @@ end
 #   ConstraintDual
 # =============================================
 function MOI.get(
-    m::Optimizer{Tv}, ::MOI.ConstraintDual,
+    m::Optimizer{Tv}, attr::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{Tv}}
 ) where{Tv<:Real}
     MOI.throw_if_not_valid(m, c)  # Sanity check
+    MOI.check_result_index_bounds(m, attr)
 
     # Get variable index
     vidx = VarId(c.value)
@@ -1099,10 +1145,11 @@ function MOI.get(
 end
 
 function MOI.get(
-    m::Optimizer{Tv}, ::MOI.ConstraintDual,
+    m::Optimizer{Tv}, attr::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{Tv}}
 ) where{Tv<:Real}
     MOI.throw_if_not_valid(m, c)  # Sanity check
+    MOI.check_result_index_bounds(m, attr)
 
     # Get variable index
     vidx = VarId(c.value)
@@ -1116,10 +1163,11 @@ function MOI.get(
 end
 
 function MOI.get(
-    m::Optimizer{Tv}, ::MOI.ConstraintDual,
+    m::Optimizer{Tv}, attr::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.SingleVariable, S}
 ) where{Tv<:Real, S<:Union{MOI.EqualTo{Tv}, MOI.Interval{Tv}}}
     MOI.throw_if_not_valid(m, c)  # Sanity check
+    MOI.check_result_index_bounds(m, attr)
 
     # Constraint is l <= x <= u
     # The corresponding dual is s_l - s_u
@@ -1147,10 +1195,11 @@ function MOI.get(
 end
 
 function MOI.get(
-    m::Optimizer{Tv}, ::MOI.ConstraintDual,
+    m::Optimizer{Tv}, attr::MOI.ConstraintDual,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, S}
 ) where{Tv<:Real, S<:SCALAR_SETS{Tv}}
     MOI.throw_if_not_valid(m, c)  # Sanity check
+    MOI.check_result_index_bounds(m, attr)
 
     return get_dual_value(m.inner, ConstrId(c.value))
 end
