@@ -5,6 +5,13 @@ using SparseArrays
 
 export factor_normaleq, factor_normaleq!, symbolic_cholesky, construct_matrix
 
+"""
+    TLPLinearSolver{T<:Real}
+
+Abstract container for linear solver used in solving the augmented system.
+"""
+abstract type TLPLinearSolver{T<:Real} end
+
 
 """
     construct_matrix
@@ -120,5 +127,6 @@ Add row `c` to matrix `A`.
 addrow!(A::AbstractMatrix, r::AbstractVector) = (vcat(A, r'), size(A, 1) + 1)
 
 include("unitBlockAngular.jl")
+include("sparse.jl")
 
 end  # module

@@ -38,6 +38,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     pt::Point{Tv}    # Current primal-dual iterate
     res::Residuals{Tv}  # Residuals at current iterate
     F::Union{Nothing, Factorization{Tv}}
+    ls::SparseLinearSolver{Tv}
 
     # rxs::Tv  # rhs for complimentary products
     # rwz::Tv  # rhs for complimentary products
@@ -83,6 +84,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         )
 
         hsd.F = nothing
+        hsd.ls = SparseLinearSolver(A)
 
         return hsd
     end
@@ -227,28 +229,28 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
     hsd.niter = 0
 
     # TODO: allocate space for factorization
-    try
-        hsd.F = symbolic_cholesky(hsd.A)
-    catch err
+    # try
+    #     hsd.F = symbolic_cholesky(hsd.A)
+    # catch err
 
-        if isa(err, PosDefException) || isa(err, SingularException)
-            # Numerical trouble while computing the factorization
-            hsd.solver_status = Trm_NumericalProblem
+    #     if isa(err, PosDefException) || isa(err, SingularException)
+    #         # Numerical trouble while computing the factorization
+    #         hsd.solver_status = Trm_NumericalProblem
 
-        elseif isa(err, OutOfMemoryError)
-            # Out of memory
-            hsd.solver_status = Trm_MemoryLimit
+    #     elseif isa(err, OutOfMemoryError)
+    #         # Out of memory
+    #         hsd.solver_status = Trm_MemoryLimit
 
-        elseif isa(err, InterruptException)
-            hsd.solver_status = Trm_Unknown
-        else
-            # Unknown error: rethrow
-            rethrow(err)
-        end
+    #     elseif isa(err, InterruptException)
+    #         hsd.solver_status = Trm_Unknown
+    #     else
+    #         # Unknown error: rethrow
+    #         rethrow(err)
+    #     end
 
-        env.verbose == 1 && println("Solver exited with status $((hsd.solver_status))")
-        return nothing
-    end
+    #     env.verbose == 1 && println("Solver exited with status $((hsd.solver_status))")
+    #     return nothing
+    # end
 
     # IPM LOG
     if env.verbose != 0
