@@ -31,7 +31,6 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     uind = hsd.uind
     uval = hsd.uval
 
-    
     # Compute scaling
     θ   = pt.s ./ pt.x
     θwz = pt.z ./ pt.w
@@ -39,12 +38,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     θ .\= oneunit(Tv)
 
     # Update factorization
-    # F = factor_normaleq!(A, θ, hsd.F)
-    hsd.ls.θ .= θ
-    hsd.ls.up_to_date = false
-    update_linear_solver(hsd.ls)
-
-    # F = hsd.F
+    update_linear_solver(hsd.ls, θ)
 
     # Search directions
     # Predictor
@@ -65,22 +59,11 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     p = zeros(Tv, nvar)
     q = zeros(Tv, ncon)
     r = zeros(Tv, nupb)
-    # solve_augsys_hsd!(
-    #     A, F, θ, θwz, uind,
-    #     p, q, r,
-    #     b, c, uval
-    # )
-    # p_ = zeros(Tv, nvar)
-    # q_ = zeros(Tv, ncon)
-    # r_ = zeros(Tv, nupb)
     solve_augsys_hsd!(
         A, hsd.ls, θ, θwz, uind,
         p, q, r,
         b, c, uval
     )
-    # env.verbose != 0 && println(norm(p - p_, Inf))
-    # env.verbose != 0 && println(norm(q - q_, Inf))
-    # env.verbose != 0 && println(norm(r - r_, Inf))
 
     ρ = (pt.k / pt.t) - dot(c, p) + dot(b, q) - dot(uval, r)
 
@@ -266,7 +249,7 @@ Solve the augmented system below, and overwrite `dx, dy, dz` with the result.
 - `ξp, ξd, ξu`: Right-hand-side vectors
 """
 function solve_augsys_hsd!(
-    A::AbstractMatrix{Tv}, ls::SparseLinearSolver{Tv},
+    A::AbstractMatrix{Tv}, ls::TLPLinearSolver{Tv},
     θ::Vector{Tv}, θwz::Vector{Tv}, uind::Vector{Int},
     dx::Vector{Tv}, dy::Vector{Tv}, dz::Vector{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}, ξu::Vector{Tv}

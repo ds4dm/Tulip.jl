@@ -37,8 +37,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     =====================#
     pt::Point{Tv}    # Current primal-dual iterate
     res::Residuals{Tv}  # Residuals at current iterate
-    F::Union{Nothing, Factorization{Tv}}
-    ls::SparseLinearSolver{Tv}
+    ls::TLPLinearSolver{Tv}
 
     # rxs::Tv  # rhs for complimentary products
     # rwz::Tv  # rhs for complimentary products
@@ -83,8 +82,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
             zero(Tv), zero(Tv), zero(Tv), zero(Tv)
         )
 
-        hsd.F = nothing
-        hsd.ls = SparseLinearSolver(A)
+        hsd.ls = TLPLinearSolver(A)
 
         return hsd
     end
@@ -228,39 +226,10 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
     tstart = time()
     hsd.niter = 0
 
-    # TODO: allocate space for factorization
-    # try
-    #     hsd.F = symbolic_cholesky(hsd.A)
-    # catch err
-
-    #     if isa(err, PosDefException) || isa(err, SingularException)
-    #         # Numerical trouble while computing the factorization
-    #         hsd.solver_status = Trm_NumericalProblem
-
-    #     elseif isa(err, OutOfMemoryError)
-    #         # Out of memory
-    #         hsd.solver_status = Trm_MemoryLimit
-
-    #     elseif isa(err, InterruptException)
-    #         hsd.solver_status = Trm_Unknown
-    #     else
-    #         # Unknown error: rethrow
-    #         rethrow(err)
-    #     end
-
-    #     env.verbose == 1 && println("Solver exited with status $((hsd.solver_status))")
-    #     return nothing
-    # end
-
     # IPM LOG
     if env.verbose != 0
         @printf "%4s  %16s%16s %9s%9s%9s  %7s  %4s\n" "Itn" "PObj" "DObj" "PFeas" "DFeas" "GFeas" "Mu" "Time"
-        # println(" Itn    Primal Obj      Dual Obj        PFeas    DFeas    GFeas     Mu       Time")
     end
-
-
-    # TODO: compute symbolic Cholesky
-    # For this to be efficient, we need to now the type of A in the signature
 
     # TODO: set starting point
     # Q: should we allocate memory for `pt` here?

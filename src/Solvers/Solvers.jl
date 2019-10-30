@@ -1,13 +1,4 @@
-# module Solvers
-
-# using LinearAlgebra
 using Printf
-
-# import Tulip:
-#     TerminationStatus, SolutionStatus, Env, StandardForm,
-    
-#     symbolic_cholesky, factor_normaleq!
-
 
 """
     Point{Tv<:Real}
@@ -74,8 +65,5 @@ Currently supported:
 """
 abstract type AbstractIPMSolver{Tv<:Real} end
 
-
 include("HSDSolver/HSDSolver.jl")
-# include("MPC/MPSSolver.jl")  # TODO
-
-# end  # module
+# TODO: MPC solver

@@ -1,16 +1,11 @@
 using SparseArrays
 using SuiteSparse
 
-const SS_FLOAT = Union{Float32, Float64}
-
 """
     SparseLinearSolver{T}
 
 """
-mutable struct SparseLinearSolver{T<:SS_FLOAT} <: TLPLinearSolver{T}
-    # Up-to-date flag
-    # Reset at the beginning of every IPM iteration
-    up_to_date::Bool
+mutable struct SparseLinearSolver{T<:BlasReal} <: TLPLinearSolver{T}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -25,8 +20,7 @@ mutable struct SparseLinearSolver{T<:SS_FLOAT} <: TLPLinearSolver{T}
     F
 
     # TODO: constructor with initial memory allocation
-    function SparseLinearSolver(A::SparseMatrixCSC{T, Int}) where{T<:SS_FLOAT}
-        
+    function SparseLinearSolver(A::SparseMatrixCSC{T, Int}) where{T<:BlasReal}
         m, n = size(A)
         θ = ones(T, n)
 
@@ -38,25 +32,33 @@ mutable struct SparseLinearSolver{T<:SS_FLOAT} <: TLPLinearSolver{T}
         # TODO: PSD-ness checks
         F = ldlt(Symmetric(S))
 
-        return new{T}(false, m, n, A, θ, F)
+        return new{T}(m, n, A, θ, F)
     end
 
 end
 
+TLPLinearSolver(A::SparseMatrixCSC{Tv, Int64}) where{Tv<:BlasReal} = SparseLinearSolver(A)
 
-function update_linear_solver(ls::SparseLinearSolver{T}) where{T<:SS_FLOAT}
-    ls.up_to_date && return
+function update_linear_solver(
+    ls::SparseLinearSolver{Tv},
+    d::AbstractVector{Tv}
+) where{Tv<:BlasReal}
+    
+    # Sanity checks
+    length(d) == ls.n || throw(DimensionMismatch(
+        "d has length $(length(d)) but linear solver is for n=$(ls.n)."
+    ))
+
+    ls.θ .= d
 
     # Re-compute factorization
     S = [
-        spdiagm(0 => -(one(T) ./ ls.θ) .+ 1e-12)  ls.A';
-        ls.A spdiagm(0 => 1e-12 .* ones(ls.m))
+        spdiagm(0 => -(one(Tv) ./ ls.θ) .+ 1e-6)  ls.A';
+        ls.A spdiagm(0 => 1e-6 .* ones(ls.m))
     ]
 
     # TODO: PSD-ness checks
     ldlt!(ls.F, Symmetric(S))
-
-    ls.up_to_date = true
     
     return nothing
 end
@@ -82,7 +84,7 @@ Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
-    ls::SparseLinearSolver{Tv}, A::AbstractMatrix{Tv}, θ::Vector{Tv},
+    ls::SparseLinearSolver{Tv}, A::SparseMatrixCSC{Tv}, θ::Vector{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:Real}
     m, n = size(A)
