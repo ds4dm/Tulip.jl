@@ -47,7 +47,7 @@ function test_linalg(
         dx, dy, ls, A, d, ξp, ξd
     )
 
-    # TODO: check that solution 
+    # TODO: check that solution is approximately correct
 
     return true
 end
@@ -55,7 +55,8 @@ end
 @testset "LinearAlgebra" begin
 
     # Test specific data structures
-    include("sparseMatrixCSC.jl")  # General sparse matrices (Julia native)
+    include("sparseMatrixCSC.jl")   # General sparse matrices (Julia native)
+    include("dense.jl")             # Dense matrices
     # include("unitBlockAngular.jl") # Specialized unit block-angular
 
 end
