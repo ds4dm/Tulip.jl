@@ -33,10 +33,10 @@ function test_linalg(
     mul!(y, A, x)
 
     # Cholesky factorization
-    d = 1.1 .* ones(n)
+    θ = 1.1 .* ones(n)
 
     ls = TLP.TLPLinearSolver(A)
-    TLP.TLPLinearAlgebra.update_linear_solver(ls, d)
+    TLP.TLPLinearAlgebra.update_linear_solver(ls, θ)
 
     # solve linear system
     dx = zeros(n)
@@ -44,10 +44,15 @@ function test_linalg(
     ξp = ones(m)
     ξd = ones(n)
     TLP.TLPLinearAlgebra.solve_augmented_system!(
-        dx, dy, ls, A, d, ξp, ξd
+        dx, dy, ls, A, θ, ξp, ξd
     )
 
     # TODO: check that solution is approximately correct
+    rp = norm(A  * dx - ξp, Inf)
+    rd = norm(A' * dy - dx ./ θ - ξd, Inf)
+
+    @test rp <= 1e-8
+    @test rd <= 1e-8
 
     return true
 end
@@ -55,7 +60,7 @@ end
 @testset "LinearAlgebra" begin
 
     # Test specific data structures
-    include("sparseMatrixCSC.jl")   # General sparse matrices (Julia native)
+    include("sparse.jl")            # General sparse matrices (Julia native)
     include("dense.jl")             # Dense matrices
     # include("unitBlockAngular.jl") # Specialized unit block-angular
 

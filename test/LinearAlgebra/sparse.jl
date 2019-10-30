@@ -11,7 +11,7 @@ uind = u.nzind
 uval = u.nzval
 p = nnz(u)
 
-@test test_linalg(
+test_linalg(
     A, b, c, uind, uval,
     zeros(n), zeros(p), zeros(m), zeros(n), zeros(p)
 )

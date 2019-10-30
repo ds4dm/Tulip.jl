@@ -85,7 +85,7 @@ function solve_augmented_system!(
     m, n = size(A)
     
     # Set-up right-hand side
-    ξp_ = ξp + ls.A * (ξd ./ θ)
+    ξp_ = ξp + ls.A * (ξd .* θ)
 
     # Solve augmented system
     copyto!(dy, ξp_)
@@ -93,7 +93,7 @@ function solve_augmented_system!(
 
     # Recover dx
     # TODO: use more efficient mul! syntax
-    dx .= (ls.A' * dy - ξd)
+    dx .= (ls.A' * dy - ξd) .* θ
 
     # TODO: Iterative refinement
     return nothing
