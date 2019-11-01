@@ -338,7 +338,7 @@ function compute_higher_corrector_hsd_!(
     pt::Point{Tv},
     Δ::Point{Tv}, α::Tv,
     Δc::Point{Tv},
-    beta1::Float64, beta2::Float64, beta3::Float64, beta4::Float64,
+    beta1::Tv, beta2::Tv, beta3::Tv, beta4::Tv,
 ) where{Tv<:Real}
     # TODO: Sanity checks
 
