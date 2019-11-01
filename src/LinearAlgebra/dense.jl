@@ -30,8 +30,39 @@ mutable struct DenseLinearSolver{T<:Real} <: TLPLinearSolver{T}
     end
 end
 
-TLPLinearSolver(A::Matrix{Tv}) where{Tv<:BlasReal} = DenseLinearSolver(A)
+TLPLinearSolver(A::Matrix{Tv}) where{Tv<:Real} = DenseLinearSolver(A)
 
+# generic
+function update_linear_solver(
+    ls::DenseLinearSolver{T},
+    d::AbstractVector{T}
+) where{T<:Real}
+    # Sanity checks
+    length(d) == ls.n || throw(DimensionMismatch(
+        "d has length $(length(d)) but linear solver is for n=$(ls.n)."
+    ))
+
+    ls.θ .= d
+
+    # Re-compute normal equations matrix
+    # There's no function that does S = A*D*A', so we cache a copy of A
+    copyto!(ls.B, ls.A)
+    rmul!(ls.B, Diagonal(ls.θ))  # B = A * D
+    mul!(ls.S, ls.B, transpose(ls.A))  # Now S = A*D
+    
+    # Cholesky factorization
+    # TODO: regularize if needed
+    try
+        cholesky!(Symmetric(ls.S))
+    catch err
+        rethrow(err)
+    end
+
+    
+    return nothing
+end
+
+# Use BLAS/LAPACK if available
 function update_linear_solver(
     ls::DenseLinearSolver{T},
     d::AbstractVector{T}
@@ -81,14 +112,36 @@ function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
     ls::DenseLinearSolver{Tv}, A::Matrix{Tv}, θ::Vector{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
+) where{Tv<:Real}
+    m, n = size(A)
+    
+    # Set-up right-hand side
+    dy .= ξp + ls.A * (ξd .* θ)
+
+    # Solve augmented system
+    # 
+    ldiv!(UpperTriangular(ls.S)', dy)
+    ldiv!(UpperTriangular(ls.S) , dy)
+
+    # Recover dx
+    # TODO: use more efficient mul! syntax
+    dx .= (ls.A' * dy - ξd) .* θ
+
+    # TODO: Iterative refinement
+    return nothing
+end
+
+function solve_augmented_system!(
+    dx::Vector{Tv}, dy::Vector{Tv},
+    ls::DenseLinearSolver{Tv}, A::Matrix{Tv}, θ::Vector{Tv},
+    ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:BlasReal}
     m, n = size(A)
     
     # Set-up right-hand side
-    ξp_ = ξp + ls.A * (ξd .* θ)
+    dy .= ξp + ls.A * (ξd .* θ)
 
     # Solve augmented system
-    copyto!(dy, ξp_)
     LAPACK.potrs!('U', ls.S, dy)  # potrs! over-writes the right-hand side
 
     # Recover dx
