@@ -1,21 +1,19 @@
-@testset "Dense" begin
+function test_linalg_dense(Tv::Type{<:Real})
     
-# SparseCSC matrix
-A = [
-    1.0 0.0 1.0 0.0;
-    0.0 1.0 0.0 1.0
-]
-m, n = size(A)
-c = [1.1, 1.2, 1.3, 1.4]
-b = [1.1, 0.9]
-u = sparse([0.5, 0.4, 0.7, 1.1])
-uind = u.nzind
-uval = u.nzval
-p = nnz(u)
+    A = Matrix{Tv}([
+        1 0 1 0;
+        0 1 0 1
+    ])
+    test_linalg(A)
 
-test_linalg(
-    A, b, c, uind, uval,
-    zeros(n), zeros(p), zeros(m), zeros(n), zeros(p)
-)
+    # TODO: test linear solvers more extensively (?)
+    return nothing
+end
 
+@testset "Matrix" begin
+    for Tv in TvTYPES
+        @testset "$Tv" begin
+            test_linalg_dense(Tv)
+        end    
+    end
 end  # testset

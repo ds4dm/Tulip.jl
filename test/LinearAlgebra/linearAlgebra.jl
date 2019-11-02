@@ -4,28 +4,15 @@
 Verify that the linear algebra operations are properly defined for the input
     data structures.
 """
-function test_linalg(
-    A::AbstractMatrix{Tv},
-    b::AbstractVector{Tv},
-    c::AbstractVector{Tv},
-    uind::AbstractVector{Int},
-    uval::AbstractVector{Tv},
-    x::AbstractVector{Tv},
-    w::AbstractVector{Tv},
-    y::AbstractVector{Tv},
-    s::AbstractVector{Tv},
-    z::AbstractVector{Tv}
-) where{Tv<:Real}
+function test_linalg(A::AbstractMatrix{Tv}) where{Tv<:Real}
 
     # Dimension check
     m = size(A, 1)
     n = size(A, 2)
-    n == size(c, 1) || throw(DimensionMismatch(""))
-    m == size(b, 1) || throw(DimensionMismatch(""))
-    n == size(x, 1) || throw(DimensionMismatch(""))
-    m == size(y, 1) || throw(DimensionMismatch(""))
-    n == size(s, 1) || throw(DimensionMismatch(""))
-    size(uind, 1) == size(uval, 1) || throw(DimensionMismatch(""))
+
+    # Matrix-vector multiplication
+    x = zeros(Tv, n)
+    y = zeros(Tv, m)
 
     # matrix-vector multiplication
     A * x;
@@ -33,16 +20,16 @@ function test_linalg(
     mul!(y, A, x)
 
     # Cholesky factorization
-    θ = 1.1 .* ones(n)
+    θ = Tv(2) .* ones(Tv, n)
 
     ls = TLP.TLPLinearSolver(A)
     TLP.TLPLinearAlgebra.update_linear_solver(ls, θ)
 
     # solve linear system
-    dx = zeros(n)
-    dy = zeros(m)
-    ξp = ones(m)
-    ξd = ones(n)
+    dx = zeros(Tv, n)
+    dy = zeros(Tv, m)
+    ξp = ones(Tv, m)
+    ξd = ones(Tv, n)
     TLP.TLPLinearAlgebra.solve_augmented_system!(
         dx, dy, ls, A, θ, ξp, ξd
     )
@@ -51,8 +38,8 @@ function test_linalg(
     rp = norm(A  * dx - ξp, Inf)
     rd = norm(A' * dy - dx ./ θ - ξd, Inf)
 
-    @test rp <= 1e-8
-    @test rd <= 1e-8
+    @test rp <= sqrt(eps(Tv))
+    @test rd <= sqrt(eps(Tv))
 
     return true
 end
@@ -60,8 +47,9 @@ end
 @testset "LinearAlgebra" begin
 
     # Test specific data structures
-    include("sparse.jl")            # General sparse matrices (Julia native)
-    include("dense.jl")             # Dense matrices
+    include("dense.jl")     # Dense matrices
+    include("sparse.jl")    # SparseMatrixCSC
+    
     # include("unitBlockAngular.jl") # Specialized unit block-angular
 
 end

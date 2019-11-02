@@ -1,8 +1,25 @@
 using LinearAlgebra.LAPACK
 
-"""
-    SparseLinearSolver{T}
+function construct_matrix(
+    ::Type{Matrix}, m::Int, n::Int,
+    aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{Tv}
+) where{Tv<:Real}
+    A = zeros(Tv, m, n)
+    # TODO: may be more efficient to first sort indices so that
+    # A is accessed in column-major order.
+    for(i, j, v) in zip(aI, aJ, aV)
+        A[i, j] = v
+    end
+    return A
+end
 
+"""
+    DenseLinearSolver{T}
+
+Linear solver for dense matrices.
+
+The augmented system is automatically reduced to the normal equations system.
+BLAS/LAPACK functions are used whenever applicable.
 """
 mutable struct DenseLinearSolver{T<:Real} <: TLPLinearSolver{T}
     m::Int  # Number of rows in A

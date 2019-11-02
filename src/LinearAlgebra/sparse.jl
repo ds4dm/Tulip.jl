@@ -1,6 +1,11 @@
 using SparseArrays
 using SuiteSparse
 
+construct_matrix(
+    ::Type{SparseMatrixCSC}, m::Int, n::Int,
+    aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{Tv}
+) where{Tv<:Real} = sparse(aI, aJ, aV, m, n)
+
 """
     SparseLinearSolver{T}
 

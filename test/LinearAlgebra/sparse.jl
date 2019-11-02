@@ -1,19 +1,20 @@
-@testset "SparseMatrixCSC" begin
+function test_linalg_sparse(Tv::Type{<:Real})
     
-# SparseCSC matrix
-A = hcat(sparse(1.0I, 2, 2), sparse(1.0I, 2, 2))
-m = A.m
-n = A.n
-c = [1.1, 1.2, 1.3, 1.4]
-b = [1.1, 0.9]
-u = sparse([0.5, 0.4, 0.7, 1.1])
-uind = u.nzind
-uval = u.nzval
-p = nnz(u)
+    A = SparseMatrixCSC{Tv, Int}([
+        1 0 1 0;
+        0 1 0 1
+    ])
+    test_linalg(A)
 
-test_linalg(
-    A, b, c, uind, uval,
-    zeros(n), zeros(p), zeros(m), zeros(n), zeros(p)
-)
+    # TODO: test linear solvers more extensively (?)
+    return nothing
+end
 
+@testset "SparseMatrixCSC" begin
+    for Tv in TvTYPES
+        Tv == Float64 || continue  # Only do Float64 for now
+        @testset "$Tv" begin
+            test_linalg_sparse(Tv)
+        end    
+    end
 end  # testset
