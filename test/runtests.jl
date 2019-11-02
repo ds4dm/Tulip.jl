@@ -6,7 +6,7 @@ using SparseArrays
 using Tulip
 TLP = Tulip
 
-const TvTYPES = [Float32, Float64]#, BigFloat, Rational]
+const TvTYPES = [Float64, BigFloat]
 
 # write your own tests here
 const testdir = dirname(@__FILE__)
@@ -29,6 +29,6 @@ const test_files = [
     end
 end  # testset
 
-@testset "MathOptInterface Tests" begin
-    include("MOI_wrapper.jl")
-end
+# @testset "MathOptInterface Tests" begin
+#     include("MOI_wrapper.jl")
+# end
