@@ -29,6 +29,6 @@ const test_files = [
     end
 end  # testset
 
-# @testset "MathOptInterface Tests" begin
-#     include("MOI_wrapper.jl")
-# end
+@testset "MathOptInterface Tests" begin
+    include("MOI_wrapper.jl")
+end
