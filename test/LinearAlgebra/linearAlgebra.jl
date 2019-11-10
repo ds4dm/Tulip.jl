@@ -11,35 +11,43 @@ function test_linalg(A::AbstractMatrix{Tv}) where{Tv<:Real}
     n = size(A, 2)
 
     # Matrix-vector multiplication
-    x = zeros(Tv, n)
-    y = zeros(Tv, m)
+    @testset "Matrix-Vector" begin
+        x = zeros(Tv, n)
+        y = zeros(Tv, m)
 
-    # matrix-vector multiplication
-    A * x;
-    transpose(A) * y;
-    mul!(y, A, x)
+        A * x;
+        transpose(A) * y;
+        mul!(y, A, x)
+    end
 
     # Cholesky factorization
-    θ = Tv(2) .* ones(Tv, n)
+    @testset "LinearSolver" begin
+        # Initialize linear solver
+        ls = TLP.TLPLinearSolver(A)
 
-    ls = TLP.TLPLinearSolver(A)
-    TLP.TLPLinearAlgebra.update_linear_solver(ls, θ)
+        # Update factorization
+        θ = Tv(2) .* ones(Tv, n)
+        regP = ones(Tv, n)
+        regD = ones(Tv, m)
 
-    # solve linear system
-    dx = zeros(Tv, n)
-    dy = zeros(Tv, m)
-    ξp = ones(Tv, m)
-    ξd = ones(Tv, n)
-    TLP.TLPLinearAlgebra.solve_augmented_system!(
-        dx, dy, ls, A, θ, ξp, ξd
-    )
+        TLP.TLPLinearAlgebra.update_linear_solver(ls, θ, regP, regD)
 
-    # TODO: check that solution is approximately correct
-    rp = norm(A  * dx - ξp, Inf)
-    rd = norm(A' * dy - dx ./ θ - ξd, Inf)
+        # solve linear system
+        dx = zeros(Tv, n)
+        dy = zeros(Tv, m)
+        ξp = ones(Tv, m)
+        ξd = ones(Tv, n)
+        TLP.TLPLinearAlgebra.solve_augmented_system!(
+            dx, dy, ls, A, θ, ξp, ξd
+        )
 
-    @test rp <= sqrt(eps(Tv))
-    @test rd <= sqrt(eps(Tv))
+        # Check accuracy of solution
+        resP = norm(ξp - A * dx - regD .* dy, Inf)
+        resD = norm(ξd - dx ./ ( (ones(Tv) ./ θ) .+ regP) - A' * dy, Inf)
+
+        @test resP <= sqrt(eps(Tv))
+        @test resD <= sqrt(eps(Tv))
+    end
 
     return true
 end
