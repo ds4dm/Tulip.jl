@@ -16,7 +16,12 @@ end
 """
     DenseLinearSolver{Tv}
 
-Linear solver for dense matrices.
+Linear solver for the 2x2 augmented system
+```math
+    [-(Θ^{-1} + Rp)   A'] [dx] = [xi_d]
+    [   A             Rd] [dy] = [xi_p]
+```
+with ``A`` dense.
 
 The augmented system is automatically reduced to the normal equations system.
 BLAS/LAPACK functions are used whenever applicable.
@@ -30,8 +35,8 @@ mutable struct DenseLinearSolver{Tv<:Real} <: PosDefLinearSolver{Tv, Matrix{Tv}}
     θ::Vector{Tv}
 
     # Regularizations
-    rp::Vector{Tv}  # primal
-    rd::Vector{Tv}  # dual
+    regP::Vector{Tv}  # primal
+    regD::Vector{Tv}  # dual
 
     B::Matrix{Tv}  # place-holder to avoid allocating memory afterwards
 
@@ -51,41 +56,44 @@ mutable struct DenseLinearSolver{Tv<:Real} <: PosDefLinearSolver{Tv, Matrix{Tv}}
     end
 end
 
-AbstractLinearSolver(A::Matrix{Tv}) where{Tv<:Real} = DenseLinearSolver(A)
+"""
+    update_linear_solver!(ls, θ, regP, regD)
 
-# generic
+Compute normal equations system matrix and update Cholesky factorization.
+Uses Julia's generic linear algebra.
+"""
 function update_linear_solver!(
     ls::DenseLinearSolver{Tv},
-    d::AbstractVector{Tv},
-    rp::AbstractVector{Tv}=zeros(Tv, ls.n),
-    rd::AbstractVector{Tv}=zeros(Tv, ls.m)
+    θ::AbstractVector{Tv},
+    regP::AbstractVector{Tv}=zeros(Tv, ls.n),
+    regD::AbstractVector{Tv}=zeros(Tv, ls.m)
 ) where{Tv<:Real}
     # Sanity checks
-    length(d) == ls.n || throw(DimensionMismatch(
-        "d has length $(length(d)) but linear solver is for n=$(ls.n)."
+    length(θ) == ls.n || throw(DimensionMismatch(
+        "θ has length $(length(d)) but linear solver is for n=$(ls.n)."
     ))
-    length(rp) == ls.n || throw(DimensionMismatch(
-        "rp has length $(length(rp)) but linear solver has n=$(ls.n)"
+    length(regP) == ls.n || throw(DimensionMismatch(
+        "regP has length $(length(regP)) but linear solver has n=$(ls.n)"
     ))
-    length(rd) == ls.m || throw(DimensionMismatch(
-        "rd has length $(length(rd)) but linear solver has m=$(ls.m)"
+    length(regD) == ls.m || throw(DimensionMismatch(
+        "regD has length $(length(regD)) but linear solver has m=$(ls.m)"
     ))
 
-    ls.θ .= d
-    ls.rp .= rp
-    ls.rd .= rd
+    ls.θ .= θ
+    ls.regP .= regP
+    ls.regD .= regD
 
     # Re-compute normal equations matrix
     # There's no function that does S = A*D*A', so we cache a copy of A
     copyto!(ls.B, ls.A)
     D = Diagonal(
-        one(Tv) ./ ( (one(Tv) ./ ls.θ) .+ ls.rp)
+        one(Tv) ./ ( (one(Tv) ./ ls.θ) .+ ls.regP)
     )
     rmul!(ls.B, D)  # B = A * D
     mul!(ls.S, ls.B, transpose(ls.A))  # Now S = A*D*A'
     # TODO: do not re-compute S if only dual regularization changes
     @inbounds for i in 1:ls.m
-        ls.S[i, i] += ls.rd[i]
+        ls.S[i, i] += ls.regD[i]
     end
     
     # Cholesky factorization
@@ -94,33 +102,38 @@ function update_linear_solver!(
     return nothing
 end
 
-# Use BLAS/LAPACK if available
+"""
+    update_linear_solver!(ls, θ, regP, regD)
+
+Compute normal equations system matrix and update Cholesky factorization.
+Uses fast BLAS and LAPACK routines.
+"""
 function update_linear_solver!(
     ls::DenseLinearSolver{Tv},
     d::AbstractVector{Tv},
-    rp::AbstractVector{Tv}=zeros(Tv, ls.n),
-    rd::AbstractVector{Tv}=zeros(Tv, ls.m)
+    regP::AbstractVector{Tv}=zeros(Tv, ls.n),
+    regD::AbstractVector{Tv}=zeros(Tv, ls.m)
 ) where{Tv<:BlasReal}
     # Sanity checks
     length(d) == ls.n || throw(DimensionMismatch(
         "d has length $(length(d)) but linear solver is for n=$(ls.n)."
     ))
-    length(rp) == ls.n || throw(DimensionMismatch(
-        "rp has length $(length(rp)) but linear solver has n=$(ls.n)"
+    length(regP) == ls.n || throw(DimensionMismatch(
+        "regP has length $(length(regP)) but linear solver has n=$(ls.n)"
     ))
-    length(rd) == ls.m || throw(DimensionMismatch(
-        "rd has length $(length(rd)) but linear solver has m=$(ls.m)"
+    length(regD) == ls.m || throw(DimensionMismatch(
+        "regD has length $(length(regD)) but linear solver has m=$(ls.m)"
     ))
 
     ls.θ .= d
-    ls.rp .= rp
-    ls.rd .= rd
+    ls.regP .= regP
+    ls.regD .= regD
 
     # Re-compute normal equations matrix
     # There's no function that does S = A*D*A', so we cache a copy of A
     copyto!(ls.B, ls.A)
     D = Diagonal(sqrt.(
-        one(Tv) ./ ( (one(Tv) ./ ls.θ) .+ ls.rp)
+        one(Tv) ./ ( (one(Tv) ./ ls.θ) .+ ls.regP)
     ))
     rmul!(ls.B, D)  # B = A * √D
     BLAS.syrk!('U', 'N', one(Tv), ls.B, zero(Tv), ls.S)
@@ -128,7 +141,7 @@ function update_linear_solver!(
     # Regularization
     # TODO: only update diagonal of S if only dual regularization changes
     @inbounds for i in 1:ls.m
-        ls.S[i, i] += ls.rd[i]
+        ls.S[i, i] += ls.regD[i]
     end
     
     # Cholesky factorization
@@ -140,20 +153,16 @@ end
 
 
 """
-    solve_augmented_system!(dx, dy, A, ls, θ, ξp, ξd)
+    solve_augmented_system!(dx, dy, ls, ξp, ξd)
 
 Solve the augmented system, overwriting `dx, dy` with the result.
-```
-    -Θ*dx  + A'dy = ξd
-     A*dx         = ξp
-```
 
-For dense `A` we first compute the normal equations system.
+Uses two generic triangular solves for solving the normal equations system.
 
 # Arguments
-- `dx::Vector{Tv}, dy::Vector{Tv}`: Vectors of unknowns, modified in-place
-- `ls::DenseLinearSolver{Tv}`: Linear solver for the augmented system
-- `ξp::Vector{Tv}, ξd::Vector{Tv}`: Right-hand-side vectors
+- `dx, dy`: Vectors of unknowns, modified in-place
+- `ls::DenseLinearSolver`: Linear solver
+- `ξp, ξd`: Right-hand-side vectors
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
@@ -163,21 +172,32 @@ function solve_augmented_system!(
     m, n = ls.m, ls.n
     
     # Set-up right-hand side
-    dy .= ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ ls.θ) .+ ls.rp))
+    dy .= ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ ls.θ) .+ ls.regP))
 
-    # Solve augmented system
-    # 
+    # Solve normal equations
     ldiv!(UpperTriangular(ls.S)', dy)
     ldiv!(UpperTriangular(ls.S) , dy)
 
     # Recover dx
     # TODO: use more efficient mul! syntax
-    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ ls.θ) .+ ls.rp)
+    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ ls.θ) .+ ls.regP)
 
     # TODO: Iterative refinement
     return nothing
 end
 
+"""
+    solve_augmented_system!(dx, dy, ls, ξp, ξd)
+
+Solve the augmented system, overwriting `dx, dy` with the result.
+
+Uses one LAPACK call for solving the normal equations system.
+
+# Arguments
+- `dx, dy`: Vectors of unknowns, modified in-place
+- `ls::DenseLinearSolver`: Linear solver
+- `ξp, ξd`: Right-hand-side vectors
+"""
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
     ls::DenseLinearSolver{Tv},
@@ -186,14 +206,14 @@ function solve_augmented_system!(
     m, n = ls.m, ls.n
     
     # Set-up right-hand side
-    dy .= ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ ls.θ) .+ ls.rp))
+    dy .= ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ ls.θ) .+ ls.regP))
 
     # Solve augmented system
     LAPACK.potrs!('U', ls.S, dy)  # potrs! over-writes the right-hand side
 
     # Recover dx
     # TODO: use more efficient mul! syntax
-    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ ls.θ) .+ ls.rp)
+    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ ls.θ) .+ ls.regP)
 
     # TODO: Iterative refinement
     return nothing

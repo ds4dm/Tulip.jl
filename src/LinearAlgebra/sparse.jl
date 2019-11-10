@@ -13,6 +13,14 @@ construct_matrix(
 """
     SparseIndefLinearSolver{Tv}
 
+Linear solver for the 2x2 augmented system
+```math
+    [-(Θ^{-1} + Rp)   A'] [dx] = [xi_d]
+    [   A             Rd] [dy] = [xi_p]
+```
+with ``A`` sparse.
+
+Uses an LDLt factorization of the quasi-definite system above.
 """
 mutable struct SparseIndefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:Integer}} <: IndefLinearSolver{Tv, Ta}
     m::Int  # Number of rows
@@ -24,8 +32,8 @@ mutable struct SparseIndefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:I
     # Problem data
     A::Ta
     θ::Vector{Tv}
-    rp::Vector{Tv}  # primal regularization
-    rd::Vector{Tv}  # dual regularization
+    regP::Vector{Tv}  # primal regularization
+    regD::Vector{Tv}  # dual regularization
 
     # Factorization
     F
@@ -47,36 +55,39 @@ mutable struct SparseIndefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:I
 
 end
 
-AbstractLinearSolver(A::SparseMatrixCSC{Tv, Int64}) where{Tv<:BlasReal} = SparsePosDefLinearSolver(A)
+"""
+    update_linear_solver!(ls, θ, regP, regD)
 
+Update LDLt factorization of the augmented system.
+"""
 function update_linear_solver!(
-    ls::SparseIndefLinearSolver{Tv},
+    ls::SparseIndefLinearSolver{Tv, Ta},
     θ::AbstractVector{Tv},
-    rp::AbstractVector{Tv}=zeros(Tv, ls.n),
-    rd::AbstractVector{Tv}=zeros(Tv, ls.m)
-) where{Tv<:BlasReal}
+    regP::AbstractVector{Tv}=zeros(Tv, ls.n),
+    regD::AbstractVector{Tv}=zeros(Tv, ls.m)
+) where{Tv<:BlasReal, Ta<:AbstractMatrix{Tv}}
     # Sanity checks
     length(θ)  == ls.n || throw(DimensionMismatch(
         "θ has length $(length(θ)) but linear solver is for n=$(ls.n)."
     ))
-    length(rp) == ls.n || throw(DimensionMismatch(
-        "rp has length $(length(rp)) but linear solver has n=$(ls.n)"
+    length(regP) == ls.n || throw(DimensionMismatch(
+        "regP has length $(length(regP)) but linear solver has n=$(ls.n)"
     ))
-    length(rd) == ls.m || throw(DimensionMismatch(
-        "rd has length $(length(rd)) but linear solver has m=$(ls.m)"
+    length(regD) == ls.m || throw(DimensionMismatch(
+        "regD has length $(length(regD)) but linear solver has m=$(ls.m)"
     ))
 
     # Update diagonal scaling
     ls.θ .= θ
     # Update regularizers
-    ls.rp .= rp
-    ls.rd .= rd
+    ls.regP .= regP
+    ls.regD .= regD
 
     # Re-compute factorization
     # TODO: Keep S in memory, only change diagonal
     S = [
-        spdiagm(0 => -(one(Tv) ./ ls.θ) .- rp)  ls.A';
-        ls.A spdiagm(0 => rd)
+        spdiagm(0 => -(one(Tv) ./ ls.θ) .- regP)  ls.A';
+        ls.A spdiagm(0 => regD)
     ]
 
     # TODO: PSD-ness checks
@@ -85,24 +96,15 @@ function update_linear_solver!(
     return nothing
 end
 
-
 """
-    solve_augmented_system!(dx, dy, A, ls, θ, ξp, ξd)
+    solve_augmented_system!(dx, dy, ls, ξp, ξd)
 
 Solve the augmented system, overwriting `dx, dy` with the result.
-```
-    -Θ*dx  + A'dy = ξd
-     A*dx         = ξp
-```
-
-`A` and `θ` are given to perform iterative refinement if needed.
 
 # Arguments
-- `dx::Vector{Tv}, dy::Vector{Tv}`: Vectors of unknowns, modified in-place
-- `ls::SparseIndefLinearSolver{Tv}`: Linear solver for the augmented system
-- `A::AbstractMatrix{Tv}`: Constraint matrix
-- `θ::Vector{Tv}`: Diagonal scaling vector
-- `ξp::Vector{Tv}, ξd::Vector{Tv}`: Right-hand-side vectors
+- `dx, dy`: Vectors of unknowns, modified in-place
+- `ls::SparseIndefLinearSolver`: Linear solver for the augmented system
+- `ξp, ξd`: Right-hand-side vectors
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
@@ -126,11 +128,11 @@ function solve_augmented_system!(
     # * Max number of refine steps
     # * Check for residuals before refining
     # * Check whether residuals did improve
-    # rp = A*dx + ls.rd .* dy - ξp
-    # rd = - dx .* ( (one(Tv) ./ ls.θ) + ls.rp) + A' * dy - ξd
-    # @info "\n|rp| = $(norm(rp, Inf))\n|rd| = $(norm(rd, Inf))\n"
+    # resP = A*dx + ls.regD .* dy - ξp
+    # resD = - dx .* ( (one(Tv) ./ ls.θ) + ls.regP) + A' * dy - ξd
+    # @info "\n|resP| = $(norm(resP, Inf))\n|resD| = $(norm(resD, Inf))\n"
 
-    # ξ1 = [rd; rp]
+    # ξ1 = [resD; resP]
     # d1 = ls.F \ ξ1
 
     # # Update search direction
@@ -147,6 +149,18 @@ end
 """
     SparsePosDefLinearSolver{Tv}
 
+Linear solver for the 2x2 augmented system
+```math
+    [-(Θ^{-1} + Rp)   A'] [dx] = [xi_d]
+    [   A             Rd] [dy] = [xi_p]
+```
+with ``A`` sparse.
+
+Uses a Cholesky factorization of the positive definite normal equations system
+```
+(A*(Θ^{-1} + Rp)^{-1}*A' + Rd)  dy = xi_p + A*(Θ^{-1} + Rp)^{-1}*xi_d
+                                dx = (Θ^{-1} + Rp)^{-1} * (A' dy - xi_d)
+```
 """
 mutable struct SparsePosDefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:Integer}} <: PosDefLinearSolver{Tv, Ta}
     m::Int  # Number of rows
@@ -159,8 +173,8 @@ mutable struct SparsePosDefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:
     A::Ta
     θ::Vector{Tv}   # Diagonal scaling
     # Regularization
-    rp::Vector{Tv}  # primal
-    rd::Vector{Tv}  # dual
+    regP::Vector{Tv}  # primal
+    regD::Vector{Tv}  # dual
 
     # Factorization
     F
@@ -181,34 +195,39 @@ mutable struct SparsePosDefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:
 
 end
 
+"""
+    update_linear_solver!(ls, θ, regP, regD)
+
+Compute normal equation system matrix, and update the factorization.
+"""
 function update_linear_solver!(
     ls::SparsePosDefLinearSolver{Tv},
     θ::AbstractVector{Tv},
-    rp::AbstractVector{Tv}=zeros(Tv, ls.n),
-    rd::AbstractVector{Tv}=zeros(Tv, ls.m)
+    regP::AbstractVector{Tv}=zeros(Tv, ls.n),
+    regD::AbstractVector{Tv}=zeros(Tv, ls.m)
 ) where{Tv<:BlasReal}
     
     # Sanity checks
     length(θ) == ls.n || throw(DimensionMismatch(
         "θ has length $(length(θ)) but linear solver is for n=$(ls.n)."
     ))
-    length(rp) == ls.n || throw(DimensionMismatch(
-        "rp has length $(length(rp)) but linear solver has n=$(ls.n)"
+    length(regP) == ls.n || throw(DimensionMismatch(
+        "regP has length $(length(regP)) but linear solver has n=$(ls.n)"
     ))
-    length(rd) == ls.m || throw(DimensionMismatch(
-        "rd has length $(length(rd)) but linear solver has m=$(ls.m)"
+    length(regD) == ls.m || throw(DimensionMismatch(
+        "regD has length $(length(regD)) but linear solver has m=$(ls.m)"
     ))
 
     ls.θ .= θ
-    ls.rp .= rp  # Primal regularization is disabled for normal equations
-    ls.rd .= rd
+    ls.regP .= regP  # Primal regularization is disabled for normal equations
+    ls.regD .= regD
 
     # Re-compute factorization
     # D = (Θ^{-1} + Rp)^{-1}
     D = Diagonal(
-        one(Tv) ./ ( (one(Tv) ./ ls.θ) .+ ls.rp)
+        one(Tv) ./ ( (one(Tv) ./ ls.θ) .+ ls.regP)
     )
-    Rd = spdiagm(0 => ls.rd)
+    Rd = spdiagm(0 => ls.regD)
     S = ls.A * D * ls.A' + Rd
 
     # Update factorization
@@ -218,23 +237,14 @@ function update_linear_solver!(
     return nothing
 end
 
-
 """
-    solve_augmented_system!(dx, dy, A, ls, θ, ξp, ξd)
+    solve_augmented_system!(dx, dy, ls, ξp, ξd)
 
 Solve the augmented system, overwriting `dx, dy` with the result.
-```
-    -Θ*dx  + A'dy = ξd
-     A*dx         = ξp
-```
-
-`A` and `θ` are given to perform iterative refinement if needed.
 
 # Arguments
 - `dx::Vector{Tv}, dy::Vector{Tv}`: Vectors of unknowns, modified in-place
-- `ls::SparseIndefLinearSolver{Tv}`: Linear solver for the augmented system
-- `A::AbstractMatrix{Tv}`: Constraint matrix
-- `θ::Vector{Tv}`: Diagonal scaling vector
+- `ls::SparsePosDefLinearSolver{Tv}`: Linear solver for the augmented system
 - `ξp::Vector{Tv}, ξd::Vector{Tv}`: Right-hand-side vectors
 """
 function solve_augmented_system!(
@@ -245,13 +255,13 @@ function solve_augmented_system!(
     m, n = ls.m, ls.n
     
     # Set-up right-hand side
-    ξ_ = ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ ls.θ) .+ ls.rp))
+    ξ_ = ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ ls.θ) .+ ls.regP))
 
     # Solve augmented system
     dy .= (ls.F \ ξ_)
 
     # Recover dx
-    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ ls.θ) .+ ls.rp)
+    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ ls.θ) .+ ls.regP)
 
     # TODO: Iterative refinement
     # * Max number of refine steps

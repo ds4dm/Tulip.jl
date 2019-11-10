@@ -38,7 +38,11 @@ Construct matrix given matrix type `Ta`, size `m, n`, and data in COO format.
 """
 function construct_matrix end
 
-include("sparse.jl")
 include("dense.jl")
+include("sparse.jl")
+
+# TODO: use parameter to choose between Indef/PosDef system
+AbstractLinearSolver(A::Matrix{Tv}) where{Tv<:Real} = DenseLinearSolver(A)
+AbstractLinearSolver(A::SparseMatrixCSC{Tv, Int64}) where{Tv<:BlasReal} = SparsePosDefLinearSolver(A)
 
 end  # module
