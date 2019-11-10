@@ -37,8 +37,32 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     @views θ[uind] .+= θwz
     θ .\= oneunit(Tv)
 
+    # Update regularizations
+    # Decrease regularization
+    # @info "\nα = $(α); |reg_dual| = $(norm(hsd.rd, Inf))\n\n"
+    rd_min = sqrt(eps(Tv))
+    rp_min = eps(Tv)
+    hsd.rp .= max.(rp_min, hsd.rp ./ 10)
+    hsd.rd .= max.(rd_min, hsd.rd ./ 10)
+
     # Update factorization
-    update_linear_solver(hsd.ls, θ)
+    nbump = 0
+    while nbump <= 3
+        try
+            update_linear_solver(hsd.ls, θ, hsd.rp, hsd.rd)
+            break
+        catch err
+            # @info hsd.niter, err, hsd.rd[1]
+            isa(err, PosDefException) || rethrow(err)
+
+            # Increase regularization
+            hsd.rd .*= 100
+            hsd.rp .*= 100
+            nbump += 1
+        end
+    end
+    nbump < 3 || throw(PosDefException(0))  # factorization could not be saved
+
 
     # Search directions
     # Predictor
@@ -142,7 +166,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
         
     end
     # Update current iterate
-    α *= Tv(0.99995)
+    α *= Tv(0.9995)
     pt.x .+= α .* Δ.x
     pt.w .+= α .* Δ.w
     pt.t  += α  * Δ.t

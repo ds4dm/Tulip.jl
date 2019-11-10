@@ -11,10 +11,10 @@ construct_matrix(
 # ==============================================================================
 
 """
-    SparseIndefLinearSolver{T}
+    SparseIndefLinearSolver{Tv}
 
 """
-mutable struct SparseIndefLinearSolver{T<:BlasReal} <: TLPLinearSolver{T}
+mutable struct SparseIndefLinearSolver{Tv<:BlasReal} <: TLPLinearSolver{Tv}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -22,16 +22,18 @@ mutable struct SparseIndefLinearSolver{T<:BlasReal} <: TLPLinearSolver{T}
     #   and add flag (default to false) to know whether user ordering should be used
 
     # Problem data
-    A::SparseMatrixCSC{T, Int}
-    θ::Vector{T}
+    A::SparseMatrixCSC{Tv, Int}
+    θ::Vector{Tv}
+    rp::Vector{Tv}  # primal regularization
+    rd::Vector{Tv}  # dual regularization
 
     # Factorization
     F
 
     # TODO: constructor with initial memory allocation
-    function SparseIndefLinearSolver(A::SparseMatrixCSC{T, Int}) where{T<:BlasReal}
+    function SparseIndefLinearSolver(A::SparseMatrixCSC{Tv, Int}) where{Tv<:BlasReal}
         m, n = size(A)
-        θ = ones(T, n)
+        θ = ones(Tv, n)
 
         S = [
             spdiagm(0 => -θ)  A';
@@ -40,7 +42,7 @@ mutable struct SparseIndefLinearSolver{T<:BlasReal} <: TLPLinearSolver{T}
 
         # TODO: PSD-ness checks
         F = ldlt(Symmetric(S))
-        return new{T}(m, n, A, θ, F)
+        return new{Tv}(m, n, A, θ, ones(Tv, n), ones(Tv, m), F)
     end
 
 end
@@ -51,7 +53,7 @@ function update_linear_solver(
     ls::SparseIndefLinearSolver{Tv},
     θ::AbstractVector{Tv},
     rp::AbstractVector{Tv}=zeros(Tv, ls.n),
-    rd::AbstractVector{Tv}=fill(Tv(1 // 10^4), ls.m)
+    rd::AbstractVector{Tv}=zeros(Tv, ls.m)
 ) where{Tv<:BlasReal}
     # Sanity checks
     length(θ)  == ls.n || throw(DimensionMismatch(
@@ -64,11 +66,16 @@ function update_linear_solver(
         "rd has length $(length(rd)) but linear solver has m=$(ls.m)"
     ))
 
+    # Update diagonal scaling
     ls.θ .= θ
+    # Update regularizers
+    ls.rp .= rp
+    ls.rd .= rd
 
     # Re-compute factorization
+    # TODO: Keep S in memory, only change diagonal
     S = [
-        spdiagm(0 => -(one(Tv) ./ ls.θ) .+ rp)  ls.A';
+        spdiagm(0 => -(one(Tv) ./ ls.θ) .- rp)  ls.A';
         ls.A spdiagm(0 => rd)
     ]
 
@@ -119,15 +126,16 @@ function solve_augmented_system!(
     # * Max number of refine steps
     # * Check for residuals before refining
     # * Check whether residuals did improve
-    rp = A*dx - ξp
-    rd = -dx ./ θ + A' * dy - ξd
+    # rp = A*dx + ls.rd .* dy - ξp
+    # rd = - dx .* ( (one(Tv) ./ ls.θ) + ls.rp) + A' * dy - ξd
+    # @info "\n|rp| = $(norm(rp, Inf))\n|rd| = $(norm(rd, Inf))\n"
 
-    ξ1 = [rd; rp]
-    d1 = ls.F \ ξ1
+    # ξ1 = [rd; rp]
+    # d1 = ls.F \ ξ1
 
-    # Update search direction
-    @views dx .-= d1[1:n]
-    @views dy .-= d1[(n+1):(m+n)]
+    # # Update search direction
+    # @views dx .-= d1[1:n]
+    # @views dy .-= d1[(n+1):(m+n)]
 
     return nothing
 end
@@ -137,10 +145,10 @@ end
 # ==============================================================================
 
 """
-    SparsePosDefLinearSolver{T}
+    SparsePosDefLinearSolver{Tv}
 
 """
-mutable struct SparsePosDefLinearSolver{T<:BlasReal} <: TLPLinearSolver{T}
+mutable struct SparsePosDefLinearSolver{Tv<:BlasReal} <: TLPLinearSolver{Tv}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -148,23 +156,26 @@ mutable struct SparsePosDefLinearSolver{T<:BlasReal} <: TLPLinearSolver{T}
     #   and add flag (default to false) to know whether user ordering should be used
 
     # Problem data
-    A::SparseMatrixCSC{T, Int}
-    θ::Vector{T}
+    A::SparseMatrixCSC{Tv, Int}
+    θ::Vector{Tv}   # Diagonal scaling
+    # Regularization
+    rp::Vector{Tv}  # primal
+    rd::Vector{Tv}  # dual
 
     # Factorization
     F
 
     # TODO: constructor with initial memory allocation
-    function SparsePosDefLinearSolver(A::SparseMatrixCSC{T, Int}) where{T<:BlasReal}
+    function SparsePosDefLinearSolver(A::SparseMatrixCSC{Tv, Int}) where{Tv<:BlasReal}
         m, n = size(A)
-        θ = ones(T, n)
+        θ = ones(Tv, n)
 
         S = A * A' + spdiagm(0 => ones(m))
 
         # TODO: PSD-ness checks
         F = cholesky(Symmetric(S))
 
-        return new{T}(m, n, A, θ, F)
+        return new{Tv}(m, n, A, θ, zeros(Tv, n), ones(Tv, m), F)
     end
 
 end
@@ -173,7 +184,7 @@ function update_linear_solver(
     ls::SparsePosDefLinearSolver{Tv},
     θ::AbstractVector{Tv},
     rp::AbstractVector{Tv}=zeros(Tv, ls.n),
-    rd::AbstractVector{Tv}=fill(Tv(1 // 10^6), ls.m)
+    rd::AbstractVector{Tv}=zeros(Tv, ls.m)
 ) where{Tv<:BlasReal}
     
     # Sanity checks
@@ -188,21 +199,21 @@ function update_linear_solver(
     ))
 
     ls.θ .= θ
+    ls.rp .= rp  # Primal regularization is disabled for normal equations
+    ls.rd .= rd
 
     # Re-compute factorization
     # D = (Θ^{-1} + Rp)^{-1}
-    D = Diagonal(one(Tv) ./ ((one(Tv) ./ θ) .+ rp))
-    Rd = spdiagm(0 => rd)
-    S = ls.A * D * ls.A'
+    D = Diagonal(
+        one(Tv) ./ ( (one(Tv) ./ ls.θ) .+ ls.rp)
+    )
+    Rd = spdiagm(0 => ls.rd)
+    S = ls.A * D * ls.A' + Rd
 
-    # TODO: PSD-ness checks
+    # Update factorization
     cholesky!(ls.F, Symmetric(S), check=false)
-    if !issuccess(ls.F)
-        # add regularization and try factor again.
-        LinearAlgebra.cholesky!(ls.F, Symmetric(S + Rd), check=false)
+    issuccess(ls.F) || throw(PosDefException(0))
 
-        issuccess(ls.F) || throw(PosDefException(0))
-    end
     return nothing
 end
 
@@ -233,13 +244,13 @@ function solve_augmented_system!(
     m, n = size(A)
     
     # Set-up right-hand side
-    ξ_ = ξp + ls.A * (ξd .* θ)
+    ξ_ = ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ θ) .+ ls.rp))
 
     # Solve augmented system
     dy .= (ls.F \ ξ_)
 
     # Recover dx
-    dx .= (ls.A' * dy - ξd) .* θ
+    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ θ) .+ ls.rp)
 
     # TODO: Iterative refinement
     # * Max number of refine steps

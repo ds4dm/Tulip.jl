@@ -38,6 +38,8 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     pt::Point{Tv}    # Current primal-dual iterate
     res::Residuals{Tv}  # Residuals at current iterate
     ls::TLPLinearSolver{Tv}
+    rp::Vector{Tv}  # primal regularization
+    rd::Vector{Tv}  # dual regularization
 
     # rxs::Tv  # rhs for complimentary products
     # rwz::Tv  # rhs for complimentary products
@@ -83,6 +85,9 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         )
 
         hsd.ls = TLPLinearSolver(A)
+
+        hsd.rp = ones(Tv, nvar)
+        hsd.rd = ones(Tv, ncon)  # Initial dual regularization
 
         return hsd
     end

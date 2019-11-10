@@ -14,36 +14,40 @@ function construct_matrix(
 end
 
 """
-    DenseLinearSolver{T}
+    DenseLinearSolver{Tv}
 
 Linear solver for dense matrices.
 
 The augmented system is automatically reduced to the normal equations system.
 BLAS/LAPACK functions are used whenever applicable.
 """
-mutable struct DenseLinearSolver{T<:Real} <: TLPLinearSolver{T}
+mutable struct DenseLinearSolver{Tv<:Real} <: TLPLinearSolver{Tv}
     m::Int  # Number of rows in A
     n::Int  # Number of columns in A
 
     # Problem data
-    A::Matrix{T}
-    θ::Vector{T}
+    A::Matrix{Tv}
+    θ::Vector{Tv}
 
-    B::Matrix{T}  # place-holder to avoid allocating memory afterwards
+    # Regularizations
+    rp::Vector{Tv}  # primal
+    rd::Vector{Tv}  # dual
+
+    B::Matrix{Tv}  # place-holder to avoid allocating memory afterwards
 
     # Factorization
-    S::Matrix{T}  # Normal equations matrix, that also holds the factorization
+    S::Matrix{Tv}  # Normal equations matrix, that also holds the factorization
 
     # Constructor
-    function DenseLinearSolver(A::Matrix{T}) where{T<:Real}
+    function DenseLinearSolver(A::Matrix{Tv}) where{Tv<:Real}
         m, n = size(A)
-        θ = ones(T, n)
+        θ = ones(Tv, n)
 
         # We just need to allocate memory here,
         # so no factorization yet
-        S = zeros(T, m, m)
+        S = zeros(Tv, m, m)
 
-        return new{T}(m, n, A, θ, copy(A), S)
+        return new{Tv}(m, n, A, θ, zeros(Tv, n), zeros(Tv, m), copy(A), S)
     end
 end
 
@@ -51,51 +55,81 @@ TLPLinearSolver(A::Matrix{Tv}) where{Tv<:Real} = DenseLinearSolver(A)
 
 # generic
 function update_linear_solver(
-    ls::DenseLinearSolver{T},
-    d::AbstractVector{T}
-) where{T<:Real}
+    ls::DenseLinearSolver{Tv},
+    d::AbstractVector{Tv},
+    rp::AbstractVector{Tv}=zeros(Tv, ls.n),
+    rd::AbstractVector{Tv}=zeros(Tv, ls.m)
+) where{Tv<:Real}
     # Sanity checks
     length(d) == ls.n || throw(DimensionMismatch(
         "d has length $(length(d)) but linear solver is for n=$(ls.n)."
     ))
+    length(rp) == ls.n || throw(DimensionMismatch(
+        "rp has length $(length(rp)) but linear solver has n=$(ls.n)"
+    ))
+    length(rd) == ls.m || throw(DimensionMismatch(
+        "rd has length $(length(rd)) but linear solver has m=$(ls.m)"
+    ))
 
     ls.θ .= d
+    ls.rp .= rp
+    ls.rd .= rd
 
     # Re-compute normal equations matrix
     # There's no function that does S = A*D*A', so we cache a copy of A
     copyto!(ls.B, ls.A)
-    rmul!(ls.B, Diagonal(ls.θ))  # B = A * D
-    mul!(ls.S, ls.B, transpose(ls.A))  # Now S = A*D
+    D = Diagonal(
+        one(Tv) ./ ( (one(Tv) ./ ls.θ) .+ ls.rp)
+    )
+    rmul!(ls.B, D)  # B = A * D
+    mul!(ls.S, ls.B, transpose(ls.A))  # Now S = A*D*A'
+    # TODO: do not re-compute S if only dual regularization changes
+    @inbounds for i in 1:ls.m
+        ls.S[i, i] += ls.rd[i]
+    end
     
     # Cholesky factorization
-    # TODO: regularize if needed
-    try
-        cholesky!(Symmetric(ls.S))
-    catch err
-        rethrow(err)
-    end
+    cholesky!(Symmetric(ls.S))
 
-    
     return nothing
 end
 
 # Use BLAS/LAPACK if available
 function update_linear_solver(
-    ls::DenseLinearSolver{T},
-    d::AbstractVector{T}
-) where{T<:BlasReal}
+    ls::DenseLinearSolver{Tv},
+    d::AbstractVector{Tv},
+    rp::AbstractVector{Tv}=zeros(Tv, ls.n),
+    rd::AbstractVector{Tv}=zeros(Tv, ls.m)
+) where{Tv<:BlasReal}
     # Sanity checks
     length(d) == ls.n || throw(DimensionMismatch(
         "d has length $(length(d)) but linear solver is for n=$(ls.n)."
     ))
+    length(rp) == ls.n || throw(DimensionMismatch(
+        "rp has length $(length(rp)) but linear solver has n=$(ls.n)"
+    ))
+    length(rd) == ls.m || throw(DimensionMismatch(
+        "rd has length $(length(rd)) but linear solver has m=$(ls.m)"
+    ))
 
     ls.θ .= d
+    ls.rp .= rp
+    ls.rd .= rd
 
     # Re-compute normal equations matrix
     # There's no function that does S = A*D*A', so we cache a copy of A
     copyto!(ls.B, ls.A)
-    rmul!(ls.B, Diagonal(sqrt.(ls.θ)))  # B = A * √D
-    BLAS.syrk!('U', 'N', one(T), ls.B, zero(T), ls.S)
+    D = Diagonal(sqrt.(
+        one(Tv) ./ ( (one(Tv) ./ ls.θ) .+ ls.rp)
+    ))
+    rmul!(ls.B, D)  # B = A * √D
+    BLAS.syrk!('U', 'N', one(Tv), ls.B, zero(Tv), ls.S)
+
+    # Regularization
+    # TODO: only update diagonal of S if only dual regularization changes
+    @inbounds for i in 1:ls.m
+        ls.S[i, i] += ls.rd[i]
+    end
     
     # Cholesky factorization
     # TODO: regularize if needed
@@ -133,7 +167,7 @@ function solve_augmented_system!(
     m, n = size(A)
     
     # Set-up right-hand side
-    dy .= ξp + ls.A * (ξd .* θ)
+    dy .= ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ θ) .+ ls.rp))
 
     # Solve augmented system
     # 
@@ -142,7 +176,7 @@ function solve_augmented_system!(
 
     # Recover dx
     # TODO: use more efficient mul! syntax
-    dx .= (ls.A' * dy - ξd) .* θ
+    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ θ) .+ ls.rp)
 
     # TODO: Iterative refinement
     return nothing
@@ -156,14 +190,14 @@ function solve_augmented_system!(
     m, n = size(A)
     
     # Set-up right-hand side
-    dy .= ξp + ls.A * (ξd .* θ)
+    dy .= ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ θ) .+ ls.rp))
 
     # Solve augmented system
     LAPACK.potrs!('U', ls.S, dy)  # potrs! over-writes the right-hand side
 
     # Recover dx
     # TODO: use more efficient mul! syntax
-    dx .= (ls.A' * dy - ξd) .* θ
+    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ θ) .+ ls.rp)
 
     # TODO: Iterative refinement
     return nothing
