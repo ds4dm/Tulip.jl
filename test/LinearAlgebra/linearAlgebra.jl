@@ -38,7 +38,7 @@ function test_linalg(A::AbstractMatrix{Tv}) where{Tv<:Real}
         ξp = ones(Tv, m)
         ξd = ones(Tv, n)
         TLP.TLPLinearAlgebra.solve_augmented_system!(
-            dx, dy, ls, A, θ, ξp, ξd
+            dx, dy, ls, ξp, ξd
         )
 
         # Check accuracy of solution

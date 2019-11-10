@@ -106,10 +106,10 @@ Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
-    ls::SparseIndefLinearSolver{Tv}, A::SparseMatrixCSC{Tv}, θ::Vector{Tv},
+    ls::SparseIndefLinearSolver{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:Real}
-    m, n = size(A)
+    m, n = ls.m, ls.n
     
     # Set-up right-hand side
     ξ = [ξd; ξp]
@@ -239,19 +239,19 @@ Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
-    ls::SparsePosDefLinearSolver{Tv}, A::SparseMatrixCSC{Tv}, θ::Vector{Tv},
+    ls::SparsePosDefLinearSolver{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:Real}
-    m, n = size(A)
+    m, n = ls.m, ls.n
     
     # Set-up right-hand side
-    ξ_ = ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ θ) .+ ls.rp))
+    ξ_ = ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ ls.θ) .+ ls.rp))
 
     # Solve augmented system
     dy .= (ls.F \ ξ_)
 
     # Recover dx
-    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ θ) .+ ls.rp)
+    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ ls.θ) .+ ls.rp)
 
     # TODO: Iterative refinement
     # * Max number of refine steps

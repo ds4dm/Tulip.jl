@@ -150,24 +150,20 @@ Solve the augmented system, overwriting `dx, dy` with the result.
 
 For dense `A` we first compute the normal equations system.
 
-`A` and `θ` are given to perform iterative refinement if needed.
-
 # Arguments
 - `dx::Vector{Tv}, dy::Vector{Tv}`: Vectors of unknowns, modified in-place
 - `ls::DenseLinearSolver{Tv}`: Linear solver for the augmented system
-- `A::Matrix{Tv}`: Constraint matrix
-- `θ::Vector{Tv}`: Diagonal scaling vector
 - `ξp::Vector{Tv}, ξd::Vector{Tv}`: Right-hand-side vectors
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
-    ls::DenseLinearSolver{Tv}, A::Matrix{Tv}, θ::Vector{Tv},
+    ls::DenseLinearSolver{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:Real}
-    m, n = size(A)
+    m, n = ls.m, ls.n
     
     # Set-up right-hand side
-    dy .= ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ θ) .+ ls.rp))
+    dy .= ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ ls.θ) .+ ls.rp))
 
     # Solve augmented system
     # 
@@ -176,7 +172,7 @@ function solve_augmented_system!(
 
     # Recover dx
     # TODO: use more efficient mul! syntax
-    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ θ) .+ ls.rp)
+    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ ls.θ) .+ ls.rp)
 
     # TODO: Iterative refinement
     return nothing
@@ -184,20 +180,20 @@ end
 
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
-    ls::DenseLinearSolver{Tv}, A::Matrix{Tv}, θ::Vector{Tv},
+    ls::DenseLinearSolver{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:BlasReal}
-    m, n = size(A)
+    m, n = ls.m, ls.n
     
     # Set-up right-hand side
-    dy .= ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ θ) .+ ls.rp))
+    dy .= ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ ls.θ) .+ ls.rp))
 
     # Solve augmented system
     LAPACK.potrs!('U', ls.S, dy)  # potrs! over-writes the right-hand side
 
     # Recover dx
     # TODO: use more efficient mul! syntax
-    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ θ) .+ ls.rp)
+    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ ls.θ) .+ ls.rp)
 
     # TODO: Iterative refinement
     return nothing

@@ -284,7 +284,7 @@ function solve_augsys_hsd!(
     ξd_ = copy(ξd)
     @views ξd_[uind] .-= (ξu .* θwz)
 
-    solve_augmented_system!(dx, dy, ls, A, θ, ξp, ξd_)
+    solve_augmented_system!(dx, dy, ls, ξp, ξd_)
 
     # Recover dz
     dz .= zero(Tv)
