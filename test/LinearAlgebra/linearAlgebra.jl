@@ -21,16 +21,16 @@ function test_linalg(A::AbstractMatrix{Tv}) where{Tv<:Real}
     end
 
     # Cholesky factorization
-    @testset "LinearSolver" begin
+    @testset "AbstractLinearSolver" begin
         # Initialize linear solver
-        ls = TLP.TLPLinearSolver(A)
+        ls = TLP.AbstractLinearSolver(A)
 
         # Update factorization
         θ = Tv(2) .* ones(Tv, n)
         regP = ones(Tv, n)
         regD = ones(Tv, m)
 
-        TLP.TLPLinearAlgebra.update_linear_solver(ls, θ, regP, regD)
+        TLP.TLPLinearAlgebra.update_linear_solver!(ls, θ, regP, regD)
 
         # solve linear system
         dx = zeros(Tv, n)

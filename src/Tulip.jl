@@ -7,7 +7,7 @@ using SparseArrays
 include("LinearAlgebra/LinearAlgebra.jl")
 import .TLPLinearAlgebra:
     construct_matrix,
-    TLPLinearSolver, update_linear_solver, solve_augmented_system!
+    AbstractLinearSolver, update_linear_solver!, solve_augmented_system!
 
 # package code goes here
 include("env.jl")       # Parameters

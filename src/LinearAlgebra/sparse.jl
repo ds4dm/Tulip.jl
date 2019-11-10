@@ -14,7 +14,7 @@ construct_matrix(
     SparseIndefLinearSolver{Tv}
 
 """
-mutable struct SparseIndefLinearSolver{Tv<:BlasReal} <: TLPLinearSolver{Tv}
+mutable struct SparseIndefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:Integer}} <: IndefLinearSolver{Tv, Ta}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -22,7 +22,7 @@ mutable struct SparseIndefLinearSolver{Tv<:BlasReal} <: TLPLinearSolver{Tv}
     #   and add flag (default to false) to know whether user ordering should be used
 
     # Problem data
-    A::SparseMatrixCSC{Tv, Int}
+    A::Ta
     θ::Vector{Tv}
     rp::Vector{Tv}  # primal regularization
     rd::Vector{Tv}  # dual regularization
@@ -42,14 +42,14 @@ mutable struct SparseIndefLinearSolver{Tv<:BlasReal} <: TLPLinearSolver{Tv}
 
         # TODO: PSD-ness checks
         F = ldlt(Symmetric(S))
-        return new{Tv}(m, n, A, θ, ones(Tv, n), ones(Tv, m), F)
+        return new{Tv, SparseMatrixCSC{Tv, Int}}(m, n, A, θ, ones(Tv, n), ones(Tv, m), F)
     end
 
 end
 
-TLPLinearSolver(A::SparseMatrixCSC{Tv, Int64}) where{Tv<:BlasReal} = SparsePosDefLinearSolver(A)
+AbstractLinearSolver(A::SparseMatrixCSC{Tv, Int64}) where{Tv<:BlasReal} = SparsePosDefLinearSolver(A)
 
-function update_linear_solver(
+function update_linear_solver!(
     ls::SparseIndefLinearSolver{Tv},
     θ::AbstractVector{Tv},
     rp::AbstractVector{Tv}=zeros(Tv, ls.n),
@@ -148,7 +148,7 @@ end
     SparsePosDefLinearSolver{Tv}
 
 """
-mutable struct SparsePosDefLinearSolver{Tv<:BlasReal} <: TLPLinearSolver{Tv}
+mutable struct SparsePosDefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:Integer}} <: PosDefLinearSolver{Tv, Ta}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -156,7 +156,7 @@ mutable struct SparsePosDefLinearSolver{Tv<:BlasReal} <: TLPLinearSolver{Tv}
     #   and add flag (default to false) to know whether user ordering should be used
 
     # Problem data
-    A::SparseMatrixCSC{Tv, Int}
+    A::Ta
     θ::Vector{Tv}   # Diagonal scaling
     # Regularization
     rp::Vector{Tv}  # primal
@@ -165,7 +165,8 @@ mutable struct SparsePosDefLinearSolver{Tv<:BlasReal} <: TLPLinearSolver{Tv}
     # Factorization
     F
 
-    # TODO: constructor with initial memory allocation
+    # Constructor and initial memory allocation
+    # TODO: symbolic only + allocation
     function SparsePosDefLinearSolver(A::SparseMatrixCSC{Tv, Int}) where{Tv<:BlasReal}
         m, n = size(A)
         θ = ones(Tv, n)
@@ -175,12 +176,12 @@ mutable struct SparsePosDefLinearSolver{Tv<:BlasReal} <: TLPLinearSolver{Tv}
         # TODO: PSD-ness checks
         F = cholesky(Symmetric(S))
 
-        return new{Tv}(m, n, A, θ, zeros(Tv, n), ones(Tv, m), F)
+        return new{Tv, SparseMatrixCSC{Tv, Int}}(m, n, A, θ, zeros(Tv, n), ones(Tv, m), F)
     end
 
 end
 
-function update_linear_solver(
+function update_linear_solver!(
     ls::SparsePosDefLinearSolver{Tv},
     θ::AbstractVector{Tv},
     rp::AbstractVector{Tv}=zeros(Tv, ls.n),

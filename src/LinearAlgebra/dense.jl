@@ -21,7 +21,7 @@ Linear solver for dense matrices.
 The augmented system is automatically reduced to the normal equations system.
 BLAS/LAPACK functions are used whenever applicable.
 """
-mutable struct DenseLinearSolver{Tv<:Real} <: TLPLinearSolver{Tv}
+mutable struct DenseLinearSolver{Tv<:Real} <: PosDefLinearSolver{Tv, Matrix{Tv}}
     m::Int  # Number of rows in A
     n::Int  # Number of columns in A
 
@@ -51,10 +51,10 @@ mutable struct DenseLinearSolver{Tv<:Real} <: TLPLinearSolver{Tv}
     end
 end
 
-TLPLinearSolver(A::Matrix{Tv}) where{Tv<:Real} = DenseLinearSolver(A)
+AbstractLinearSolver(A::Matrix{Tv}) where{Tv<:Real} = DenseLinearSolver(A)
 
 # generic
-function update_linear_solver(
+function update_linear_solver!(
     ls::DenseLinearSolver{Tv},
     d::AbstractVector{Tv},
     rp::AbstractVector{Tv}=zeros(Tv, ls.n),
@@ -95,7 +95,7 @@ function update_linear_solver(
 end
 
 # Use BLAS/LAPACK if available
-function update_linear_solver(
+function update_linear_solver!(
     ls::DenseLinearSolver{Tv},
     d::AbstractVector{Tv},
     rp::AbstractVector{Tv}=zeros(Tv, ls.n),

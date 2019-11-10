@@ -49,7 +49,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     nbump = 0
     while nbump <= 3
         try
-            update_linear_solver(hsd.ls, θ, hsd.rp, hsd.rd)
+            update_linear_solver!(hsd.ls, θ, hsd.rp, hsd.rd)
             break
         catch err
             # @info hsd.niter, err, hsd.rd[1]
@@ -273,7 +273,7 @@ Solve the augmented system below, and overwrite `dx, dy, dz` with the result.
 - `ξp, ξd, ξu`: Right-hand-side vectors
 """
 function solve_augsys_hsd!(
-    A::AbstractMatrix{Tv}, ls::TLPLinearSolver{Tv},
+    A::AbstractMatrix{Tv}, ls::AbstractLinearSolver{Tv},
     θ::Vector{Tv}, θwz::Vector{Tv}, uind::Vector{Int},
     dx::Vector{Tv}, dy::Vector{Tv}, dz::Vector{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}, ξu::Vector{Tv}

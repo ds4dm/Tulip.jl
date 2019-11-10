@@ -8,11 +8,27 @@ using SparseArrays
 export construct_matrix
 
 """
-    TLPLinearSolver{T<:Real}
+    AbstractLinearSolver{Tv, Ta}
 
 Abstract container for linear solver used in solving the augmented system.
 """
-abstract type TLPLinearSolver{Tv<:Real} end
+abstract type AbstractLinearSolver{Tv<:Real, Ta<:AbstractMatrix{Tv}} end
+
+# TODO: Traits
+
+"""
+    IndefLinearSolver{Tv, Ta}
+
+Abstract container for linear solver working on the indefinite augmented system.
+"""
+abstract type IndefLinearSolver{Tv<:Real, Ta<:AbstractMatrix{Tv}} <: AbstractLinearSolver{Tv, Ta} end
+
+"""
+    PosDefLinearSolver{Tv, Ta}
+
+Abstract container for linear solver working on the PSD normal equations system.
+"""
+abstract type PosDefLinearSolver{Tv<:Real, Ta<:AbstractMatrix{Tv}} <: AbstractLinearSolver{Tv, Ta} end
 
 
 """
