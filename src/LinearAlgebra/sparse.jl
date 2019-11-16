@@ -86,7 +86,7 @@ function update_linear_solver!(
     # Re-compute factorization
     # TODO: Keep S in memory, only change diagonal
     S = [
-        spdiagm(0 => -(one(Tv) ./ ls.θ) .- regP)  ls.A';
+        spdiagm(0 => -ls.θ .- regP)  ls.A';
         ls.A spdiagm(0 => regD)
     ]
 
@@ -128,9 +128,9 @@ function solve_augmented_system!(
     # * Max number of refine steps
     # * Check for residuals before refining
     # * Check whether residuals did improve
-    # resP = A*dx + ls.regD .* dy - ξp
-    # resD = - dx .* ( (one(Tv) ./ ls.θ) + ls.regP) + A' * dy - ξd
-    # @info "\n|resP| = $(norm(resP, Inf))\n|resD| = $(norm(resD, Inf))\n"
+    # resP = ls.A*dx + ls.regD .* dy - ξp
+    # resD = - dx .* (ls.θ + ls.regP) + ls.A' * dy - ξd
+    # println("\n|resP| = $(norm(resP, Inf))\n|resD| = $(norm(resD, Inf))")
 
     # ξ1 = [resD; resP]
     # d1 = ls.F \ ξ1
@@ -224,9 +224,7 @@ function update_linear_solver!(
 
     # Re-compute factorization
     # D = (Θ^{-1} + Rp)^{-1}
-    D = Diagonal(
-        one(Tv) ./ ( (one(Tv) ./ ls.θ) .+ ls.regP)
-    )
+    D = Diagonal(one(Tv) ./ (ls.θ .+ ls.regP))
     Rd = spdiagm(0 => ls.regD)
     S = ls.A * D * ls.A' + Rd
 
@@ -253,19 +251,27 @@ function solve_augmented_system!(
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:Real}
     m, n = ls.m, ls.n
+
+    d = one(Tv) ./ (ls.θ .+ ls.regP)
+    D = Diagonal(d)
     
     # Set-up right-hand side
-    ξ_ = ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ ls.θ) .+ ls.regP))
+    ξ_ = ξp .+ ls.A * (D * ξd)
 
     # Solve augmented system
     dy .= (ls.F \ ξ_)
 
     # Recover dx
-    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ ls.θ) .+ ls.regP)
+    dx .= D * (ls.A' * dy - ξd)
 
     # TODO: Iterative refinement
     # * Max number of refine steps
     # * Check for residuals before refining
     # * Check whether residuals did improve
+    # resP = ls.A * dx + ls.regD .* dy - ξp
+    # resD = - D \ dx + ls.A' * dy - ξd
+    # println("\n|resP| = $(norm(resP, Inf))\n|resD| = $(norm(resD, Inf))")
+
+    
     return nothing
 end

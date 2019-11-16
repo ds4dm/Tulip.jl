@@ -86,9 +86,7 @@ function update_linear_solver!(
     # Re-compute normal equations matrix
     # There's no function that does S = A*D*A', so we cache a copy of A
     copyto!(ls.B, ls.A)
-    D = Diagonal(
-        one(Tv) ./ ( (one(Tv) ./ ls.θ) .+ ls.regP)
-    )
+    D = Diagonal(one(Tv) ./ (ls.θ .+ ls.regP))
     rmul!(ls.B, D)  # B = A * D
     mul!(ls.S, ls.B, transpose(ls.A))  # Now S = A*D*A'
     # TODO: do not re-compute S if only dual regularization changes
@@ -110,13 +108,13 @@ Uses fast BLAS and LAPACK routines.
 """
 function update_linear_solver!(
     ls::DenseLinearSolver{Tv},
-    d::AbstractVector{Tv},
+    θ::AbstractVector{Tv},
     regP::AbstractVector{Tv}=zeros(Tv, ls.n),
     regD::AbstractVector{Tv}=zeros(Tv, ls.m)
 ) where{Tv<:BlasReal}
     # Sanity checks
-    length(d) == ls.n || throw(DimensionMismatch(
-        "d has length $(length(d)) but linear solver is for n=$(ls.n)."
+    length(θ) == ls.n || throw(DimensionMismatch(
+        "θ has length $(length(θ)) but linear solver is for n=$(ls.n)."
     ))
     length(regP) == ls.n || throw(DimensionMismatch(
         "regP has length $(length(regP)) but linear solver has n=$(ls.n)"
@@ -125,16 +123,14 @@ function update_linear_solver!(
         "regD has length $(length(regD)) but linear solver has m=$(ls.m)"
     ))
 
-    ls.θ .= d
+    ls.θ .= θ
     ls.regP .= regP
     ls.regD .= regD
 
     # Re-compute normal equations matrix
     # There's no function that does S = A*D*A', so we cache a copy of A
     copyto!(ls.B, ls.A)
-    D = Diagonal(sqrt.(
-        one(Tv) ./ ( (one(Tv) ./ ls.θ) .+ ls.regP)
-    ))
+    D = Diagonal(sqrt.(one(Tv) ./ (ls.θ .+ ls.regP)))
     rmul!(ls.B, D)  # B = A * √D
     BLAS.syrk!('U', 'N', one(Tv), ls.B, zero(Tv), ls.S)
 
@@ -172,7 +168,7 @@ function solve_augmented_system!(
     m, n = ls.m, ls.n
     
     # Set-up right-hand side
-    dy .= ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ ls.θ) .+ ls.regP))
+    dy .= ξp .+ ls.A * (ξd ./ (ls.θ .+ ls.regP))
 
     # Solve normal equations
     ldiv!(UpperTriangular(ls.S)', dy)
@@ -180,7 +176,7 @@ function solve_augmented_system!(
 
     # Recover dx
     # TODO: use more efficient mul! syntax
-    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ ls.θ) .+ ls.regP)
+    dx .= (ls.A' * dy - ξd) ./ (ls.θ .+ ls.regP)
 
     # TODO: Iterative refinement
     return nothing
@@ -206,14 +202,14 @@ function solve_augmented_system!(
     m, n = ls.m, ls.n
     
     # Set-up right-hand side
-    dy .= ξp .+ ls.A * (ξd ./ ( (one(Tv) ./ ls.θ) .+ ls.regP))
+    dy .= ξp .+ ls.A * (ξd ./ (ls.θ .+ ls.regP))
 
     # Solve augmented system
     LAPACK.potrs!('U', ls.S, dy)  # potrs! over-writes the right-hand side
 
     # Recover dx
     # TODO: use more efficient mul! syntax
-    dx .= (ls.A' * dy - ξd) ./ ( (one(Tv) ./ ls.θ) .+ ls.regP)
+    dx .= (ls.A' * dy - ξd) ./ (ls.θ .+ ls.regP)
 
     # TODO: Iterative refinement
     return nothing

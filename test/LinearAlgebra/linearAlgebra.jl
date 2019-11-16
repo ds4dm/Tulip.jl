@@ -43,7 +43,7 @@ function test_linalg(A::AbstractMatrix{Tv}) where{Tv<:Real}
 
         # Check accuracy of solution
         resP = norm(ξp - A * dx - regD .* dy, Inf)
-        resD = norm(ξd - dx ./ ( (ones(Tv) ./ θ) .+ regP) - A' * dy, Inf)
+        resD = norm(ξd - dx ./ (θ .+ regP) - A' * dy, Inf)
 
         @test resP <= sqrt(eps(Tv))
         @test resD <= sqrt(eps(Tv))

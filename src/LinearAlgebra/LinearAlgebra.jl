@@ -43,6 +43,8 @@ include("sparse.jl")
 
 # TODO: use parameter to choose between Indef/PosDef system
 AbstractLinearSolver(A::Matrix{Tv}) where{Tv<:Real} = DenseLinearSolver(A)
-AbstractLinearSolver(A::SparseMatrixCSC{Tv, Int64}) where{Tv<:BlasReal} = SparsePosDefLinearSolver(A)
+AbstractLinearSolver(
+    A::SparseMatrixCSC{Tv, Int64}
+) where{Tv<:BlasReal} = SparsePosDefLinearSolver(A)
 
 end  # module

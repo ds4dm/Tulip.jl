@@ -35,13 +35,12 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     θ   = pt.s ./ pt.x
     θwz = pt.z ./ pt.w
     @views θ[uind] .+= θwz
-    θ .\= oneunit(Tv)
 
     # Update regularizations
     # Decrease regularization
     # @info "\nα = $(α); |reg_dual| = $(norm(hsd.rd, Inf))\n\n"
     rd_min = sqrt(eps(Tv))
-    rp_min = eps(Tv)
+    rp_min = sqrt(eps(Tv))
     hsd.rp .= max.(rp_min, hsd.rp ./ 10)
     hsd.rd .= max.(rd_min, hsd.rd ./ 10)
 
