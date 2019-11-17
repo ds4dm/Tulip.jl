@@ -11,13 +11,12 @@ function test_linalg(A::AbstractMatrix{Tv}) where{Tv<:Real}
     n = size(A, 2)
 
     # Matrix-vector multiplication
-    @testset "Matrix-Vector" begin
-        x = zeros(Tv, n)
-        y = zeros(Tv, m)
+    @testset "Required methods" begin
+        @test hasmethod(*, Tuple{typeof(A), Vector{Tv}})
+        @test hasmethod(*, Tuple{typeof(A'), Vector{Tv}})
 
-        A * x;
-        transpose(A) * y;
-        mul!(y, A, x)
+        @test hasmethod(mul!, Tuple{Vector{Tv}, typeof(A), Vector{Tv}})
+        @test hasmethod(mul!, Tuple{Vector{Tv}, typeof(A'), Vector{Tv}})
     end
 
     # Cholesky factorization
