@@ -1,7 +1,9 @@
 # Tulip
 
-| **Documentation** | **Build Status** | **Coverage** |
-|:-----------------:|:----------------:|:----------:|
+[![DOI](https://zenodo.org/badge/131298750.svg)](https://zenodo.org/badge/latestdoi/131298750)
+
+ **Documentation** | **Build Status** | **Coverage** |
+|:-----------------:|:----------------:|:------------:|
 | [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://ds4dm.github.io/Tulip.jl/dev/) | [![Build Status](https://travis-ci.org/ds4dm/Tulip.jl.svg?branch=master)](https://travis-ci.org/ds4dm/Tulip.jl) | [![codecov.io](https://codecov.io/github/ds4dm/Tulip.jl/coverage.svg?branch=master)](http://codecov.io/github/ds4dm/Tulip.jl?branch=master)
 
 
