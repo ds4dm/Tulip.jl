@@ -138,7 +138,7 @@ end
     # =============================================
     #   I.1 Supported attributes
     # =============================================
-SUPPORTED_OPTIMIZER_ATTR = Union{
+const SUPPORTED_OPTIMIZER_ATTR = Union{
     MOI.NumberOfThreads,
     MOI.SolverName,
     MOI.Silent,
@@ -194,7 +194,7 @@ end
     #   II.1 Supported attributes
     # =============================================
 
-SUPPORTED_MODEL_ATTR = Union{
+const SUPPORTED_MODEL_ATTR = Union{
     MOI.Name,
     MOI.ObjectiveSense,
     MOI.NumberOfVariables,
@@ -470,7 +470,7 @@ List of supported MOI `VariableAttribute`.
 * `MOI.VariableName`
 * `MOI.VariablePrimal`
 """
-SUPPORTED_VARIABLE_ATTR = Union{
+const SUPPORTED_VARIABLE_ATTR = Union{
     MOI.VariableName,
     # MOI.VariablePrimalStart,
     MOI.VariablePrimal
@@ -599,7 +599,7 @@ end
 List of supported MOI `ConstraintAttribute`.
 * `MOI.ConstraintName`
 """
-SUPPORTED_CONSTR_ATTR = Union{
+const SUPPORTED_CONSTR_ATTR = Union{
     MOI.ConstraintName,
     MOI.ConstraintPrimal,
     MOI.ConstraintDual,
