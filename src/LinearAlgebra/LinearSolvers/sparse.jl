@@ -109,7 +109,7 @@ function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
     ls::SparseIndefLinearSolver{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
-) where{Tv<:Real}
+) where{Tv<:BlasReal}
     m, n = ls.m, ls.n
     
     # Set-up right-hand side
@@ -248,7 +248,7 @@ function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
     ls::SparsePosDefLinearSolver{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
-) where{Tv<:Real}
+) where{Tv<:BlasReal}
     m, n = ls.m, ls.n
 
     d = one(Tv) ./ (ls.θ .+ ls.regP)
