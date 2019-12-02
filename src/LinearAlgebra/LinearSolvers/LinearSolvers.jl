@@ -32,7 +32,14 @@ abstract type PosDefLinearSolver{Tv<:Real, Ta<:AbstractMatrix{Tv}} <: AbstractLi
 """
     update_linear_solver!(ls, θ, regP, regD)
 
-where `Θ` `θ`.   = Diag(\\theta)``.
+Update internal data, and re-compute factorization/pre-conditioner.
+
+After this call, `ls` can be used to solve the augmented system
+```
+    [-(Θ^{-1} + Rp)   A'] [dx] = [ξd]
+    [   A             Rd] [dy] = [ξp]
+```
+for given right-hand sides `ξd` and `ξp`.
 """
 function update_linear_solver!(ls::AbstractLinearSolver, θ, regP, regD) end
 

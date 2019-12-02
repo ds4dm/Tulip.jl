@@ -2,9 +2,18 @@
 CurrentModule = Tulip.TLPLinearAlgebra
 ```
 
-# Linear solvers
+# Solving linear systems
 
-## Linear systems
+!!! warning
+
+    The overall structure of Linear Solvers is expected to undergo a major update in the near future.
+    In particular, a number of type parametrization shall eventually be replaced by a trait-based implementation, 
+    which should prove more flexible.
+
+    The high-level interface should not change too much, and the underlying linear algebra
+        techniques shall remain the same.
+
+## Overview
 
 The first system we consider is the symmetric quasi-definite _augmented system_
 ```math
@@ -35,24 +44,26 @@ One can pivot out the upper-left diagonal block to obtain the positive-definite
 ```
 
 
-## Overview
+## Linear solvers
 
 Here is a list of currently supported linear solvers:
 
 | Linear solver type | type of ``A`` | System | Method | 
 |:--------------------|:------:|:--:|:--|
-| `DenseLinearSolver` | `Matrix` | Normal Eqn | Direct (Cholesky) |
-| `SparseIndefLinearSolver` | `SparseMatricCSC` | Augm. Sys | Direct (LDLt) |
-| `SparsePosDefLinearSolver` | `SparseMatricCSC` | Normal Eqn | Direct (Cholesky) |
+| [`DenseLinearSolver`](@ref) | `Matrix` | Normal Eqn | Direct (Cholesky) |
+| [`SparseIndefLinearSolver`](@ref) | `SparseMatricCSC` | Augm. Sys | Direct (LDLt) |
+| [`SparsePosDefLinearSolver`](@ref) | `SparseMatricCSC` | Normal Eqn | Direct (Cholesky) |
 
-## Linear solvers
+### AbstractLinearSolver
+
+This is the base type from which all implementations should derive.
 
 ```@docs
 AbstractLinearSolver
 ```
 
 Custom linear solvers should inherit from the `AbstractLinearSolver` class,
-and extend the following two functions
+and extend the following two functions:
 
 ```@docs
 update_linear_solver!(::AbstractLinearSolver, ::Any, ::Any, ::Any)
@@ -62,23 +73,48 @@ update_linear_solver!(::AbstractLinearSolver, ::Any, ::Any, ::Any)
 solve_augmented_system!(::Any, ::Any, ::AbstractLinearSolver, ::Any, ::Any)
 ```
 
-### Dense
+### DenseLinearSolver
 
 ```@docs
 DenseLinearSolver
 ```
 
 ```@docs
+update_linear_solver!(::DenseLinearSolver{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:Real}
 update_linear_solver!(::DenseLinearSolver{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:BlasReal}
 ```
 
+```@docs
+solve_augmented_system!(::Vector{Tv},::Vector{Tv},::DenseLinearSolver{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:Real}
+solve_augmented_system!(::Vector{Tv},::Vector{Tv},::DenseLinearSolver{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:BlasReal}
+```
 
-### Sparse
+### SparseIndefLinearSolver
 
 ```@docs
 SparseIndefLinearSolver
 ```
 
 ```@docs
+update_linear_solver!(::SparseIndefLinearSolver{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:BlasReal}
+```
+
+```@docs
+solve_augmented_system!(::Vector{Tv},::Vector{Tv},::SparseIndefLinearSolver{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:BlasReal}
+```
+
+
+
+### SparsePosDefLinearSolver
+
+```@docs
 SparsePosDefLinearSolver
+```
+
+```@docs
+update_linear_solver!(::SparsePosDefLinearSolver{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:BlasReal}
+```
+
+```@docs
+solve_augmented_system!(::Vector{Tv},::Vector{Tv},::SparsePosDefLinearSolver{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:BlasReal}
 ```
