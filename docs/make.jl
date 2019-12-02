@@ -6,7 +6,10 @@ makedocs(
     format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
     pages = [
         "Home" => "index.md",
-        "Problem formulation" => "formulation.md"
+        "Problem formulation" => "formulation.md",
+        "Reference" => Any[
+            "Linear solvers" => "man/linear_solvers.md"
+        ]
     ]
 )
 
