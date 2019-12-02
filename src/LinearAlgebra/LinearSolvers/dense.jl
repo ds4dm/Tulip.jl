@@ -66,8 +66,8 @@ Uses Julia's generic linear algebra.
 function update_linear_solver!(
     ls::DenseLinearSolver{Tv},
     θ::AbstractVector{Tv},
-    regP::AbstractVector{Tv}=zeros(Tv, ls.n),
-    regD::AbstractVector{Tv}=zeros(Tv, ls.m)
+    regP::AbstractVector{Tv},
+    regD::AbstractVector{Tv}
 ) where{Tv<:Real}
     # Sanity checks
     length(θ) == ls.n || throw(DimensionMismatch(
@@ -111,8 +111,8 @@ Uses BLAS and LAPACK routines.
 function update_linear_solver!(
     ls::DenseLinearSolver{Tv},
     θ::AbstractVector{Tv},
-    regP::AbstractVector{Tv}=zeros(Tv, ls.n),
-    regD::AbstractVector{Tv}=zeros(Tv, ls.m)
+    regP::AbstractVector{Tv},
+    regD::AbstractVector{Tv}
 ) where{Tv<:BlasReal}
     # Sanity checks
     length(θ) == ls.n || throw(DimensionMismatch(

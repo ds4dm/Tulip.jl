@@ -62,8 +62,8 @@ Throws a `PosDefException` if matrix is not quasi-definite.
 function update_linear_solver!(
     ls::SparseIndefLinearSolver{Tv, Ta},
     θ::AbstractVector{Tv},
-    regP::AbstractVector{Tv}=zeros(Tv, ls.n),
-    regD::AbstractVector{Tv}=zeros(Tv, ls.m)
+    regP::AbstractVector{Tv},
+    regD::AbstractVector{Tv}
 ) where{Tv<:BlasReal, Ta<:AbstractMatrix{Tv}}
     # Sanity checks
     length(θ)  == ls.n || throw(DimensionMismatch(
@@ -202,8 +202,8 @@ Compute normal equation system matrix, and update the factorization.
 function update_linear_solver!(
     ls::SparsePosDefLinearSolver{Tv},
     θ::AbstractVector{Tv},
-    regP::AbstractVector{Tv}=zeros(Tv, ls.n),
-    regD::AbstractVector{Tv}=zeros(Tv, ls.m)
+    regP::AbstractVector{Tv},
+    regD::AbstractVector{Tv}
 ) where{Tv<:BlasReal}
     
     # Sanity checks
