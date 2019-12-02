@@ -41,7 +41,7 @@ After this call, `ls` can be used to solve the augmented system
 ```
 for given right-hand sides `ξd` and `ξp`.
 """
-function update_linear_solver!(ls::AbstractLinearSolver, θ, regP, regD) end
+function update_linear_solver! end
 
 
 """
@@ -54,11 +54,7 @@ Solve the symmetric quasi-definite augmented system
 ```
 and over-write `dx`, `dy` with the result.
 """
-function solve_augmented_system!(
-    dx, dy,
-    ls::AbstractLinearSolver,
-    ξp, ξd
-) end
+function solve_augmented_system! end
 
 
 # 

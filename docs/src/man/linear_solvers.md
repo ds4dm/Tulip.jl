@@ -66,11 +66,11 @@ Custom linear solvers should inherit from the `AbstractLinearSolver` class,
 and extend the following two functions:
 
 ```@docs
-update_linear_solver!(::AbstractLinearSolver, ::Any, ::Any, ::Any)
+update_linear_solver!
 ```
 
 ```@docs
-solve_augmented_system!(::Any, ::Any, ::AbstractLinearSolver, ::Any, ::Any)
+solve_augmented_system!
 ```
 
 ### DenseLinearSolver
