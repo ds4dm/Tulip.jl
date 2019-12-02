@@ -71,7 +71,7 @@ function update_linear_solver!(
 ) where{Tv<:Real}
     # Sanity checks
     length(θ) == ls.n || throw(DimensionMismatch(
-        "θ has length $(length(d)) but linear solver is for n=$(ls.n)."
+        "θ has length $(length(θ)) but linear solver is for n=$(ls.n)."
     ))
     length(regP) == ls.n || throw(DimensionMismatch(
         "regP has length $(length(regP)) but linear solver has n=$(ls.n)"
