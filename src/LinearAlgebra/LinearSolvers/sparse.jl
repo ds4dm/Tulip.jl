@@ -13,14 +13,9 @@ construct_matrix(
 """
     SparseIndefLinearSolver{Tv}
 
-Linear solver for the 2x2 augmented system
-```math
-    [-(Θ^{-1} + Rp)   A'] [dx] = [xi_d]
-    [   A             Rd] [dy] = [xi_p]
-```
-with ``A`` sparse.
+Linear solver for the 2x2 augmented system with ``A`` sparse.
 
-Uses an LDLt factorization of the quasi-definite system above.
+Uses an LDLt factorization of the quasi-definite augmented system.
 """
 mutable struct SparseIndefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:Integer}} <: IndefLinearSolver{Tv, Ta}
     m::Int  # Number of rows
@@ -59,6 +54,10 @@ end
     update_linear_solver!(ls, θ, regP, regD)
 
 Update LDLt factorization of the augmented system.
+
+Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
+    the factorization.
+Throws a `PosDefException` if matrix is not quasi-definite.
 """
 function update_linear_solver!(
     ls::SparseIndefLinearSolver{Tv, Ta},

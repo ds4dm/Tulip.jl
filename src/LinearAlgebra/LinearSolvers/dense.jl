@@ -17,7 +17,7 @@ end
     DenseLinearSolver{Tv}
 
 Linear solver for the 2x2 augmented system
-```math
+```
     [-(Θ^{-1} + Rp)   A'] [dx] = [xi_d]
     [   A             Rd] [dy] = [xi_p]
 ```
@@ -57,9 +57,10 @@ mutable struct DenseLinearSolver{Tv<:Real} <: PosDefLinearSolver{Tv, Matrix{Tv}}
 end
 
 """
-    update_linear_solver!(ls, θ, regP, regD)
+    update_linear_solver!(ls::DenseLinearSolver{<:Real}, θ, regP, regD)
 
 Compute normal equations system matrix and update Cholesky factorization.
+
 Uses Julia's generic linear algebra.
 """
 function update_linear_solver!(
@@ -101,10 +102,11 @@ function update_linear_solver!(
 end
 
 """
-    update_linear_solver!(ls, θ, regP, regD)
+    update_linear_solver!(ls::DenseLinearSolver{<:BlasReal}, θ, regP, regD)
 
 Compute normal equations system matrix and update Cholesky factorization.
-Uses fast BLAS and LAPACK routines.
+
+Uses BLAS and LAPACK routines.
 """
 function update_linear_solver!(
     ls::DenseLinearSolver{Tv},
