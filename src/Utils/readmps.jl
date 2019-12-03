@@ -1,7 +1,44 @@
-"""
-    readmps(filename)
+abstract type MPSSection end
 
-    Parse an MPS file, and return a linear program in standard form.
+struct MPSNoSection <: MPSSection end
+struct MPSName <: MPSSection end
+struct MPSObjsense <: MPSSection end
+struct MPSObjName <: MPSSection end
+struct MPSRows <: MPSSection end
+struct MPSColumns <: MPSSection end
+struct MPSRhs <: MPSSection end
+struct MPSRanges <: MPSSection end
+struct MPSBounds <: MPSSection end
+struct MPSEndata <: MPSSection end
+
+function MPSSection(sec)
+    if sec == "NAME"
+        return MPSName()
+    elseif sec == "OBJSENSE"
+        return MPSObjsense()
+    elseif sec == "OBJNAME"
+        return MPSObjName()
+    elseif sec == "ROWS"
+        return MPSRows()
+    elseif sec == "COLUMNS"
+        return MPSColumns()
+    elseif sec == "RHS"
+        return MPSRhs()
+    elseif sec == "RANGES"
+        return MPSRanges()
+    elseif sec == "BOUNDS"
+        return MPSBounds()
+    elseif sec == "ENDATA"
+        return MPSEndata()
+    else
+        return MPSNoSection()
+    end
+end
+
+"""
+    readmps!(m::Model{Tv}, filename)
+
+Parse a free-MPS file into model `m`
 """
 function readmps!(m::Model{Tv}, fname::String) where{Tv<:Real}
 
@@ -24,57 +61,33 @@ function readmps!(m::Model{Tv}, fname::String) where{Tv<:Real}
     d["bound"] = ""
     d["range"] = ""
 
-    open(fname) do f
-        for ln in eachline(f)
+    section = MPSNoSection()
 
-            fields = parseline(ln)
+    open(fname) do f
+        nline = 0
+        for ln in eachline(f)
+            nline += 1
 
             # pass empty lines or comments
-            if length(fields) == 0
+            if length(ln) == 0 || ln[1] == '*'
                 continue
             end
+
+            fields = split(ln)
 
             # check for indicators
             if ln[1] != ' '
-                if fields[1] == "NAME"
-                    # extract problem name
-                    if length(fields) >= 2
-                        # second field is name, rest is ignored
-                        m.name = fields[2]
-                    else
-                        #  empty name
-                        m.name = ""
-                    end
-                    continue
-                end
-                # update section value and pass to next line
-                section = fields[1]
+                # Section header
+                section = MPSSection(fields[1])
+
+                isa(section, MPSName) && (m.name = fields[2])
                 continue
             end
 
-            if section == "ROWS"
-                parsemps_rows!(m, ln, fields, con2idx)
+            parseline!(section, m, fields, d, var2idx, con2idx, lb, ub)
 
-            elseif section == "COLUMNS"
-                parsemps_columns!(m, ln, fields, var2idx, con2idx, lb, ub)
-
-            elseif section == "RHS"
-                parsemps_rhs!(m, ln, fields, con2idx, d)
-
-            elseif section == "RANGES"
-                parsemps_ranges!(m, ln, fields, d, con2idx)
-
-            elseif section == "BOUNDS"
-                parsemps_bounds!(m, ln, fields, d, var2idx, lb, ub)
-
-            elseif section == "ENDATA"
-                # end of file
-            else
-                @warn "UNEXPECTED FORMAT PARSING\t$(ln)"
-            end
-
+            isa(section, MPSEndata) && break
         end
-
         # End of file reached
     end
 
@@ -86,61 +99,31 @@ function readmps!(m::Model{Tv}, fname::String) where{Tv<:Real}
     return m
 end
 
-
 """
-    parseline(ln)
+    parseline!(::MPSSection, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub)
+
+Dummy function for now.
 """
-function parseline(ln)
-    s = []
-    if length(ln) == 0 || ln[1] == '*'
-        # empty line or comment line
-        return s
-    elseif ln[1] != ' '
-        # indicator row
-        s = split(ln)
-        return s
-    end
-
-    # fill-in with spaces to get a 80-long line
-    if length(ln) < 80
-        ln_ = ln * (" "^(80-length(ln)))
-    end
-
-    fields = [
-        ln_[2:3],
-        ln_[5:12],
-        ln_[15:22],
-        ln_[25:36],
-        ln_[40:47],
-        ln_[50:61]
-    ]
-
-    # parse each field from right to left
-    # empty fields on the right are ignored
-    for f in fields[end:-1:1]
-        # remove left-trailing and right-trailing spaces
-        f_ = strip(f)  # f_ may be empty
-
-        if length(f_) > 0 || length(s) > 0
-            pushfirst!(s, f_)
-        end
-    end
-
-    return s
+function parseline!(::MPSSection, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub) where{Tv<:Real}
+    error()
 end
 
+"""
+    parseline!(::MPSNoSection, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub)
 
-function parsemps_rows!(m::Model{Tv}, ln, fields, con2idx) where{Tv<:Real}
-    # parse a ROWS line of the MPS file
-    # `ln` is a string that contains the current line
-    # `fields` is an array such that fields == split(ln)
-    
-    # current line should contain exactly 2 fields
-    if length(fields) != 2
-        # input error, current line is ignored
-        @warn "INPUT ERROR:\t$(ln)"
-        return nothing
-    end
+This should never be called.
+"""
+function parseline!(::MPSNoSection, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub) where{Tv<:Real}
+    error()
+end
+
+"""
+    parseline!(::MPSRows, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub)
+
+Parse a line from ROWS section in an MPS file.
+"""
+function parseline!(::MPSRows, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub) where{Tv<:Real}
+    length(fields) == 2 || error()
 
     # parse line
     # First field can be either of:
@@ -151,6 +134,7 @@ function parsemps_rows!(m::Model{Tv}, ln, fields, con2idx) where{Tv<:Real}
     if fields[1] == "N"
         # objective
         con2idx[fields[2]] = ConstrId(0)
+
     elseif fields[1] == "E" || fields[1] == "L" || fields[1] == "G"
         # constraint
         if fields[1] == "E"
@@ -165,29 +149,31 @@ function parsemps_rows!(m::Model{Tv}, ln, fields, con2idx) where{Tv<:Real}
         ridx = add_constraint!(m, String(fields[2]), lb, ub, VarId[], Float64[])
         con2idx[String(fields[2])] = ridx
     else
-        # input error, current line is ignored
-        @warn "INPUT ERROR:\t$(ln)"
-        return nothing
+        # Error in the input
+        error()
     end
+
+    return nothing
 end
 
+"""
+    parseline!(::MPSColumns, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub)
 
-function parsemps_columns!(m::Model{Tv}, ln, fields, var2idx, con2idx, lb, ub) where{Tv<:Real}
+Parse a line from COLUMNS section in an MPS file.
+"""
+function parseline!(::MPSColumns, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub) where{Tv<:Real}
     # parse a ROWS line of the MPS file
     # `ln` is a string that contains the current line
     # `fields` contains the 6 fields of that line
     
     # current line should contain at least three fields
-    if length(fields) < 4
-        @warn "COLUMN LINE TOO SHORT|$(ln)"
-        return nothing
-    end
+    length(fields) >= 3 || error("Line in COLUMNS section has less than three fields.")
+
+    fields[2] == "'MARKER'" && (return nothing)
 
     # First field is empty, second field is variable's name
-    cname = fields[2]
+    cname = fields[1]
     if !haskey(var2idx, cname)
-        # d["ncols"] += 1
-        # var2idx[cname] = d["ncols"]  # Add column name to the pool
         # Create new variable
         vidx = add_variable!(m, String(cname), zero(Tv), zero(Tv), Tv(Inf))
         var2idx[cname] = vidx
@@ -197,68 +183,47 @@ function parsemps_columns!(m::Model{Tv}, ln, fields, var2idx, con2idx, lb, ub) w
 
     # Second and third fields are
     # the row's name, and the corresponding coefficient
-    rname = fields[3]  # row name
-    if !haskey(con2idx, rname)
-        # current row not in list of rows, current line ignored
-        @warn "COL ERROR UNKNOWN ROW $(rname)|$(ln)"
-        return nothing
-    end
-    coeff = parse(Float64, fields[4])  # coefficient value
+    rname = fields[2]  # row name
+    haskey(con2idx, rname) || error("Unknown row.")
+
+    coeff = parse(Float64, fields[3])  # coefficient value
     if con2idx[rname].uuid == 0
         # objective coefficient
-        # push!(obj_col, var2idx[cname])
-        # push!(obj_val, coeff)
         set_obj_coeff!(m.pbdata_raw.vars[var2idx[cname]], coeff)
     else
         # constraint coefficient
         set_coeff!(m.pbdata_raw, var2idx[cname], con2idx[rname], coeff)
-        # push!(coeffs_row, con2idx[rname])
-        # push!(coeffs_val, coeff)
     end
 
     # optional other fields
-    if length(fields) >= 6
-        rname = fields[5]  # row name
-        if !haskey(con2idx, rname)
-            # current row not in list of rows, current line ignored
-            @warn "COL ERROR UNKNOWN ROW $(rname)|$(ln)"
-            return nothing
-        end
-        coeff = parse(Float64, fields[6])  # coefficient value
-        if con2idx[rname].uuid == 0
-            # objective coefficient
-            # push!(obj_col, var2idx[cname])
-            # push!(obj_val, coeff)
-            set_obj_coeff!(m.pbdata_raw.vars[var2idx[cname]], coeff)
-        else
-            # constraint coefficient
-            # push!(coeffs_col, var2idx[cname])
-            # push!(coeffs_row, con2idx[rname])
-            # push!(coeffs_val, coeff)
-            set_coeff!(m.pbdata_raw, var2idx[cname], con2idx[rname], coeff)
-        end
+    length(fields) >= 5 || (return nothing)
+
+    rname = fields[4]  # row name
+    haskey(con2idx, rname) || error("Unknown row.")
+    coeff = parse(Float64, fields[5])  # coefficient value
+    if con2idx[rname].uuid == 0
+        # objective coefficient
+        set_obj_coeff!(m.pbdata_raw.vars[var2idx[cname]], coeff)
+    else
+        # constraint coefficient
+        set_coeff!(m.pbdata_raw, var2idx[cname], con2idx[rname], coeff)
     end
 
     return nothing
 end
 
+"""
+    parseline!(::MPSRhs, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub)
 
-function parsemps_rhs!(m::Model{Tv}, ln, fields, con2idx, d) where{Tv<:Real}
-    # parse a line of the RHS section
-    # `ln` is the current line
-    # `fields` contains the fields of that line
+Parse a line from RHS section in an MPS file.
+"""
+function parseline!(::MPSRhs, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub) where{Tv<:Real}
 
+    # Line should contain at least 3 fields, and up to 5
+    length(fields) >= 3 || error("Line is too short.")
 
-    # Check for too short lines
-    if length(fields) < 4
-        # input error, current line is ignored
-        @warn "RHS LINE TOO SHORT|$(ln)"
-        return nothing
-    end
-
-    # First field is empty
-    # Second field is RHS name (may be empty)
-    rhsname = fields[2]
+    # First field is RHS name (may be empty)
+    rhsname = fields[1]
     if d["rhs"] == ""
         # first time RHS is read
         d["rhs"] = rhsname
@@ -267,15 +232,11 @@ function parsemps_rhs!(m::Model{Tv}, ln, fields, con2idx, d) where{Tv<:Real}
         return nothing
     end
 
-    
     # parse line
-    rname = fields[3]
-    if !haskey(con2idx, rname)
-        # current row not in list of rows, current line ignored
-        @warn "RHS ERROR UNKNOWN ROW $(rname)|$(ln)"
-        return nothing
-    end
-    rval = parse(Float64, fields[4])
+    rname = fields[2]
+    haskey(con2idx, rname) || error()
+
+    rval = parse(Float64, fields[3])
     # update index and value
     if con2idx[rname].uuid == 0
         d["obj_offset"] = -rval
@@ -298,54 +259,53 @@ function parsemps_rhs!(m::Model{Tv}, ln, fields, con2idx, d) where{Tv<:Real}
             # This should not happen
             error("Got single right-hand side for ranged constraint.")
         end
-        # push!(rhs_row, con2idx[rname])
-        # push!(rhs_val, rval)
     end
 
-    # optional fields
-    if length(fields) >= 6
-        rname = fields[5]  # row name
-        if !haskey(con2idx, rname)
-            # current row not in list of rows, current line ignored
-            @warn "RHS ERROR UNKNOWN ROW $(rname)|$(ln)"
-            return nothing
-        end
-        rval = parse(Float64, fields[6])  # coefficient value
-        # update index and value
-        if con2idx[rname].uuid == 0
-            d["obj_offset"] = -rval
-        else
-            # Check type of constraint and update coefficient accordingly
-            (bt, lb, ub) = get_bounds(m.pbdata_raw.constrs[con2idx[rname]])
-            if bt == TLP_UP
-                # a'x <= b
-                set_bounds!(m.pbdata_raw.constrs[con2idx[rname]], Tv(-Inf), rval)
-            elseif bt == TLP_LO
-                # a'x >= b
-                set_bounds!(m.pbdata_raw.constrs[con2idx[rname]], rval, Tv(Inf))
-            elseif bt == TLP_FR
-                # This should not happen
-                error("Got right-hand side for free constraint")
-            elseif bt == TLP_FX
-                # a'x = b
-                set_bounds!(m.pbdata_raw.constrs[con2idx[rname]], rval, rval)
-            elseif bt == TLP_RG
-                # This should not happen
-                error("Got single right-hand side for ranged constraint.")
-            end
-        end
-    end
-end
-
-
-function parsemps_ranges!(m::Model{Tv}, ln, fields, d, con2idx) where{Tv<:Real}
-    if length(fields) < 4
-        # input error, current line is ignored
-        @warn "RNG LINE TOO SHORT|$(ln)"
+    if length(fields) < 5
         return nothing
     end
 
-    rngname = fields[2]
+    # optional fields
+    rname = fields[4]  # row name
+    haskey(con2idx, rname) || error()
+    rval = parse(Float64, fields[5])  # coefficient value
+    # update index and value
+    if con2idx[rname].uuid == 0
+        d["obj_offset"] = -rval
+    else
+        # Check type of constraint and update coefficient accordingly
+        (bt, lb, ub) = get_bounds(m.pbdata_raw.constrs[con2idx[rname]])
+        if bt == TLP_UP
+            # a'x <= b
+            set_bounds!(m.pbdata_raw.constrs[con2idx[rname]], Tv(-Inf), rval)
+        elseif bt == TLP_LO
+            # a'x >= b
+            set_bounds!(m.pbdata_raw.constrs[con2idx[rname]], rval, Tv(Inf))
+        elseif bt == TLP_FR
+            # This should not happen
+            error("Got right-hand side for free constraint")
+        elseif bt == TLP_FX
+            # a'x = b
+            set_bounds!(m.pbdata_raw.constrs[con2idx[rname]], rval, rval)
+        elseif bt == TLP_RG
+            # This should not happen
+            error("Got single right-hand side for ranged constraint.")
+        end
+    end
+
+    return nothing
+end
+
+"""
+    parseline!(::MPSRanges, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub)
+
+Parse a line from RANGES section in an MPS file.
+"""
+function parseline!(::MPSRanges, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub) where{Tv<:Real}
+    
+    length(fields) >= 3 || error("Line too short")
+
+    rngname = fields[1]
     if d["range"] == ""
         d["range"] = rngname
     elseif d["range"] != rngname
@@ -354,13 +314,9 @@ function parsemps_ranges!(m::Model{Tv}, ln, fields, d, con2idx) where{Tv<:Real}
     end
 
     # parse line
-    rname = fields[3]
-    rval = parse(Float64, fields[4])
-    if !haskey(con2idx, rname)
-        # unknown row
-        @warn "RNG ERROR UNKNOWN ROW $(rname)|$(ln)"
-        return nothing
-    end
+    rname = fields[2]
+    rval = parse(Float64, fields[3])
+    haskey(con2idx, rname) || error()
     cidx = con2idx[rname]
     (bt, lb, ub) = get_bounds(m.pbdata_raw.constrs[cidx])
     if bt == TLP_LO
@@ -379,14 +335,10 @@ function parsemps_ranges!(m::Model{Tv}, ln, fields, d, con2idx) where{Tv<:Real}
         error("Unkown row type for RANGES: $bt.")
     end
 
-    if length(fields) >=6
-        rname = fields[5]
-        rngval = parse(Float64, fields[6])
-        if !haskey(con2idx, rname)
-            # unknown row
-            @warn "RNG ERROR UNKNOWN ROW $(rname)|$(ln)"
-            return nothing
-        end
+    if length(fields) >= 5
+        rname = fields[4]
+        rngval = parse(Float64, fields[5])
+        haskey(con2idx, rname) || error()
         cidx = con2idx[rname]
         (bt, lb, ub) = get_bounds(m.pbdata_raw.constrs[cidx])
         if bt == TLP_LO
@@ -405,32 +357,32 @@ function parsemps_ranges!(m::Model{Tv}, ln, fields, d, con2idx) where{Tv<:Real}
             error("Unkown row type for RANGES: $bt.")
         end
     end
+
+    return nothing
 end
 
+"""
+    parseline!(::MPSBounds, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub)
 
-function parsemps_bounds!(m::Model{Tv}, ln, fields, d, var2idx, lb, ub) where{Tv<:Real}
-    # parse a line of the BOUNDS section
-
-    # Check
-    
-
-    if (length(fields) < 3
-        || ((length(fields) < 4) 
-            && (fields[1] == "LO" || fields[1] == "UP" || fields[1] == "FX"))
-    )
-        @warn "BND ERROR LINE TOO SHORT|$(ln)"
-        return nothing
+Parse a line from RANGES section in an MPS file.
+"""
+function parseline!(::MPSBounds, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub) where{Tv<:Real}
+    if length(fields) < 3 || (
+            length(fields) < 4 && (
+                fields[1] == "LO" || fields[1] == "UP" || fields[1] == "FX"
+            )
+        )
+        # Missing fields
+        error()
     end
 
     # first field should be bound type
     btype = fields[1]
     bname = fields[2]
     cname = fields[3]
-    if !haskey(var2idx, cname)
-        @warn "BND ERROR UNKNOWN COL $(cname)|$(ln)"
-        return nothing
-    end
+    haskey(var2idx, cname) || error()
 
+    # 
     if d["bound"] == ""
         d["bound"] = bname
     else
@@ -439,7 +391,6 @@ function parsemps_bounds!(m::Model{Tv}, ln, fields, d, var2idx, lb, ub) where{Tv
     end
 
     vidx = var2idx[cname]
-
     if length(fields) == 3
         if btype == "FR"
             # -Inf < x < Inf
@@ -457,17 +408,15 @@ function parsemps_bounds!(m::Model{Tv}, ln, fields, d, var2idx, lb, ub) where{Tv
         elseif btype == "BV"
             # x = 0 or 1, x binary
             # Keep bounds but ignore binary requirement
-            @warn "Binary variable $cname; recording bounds but ignoring binary."
             lb[vidx] = 0.0
             ub[vidx] = 1.0
         else
-            @warn "Unknown bound type: $(btype). Input ignored."
+            error("Unknown bound type: $(btype)")
         end
         return
     end
 
     bval = parse(Float64, fields[4])
-
     if btype == "LO"
         # b <= x
         lb[vidx] = bval
@@ -484,18 +433,24 @@ function parsemps_bounds!(m::Model{Tv}, ln, fields, d, var2idx, lb, ub) where{Tv
     elseif btype == "LI"
         # 0 <= x < Inf, x integer
         # Keep bounds but ignore integer requirement
-        @warn "Integer variable $cname; recording bounds but ignoring binary."
         lb[vidx] = bval
 
     elseif btype == "UI"
         # 0 <= x <= b, x integer
         # Keep bounds but ignore integer requirement
-        @warn "Integer variable $cname; recording bounds but ignoring binary."
         ub[vidx] = bval
     else
         # error in bound type
-        @warn "Unknown bound type: $(btype). Input ignored."
+        error("Unknown bound type: $(btype)")
     end
+    return nothing
+end
 
+"""
+    parseline!(::MPSEndata, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub)
+
+End of model. Do nothing
+"""
+function parseline!(::MPSEndata, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub) where{Tv<:Real}
     return nothing
 end
