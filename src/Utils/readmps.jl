@@ -84,11 +84,7 @@ function readmps!(m::Model{Tv}, fname::String) where{Tv<:Real}
                 continue
             end
 
-            # try
-                parseline!(section, m, fields, d, var2idx, con2idx, lb, ub)
-            # catch err
-                # error("Error encountered in section $(typeof(section)) at l. $(nline):\n$(ln)")
-            # end
+            parseline!(section, m, fields, d, var2idx, con2idx, lb, ub)
 
             isa(section, MPSEndata) && break
         end
