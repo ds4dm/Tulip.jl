@@ -65,4 +65,4 @@ include("sparse.jl")
 AbstractLinearSolver(A::Matrix{Tv}) where{Tv<:Real} = DenseLinearSolver(A)
 AbstractLinearSolver(
     A::SparseMatrixCSC{Tv, Int64}
-) where{Tv<:BlasReal} = SparsePosDefLinearSolver(A)
+) where{Tv<:BlasReal} = SparseIndefLinearSolver(A)
