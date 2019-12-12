@@ -38,8 +38,8 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     pt::Point{Tv}    # Current primal-dual iterate
     res::Residuals{Tv}  # Residuals at current iterate
     ls::AbstractLinearSolver{Tv}
-    rp::Vector{Tv}  # primal regularization
-    rd::Vector{Tv}  # dual regularization
+    regP::Vector{Tv}  # primal regularization
+    regD::Vector{Tv}  # dual regularization
 
     # rxs::Tv  # rhs for complimentary products
     # rwz::Tv  # rhs for complimentary products
@@ -72,12 +72,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         hsd.dual_bound_scaled = Tv(-Inf)
         hsd.dual_bound_unscaled = Tv(-Inf)
 
-        hsd.pt = Point(
-            ncon, nvar, nupb,
-            ones(Tv, nvar), ones(Tv, nupb), oneunit(Tv),
-            ones(Tv, ncon), ones(Tv, nvar), ones(Tv, nupb), oneunit(Tv),
-            oneunit(Tv)
-        )
+        hsd.pt = Point{Tv}(ncon, nvar, nupb)
         hsd.res = Residuals(
             zeros(Tv, ncon), zeros(Tv, nupb),
             zeros(Tv, nvar), zero(Tv),
@@ -86,8 +81,9 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
 
         hsd.ls = AbstractLinearSolver(A)
 
-        hsd.rp = ones(Tv, nvar)
-        hsd.rd = ones(Tv, ncon)  # Initial dual regularization
+        # Initial regularizations
+        hsd.regP = sqrt(sqrt(eps(Tv))) .* ones(Tv, nvar)
+        hsd.regD = sqrt(sqrt(eps(Tv))) .* ones(Tv, ncon)
 
         return hsd
     end
@@ -133,7 +129,15 @@ function compute_residuals!(
     @views axpy!(oneunit(Tv), pt.z, res.rd[uind])
 
     # Gap residual
-    res.rg = dot(c, pt.x) - (dot(b, pt.y) - dot(uval, pt.z)) + pt.k
+    # res.rg = dot(c, pt.x) - (dot(b, pt.y) - dot(uval, pt.z)) + pt.k
+    res.rg = (
+        dot(c .- hsd.regP .* pt.x ./ pt.t, pt.x)
+        + dot(hsd.regP .* pt.x, pt.x) / pt.t
+        - dot(b + hsd.regD .* pt.y / pt.t, pt.y)
+        + dot(hsd.regD .* pt.y, pt.y) / pt.t
+        + dot(uval, pt.z)
+        + pt.k
+    )
 
     # Residuals norm
     res.rp_nrm = norm(res.rp, Inf)
@@ -146,6 +150,8 @@ function compute_residuals!(
     hsd.primal_bound_scaled   = hsd.primal_bound_unscaled / pt.t
     hsd.dual_bound_unscaled   = dot(b, pt.y) - dot(uval, pt.z) + pt.t * c0
     hsd.dual_bound_scaled     = hsd.dual_bound_unscaled / pt.t
+
+    # @info "x = $(pt.x ./ pt.t)"
 
     return nothing
 end
@@ -164,30 +170,28 @@ function update_solver_status!(
 ) where{Tv<:Real}
     hsd.solver_status = TerminationStatus(0)
 
-    # Check for feasibility
-    if (
-        res.rp_nrm     <= ϵp * pt.t * (oneunit(Tv) + norm(b, Inf))
-        && res.ru_nrm  <= ϵp * pt.t * (oneunit(Tv) + norm(uval, Inf))
+    ρp = max(
+        res.rp_nrm / (pt.t * (oneunit(Tv) + norm(b, Inf))),
+        res.ru_nrm / (pt.t * (oneunit(Tv) + norm(uval, Inf)))
     )
+    ρd = res.rd_nrm / (pt.t * (oneunit(Tv) + norm(c, Inf)))
+    ρg = abs(hsd.primal_bound_unscaled - hsd.dual_bound_unscaled) / (pt.t + abs(hsd.dual_bound_unscaled))
+
+    # Check for feasibility
+    if ρp <= ϵp
         hsd.primal_status = Sln_FeasiblePoint
     else
         hsd.primal_status = Sln_InfeasiblePoint
     end
 
-    if res.rd_nrm <= ϵd * pt.t * (oneunit(Tv) + norm(c, Inf))
+    if ρd <= ϵd
         hsd.dual_status = Sln_FeasiblePoint
     else
         hsd.dual_status = Sln_InfeasiblePoint
     end
     
     # Check for optimal solution
-    if (
-        res.rp_nrm     <= ϵp * pt.t * (oneunit(Tv) + norm(b, Inf))
-        && res.ru_nrm  <= ϵp * pt.t * (oneunit(Tv) + norm(uval, Inf))
-        && res.rd_nrm  <=  ϵd * pt.t * (oneunit(Tv) + norm(c, Inf))
-        && (abs(hsd.primal_bound_unscaled - hsd.dual_bound_unscaled) / (pt.t + abs(hsd.dual_bound_unscaled))) <= ϵg
-    )
-        # Optimality reached
+    if ρp <= ϵp && ρd <= ϵd && ρg <= ϵg
         hsd.primal_status = Sln_Optimal
         hsd.dual_status   = Sln_Optimal
         hsd.solver_status = TerminationStatus(1)
@@ -195,24 +199,41 @@ function update_solver_status!(
     end
 
     # Check for infeasibility certificates
-    if (pt.μ < ϵi) && ((pt.t / pt.k) < ϵi)
-        # Check for primal or dual infeasibility
-        if dot(c, pt.x) < -ϵi
-            # Dual infeasible
-            hsd.primal_status = Sln_InfeasibilityCertificate
-            hsd.solver_status = TerminationStatus(3)
-            return nothing
-        
-        elseif (-dot(b, pt.y) - dot(uval, pt.z)) < -ϵi
-            # Primal infeasible
-            hsd.dual_status = Sln_InfeasibilityCertificate
-            hsd.solver_status = TerminationStatus(2)
-            return nothing
-        else
-            # Should never be reached
-            error("Detected infeasibility, but")
-        end
+    δ = A'pt.y + pt.s
+    δ[uind] .-= pt.z
+    # Mosek stopping criterion for LP optimizer
+    if max(norm(A*pt.x, Inf), norm(pt.x[uind] + pt.w, Inf)) * (norm(c, Inf) / max(1, norm(b, Inf))) < - ϵi * dot(c, pt.x)
+        hsd.primal_status = Sln_InfeasibilityCertificate
+        hsd.solver_status = TerminationStatus(3)
+        return nothing
     end
+
+    if norm(δ, Inf) * norm(b, Inf) / (max(1, norm(c, Inf)))  < (dot(b, pt.y) - dot(uval, pt.z)) * ϵi
+        # Primal infeasible
+        hsd.dual_status = Sln_InfeasibilityCertificate
+        hsd.solver_status = TerminationStatus(2)
+        return nothing
+    end
+
+    # Old stopping criterion
+    # if (pt.μ < ϵi) && ((pt.t / pt.k) < ϵi)
+    #     # Check for primal or dual infeasibility
+    #     if dot(c, pt.x) < -ϵi
+    #         # Dual infeasible
+    #         hsd.primal_status = Sln_InfeasibilityCertificate
+    #         hsd.solver_status = TerminationStatus(3)
+    #         return nothing
+        
+    #     elseif (-dot(b, pt.y) - dot(uval, pt.z)) < -ϵi
+    #         # Primal infeasible
+    #         hsd.dual_status = Sln_InfeasibilityCertificate
+    #         hsd.solver_status = TerminationStatus(2)
+    #         return nothing
+    #     else
+    #         # Should never be reached
+    #         @warn "Small τ detected, but both infeasibility tests failed."
+    #     end 
+    # end
 
     return nothing
 end
@@ -238,13 +259,15 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
 
     # TODO: set starting point
     # Q: should we allocate memory for `pt` here?
-    hsd.pt.x .= oneunit(Tv)
-    hsd.pt.w .= oneunit(Tv)
-    hsd.pt.t  = oneunit(Tv)
-    hsd.pt.y .= zero(Tv)
-    hsd.pt.s .= oneunit(Tv)
-    hsd.pt.z .= oneunit(Tv)
-    hsd.pt.k  = oneunit(Tv)
+    hsd.pt.x  .= oneunit(Tv)
+    hsd.pt.w  .= oneunit(Tv)
+    hsd.pt.t   = oneunit(Tv)
+    hsd.pt.y  .= zero(Tv)
+    hsd.pt.s  .= oneunit(Tv)
+    hsd.pt.z  .= oneunit(Tv)
+    hsd.pt.k   = oneunit(Tv)
+    hsd.pt.qp .= zero(Tv)
+    hsd.pt.qd .= zero(Tv)
     update_mu!(hsd.pt)
 
     # Main loop
@@ -281,7 +304,8 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
 
             # Mu
             @printf "  %7.1e" hsd.pt.μ
-
+            @printf "  %8.2e" hsd.pt.t
+            @printf "  %2.2e" hsd.pt.k
             # Time
             @printf "  %.2f" ttot
 

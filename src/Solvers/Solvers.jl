@@ -22,8 +22,20 @@ mutable struct Point{Tv<:Real}
     z::Vector{Tv}  # Dual of upper-bound
     k::Tv          # Homogeneous variable
 
+    # Regularizers
+    qp::Vector{Tv}  # Primal regularizer
+    qd::Vector{Tv}  # Dual regularizer
+
     # Centrality parameter
     μ::Tv
+
+    Point{Tv}(ncon::Int, nvar::Int, nupb::Int) where{Tv<:Real} = new{Tv}(
+        ncon, nvar, nupb,
+        zeros(Tv, nvar), zeros(Tv, nupb), zero(Tv),
+        zeros(Tv, ncon), zeros(Tv, nvar), zeros(Tv, nupb), zero(Tv),
+        zeros(Tv, nvar), zeros(Tv, ncon),
+        zero(Tv)
+    )
 end
 
 function update_mu!(pt::Point{Tv}) where{Tv<:Real}
