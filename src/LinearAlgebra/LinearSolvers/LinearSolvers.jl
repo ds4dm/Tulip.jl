@@ -53,6 +53,11 @@ Solve the symmetric quasi-definite augmented system
     [   A             Rd] [dy] = [ξp]
 ```
 and over-write `dx`, `dy` with the result.
+
+# Arguments
+- `dx, dy`: Vectors of unknowns, modified in-place
+- `ls`: Linear solver for the augmented system
+- `ξp, ξd`: Right-hand-side vectors
 """
 function solve_augmented_system! end
 

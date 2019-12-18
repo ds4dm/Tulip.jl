@@ -1,11 +1,6 @@
 using SparseArrays
 using SuiteSparse
 
-construct_matrix(
-    ::Type{SparseMatrixCSC}, m::Int, n::Int,
-    aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{Tv}
-) where{Tv<:Real} = sparse(aI, aJ, aV, m, n)
-
 # ==============================================================================
 #   SparseIndefLinearSolver
 # ==============================================================================
@@ -99,11 +94,6 @@ end
     solve_augmented_system!(dx, dy, ls, ξp, ξd)
 
 Solve the augmented system, overwriting `dx, dy` with the result.
-
-# Arguments
-- `dx, dy`: Vectors of unknowns, modified in-place
-- `ls::SparseIndefLinearSolver`: Linear solver for the augmented system
-- `ξp, ξd`: Right-hand-side vectors
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
@@ -238,11 +228,6 @@ end
     solve_augmented_system!(dx, dy, ls, ξp, ξd)
 
 Solve the augmented system, overwriting `dx, dy` with the result.
-
-# Arguments
-- `dx::Vector{Tv}, dy::Vector{Tv}`: Vectors of unknowns, modified in-place
-- `ls::SparsePosDefLinearSolver{Tv}`: Linear solver for the augmented system
-- `ξp::Vector{Tv}, ξd::Vector{Tv}`: Right-hand-side vectors
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},

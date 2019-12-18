@@ -1,18 +1,5 @@
 using LinearAlgebra.LAPACK
 
-function construct_matrix(
-    ::Type{Matrix}, m::Int, n::Int,
-    aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{Tv}
-) where{Tv<:Real}
-    A = zeros(Tv, m, n)
-    # TODO: may be more efficient to first sort indices so that
-    # A is accessed in column-major order.
-    for(i, j, v) in zip(aI, aJ, aV)
-        A[i, j] = v
-    end
-    return A
-end
-
 """
     DenseLinearSolver{Tv}
 
@@ -156,11 +143,6 @@ end
 Solve the augmented system, overwriting `dx, dy` with the result.
 
 Uses two generic triangular solves for solving the normal equations system.
-
-# Arguments
-- `dx, dy`: Vectors of unknowns, modified in-place
-- `ls::DenseLinearSolver`: Linear solver
-- `ξp, ξd`: Right-hand-side vectors
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
@@ -190,11 +172,6 @@ end
 Solve the augmented system, overwriting `dx, dy` with the result.
 
 Uses one LAPACK call for solving the normal equations system.
-
-# Arguments
-- `dx, dy`: Vectors of unknowns, modified in-place
-- `ls::DenseLinearSolver`: Linear solver
-- `ξp, ξd`: Right-hand-side vectors
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
