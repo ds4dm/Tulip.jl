@@ -63,17 +63,6 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     end
     nbump < 3 || throw(PosDefException(0))  # factorization could not be saved
 
-    # Re-compute residuals
-    # We need to do this to compute the correct search directions
-    res.rg = (
-        dot(c .- hsd.regP .* pt.x ./ pt.t, pt.x)
-        + dot(hsd.regP .* pt.x, pt.x) / pt.t
-        - dot(b + hsd.regD .* pt.y / pt.t, pt.y)
-        + dot(hsd.regD .* pt.y, pt.y) / pt.t
-        + dot(uval, pt.z)
-        + pt.k
-    )
-
     # Search directions
     # Predictor
     Δ  = Point{Tv}(ncon, nvar, nupb)
@@ -90,12 +79,13 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
         - c + hsd.regP .* x̄,
         -uval
     )
-    # Recover h0
+    # Recover h0 = κ / τ + (c + ρp*x̄)'hx - (b - ρd*ȳ)'hy + u'hz
     h0 = (
-            pt.k / pt.t
-            + dot(c .+ hsd.regP .* x̄, hx)
-            - dot(b .- hsd.regD .* ȳ, hy)
-            + dot(uval, hz)
+        dot(hsd.regP .* x̄, x̄) + dot(hsd.regD .* ȳ, ȳ)
+        + pt.k / pt.t
+        + dot(c .+ hsd.regP .* x̄, hx)
+        - dot(b .- hsd.regD .* ȳ, hy)
+        + dot(uval, hz)
     )
 
     # Affine-scaling direction

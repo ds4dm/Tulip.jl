@@ -82,8 +82,8 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         hsd.ls = AbstractLinearSolver(A)
 
         # Initial regularizations
-        hsd.regP = sqrt(sqrt(eps(Tv))) .* ones(Tv, nvar)
-        hsd.regD = sqrt(sqrt(eps(Tv))) .* ones(Tv, ncon)
+        hsd.regP = ones(Tv, nvar)
+        hsd.regD = ones(Tv, ncon)
 
         return hsd
     end
@@ -129,15 +129,7 @@ function compute_residuals!(
     @views axpy!(oneunit(Tv), pt.z, res.rd[uind])
 
     # Gap residual
-    # res.rg = dot(c, pt.x) - (dot(b, pt.y) - dot(uval, pt.z)) + pt.k
-    res.rg = (
-        dot(c .- hsd.regP .* pt.x ./ pt.t, pt.x)
-        + dot(hsd.regP .* pt.x, pt.x) / pt.t
-        - dot(b + hsd.regD .* pt.y / pt.t, pt.y)
-        + dot(hsd.regD .* pt.y, pt.y) / pt.t
-        + dot(uval, pt.z)
-        + pt.k
-    )
+    res.rg = dot(c, pt.x) - (dot(b, pt.y) - dot(uval, pt.z)) + pt.k
 
     # Residuals norm
     res.rp_nrm = norm(res.rp, Inf)
@@ -150,8 +142,6 @@ function compute_residuals!(
     hsd.primal_bound_scaled   = hsd.primal_bound_unscaled / pt.t
     hsd.dual_bound_unscaled   = dot(b, pt.y) - dot(uval, pt.z) + pt.t * c0
     hsd.dual_bound_scaled     = hsd.dual_bound_unscaled / pt.t
-
-    # @info "x = $(pt.x ./ pt.t)"
 
     return nothing
 end
@@ -197,43 +187,27 @@ function update_solver_status!(
         hsd.solver_status = TerminationStatus(1)
         return nothing
     end
-
+    
     # Check for infeasibility certificates
-    δ = A'pt.y + pt.s
-    δ[uind] .-= pt.z
-    # Mosek stopping criterion for LP optimizer
-    if max(norm(A*pt.x, Inf), norm(pt.x[uind] + pt.w, Inf)) * (norm(c, Inf) / max(1, norm(b, Inf))) < - ϵi * dot(c, pt.x)
+    if (max(norm(A*pt.x, Inf), norm(pt.x[uind] + pt.w, Inf)) * (norm(c, Inf) / max(1, norm(b, Inf))) < - ϵi * dot(c, pt.x)
+        || max(norm(pt.x[uind] .+ pt.w, Inf), norm(A*pt.x, Inf)) < -ϵi * dot(c, pt.x)
+    )
+        # Dual infeasible, i.e., primal unbounded
         hsd.primal_status = Sln_InfeasibilityCertificate
         hsd.solver_status = TerminationStatus(3)
         return nothing
     end
 
-    if norm(δ, Inf) * norm(b, Inf) / (max(1, norm(c, Inf)))  < (dot(b, pt.y) - dot(uval, pt.z)) * ϵi
+    δ = A'pt.y + pt.s
+    δ[uind] .-= pt.z
+    if (norm(δ, Inf) * norm(b, Inf) / (max(1, norm(c, Inf)))  < (dot(b, pt.y) - dot(uval, pt.z)) * ϵi ||
+        norm(δ, Inf) < (dot(b, pt.y) - dot(uval, pt.z)) * ϵi
+    )
         # Primal infeasible
         hsd.dual_status = Sln_InfeasibilityCertificate
         hsd.solver_status = TerminationStatus(2)
         return nothing
     end
-
-    # Old stopping criterion
-    # if (pt.μ < ϵi) && ((pt.t / pt.k) < ϵi)
-    #     # Check for primal or dual infeasibility
-    #     if dot(c, pt.x) < -ϵi
-    #         # Dual infeasible
-    #         hsd.primal_status = Sln_InfeasibilityCertificate
-    #         hsd.solver_status = TerminationStatus(3)
-    #         return nothing
-        
-    #     elseif (-dot(b, pt.y) - dot(uval, pt.z)) < -ϵi
-    #         # Primal infeasible
-    #         hsd.dual_status = Sln_InfeasibilityCertificate
-    #         hsd.solver_status = TerminationStatus(2)
-    #         return nothing
-    #     else
-    #         # Should never be reached
-    #         @warn "Small τ detected, but both infeasibility tests failed."
-    #     end 
-    # end
 
     return nothing
 end
