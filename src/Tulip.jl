@@ -3,13 +3,11 @@ module Tulip
 using LinearAlgebra
 using SparseArrays
 
-# Cholesky module
+# Linear algebra module
 include("LinearAlgebra/LinearAlgebra.jl")
 import .TLPLinearAlgebra:
-    factor_normaleq,
-    factor_normaleq!,
-    symbolic_cholesky,
-    construct_matrix
+    construct_matrix,
+    AbstractLinearSolver, update_linear_solver!, solve_augmented_system!
 
 # package code goes here
 include("env.jl")       # Parameters

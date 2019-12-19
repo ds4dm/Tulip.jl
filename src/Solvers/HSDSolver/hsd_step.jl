@@ -31,49 +31,64 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     uind = hsd.uind
     uval = hsd.uval
 
-    
     # Compute scaling
     θ   = pt.s ./ pt.x
     θwz = pt.z ./ pt.w
     @views θ[uind] .+= θwz
-    θ .\= oneunit(Tv)
+
+    # Update regularizations
+    rd_min = sqrt(eps(Tv))
+    rp_min = sqrt(eps(Tv))
+    rg_min = sqrt(eps(Tv))
+    hsd.regP .= max.(rp_min, hsd.regP ./ 10)
+    hsd.regD .= max.(rd_min, hsd.regD ./ 10)
+    hsd.regG  = max( rg_min, hsd.regG  / 10)
 
     # Update factorization
-    F = factor_normaleq!(A, θ, hsd.F)
-    # F = hsd.F
+    nbump = 0
+    while nbump <= 3
+        try
+            update_linear_solver!(hsd.ls, θ, hsd.regP, hsd.regD)
+            break
+        catch err
+            isa(err, PosDefException) || rethrow(err)
+
+            # Increase regularization
+            hsd.regD .*= 100
+            hsd.regP .*= 100
+            hsd.regG  *= 100
+            nbump += 1
+        end
+    end
+    nbump < 3 || throw(PosDefException(0))  # factorization could not be saved
 
     # Search directions
     # Predictor
-    Δ = Point(
-        ncon, nvar, nupb,
-        zeros(Tv, nvar), zeros(Tv, nupb), zero(Tv),
-        zeros(Tv, ncon), zeros(Tv, nvar), zeros(Tv, nupb), zero(Tv),
-        zero(Tv)
-    )
-    Δc = Point(
-        ncon, nvar, nupb,
-        zeros(Tv, nvar), zeros(Tv, nupb), zero(Tv),
-        zeros(Tv, ncon), zeros(Tv, nvar), zeros(Tv, nupb), zero(Tv),
-        zero(Tv)
-    )
+    Δ  = Point{Tv}(ncon, nvar, nupb)
+    Δc = Point{Tv}(ncon, nvar, nupb)
 
-    # Compute p, q, r, ρ from augmented system
-    p = zeros(Tv, nvar)
-    q = zeros(Tv, ncon)
-    r = zeros(Tv, nupb)
+    # Compute hx, hy, hz from first augmented system solve
+    hx = zeros(Tv, nvar)
+    hy = zeros(Tv, ncon)
+    hz = zeros(Tv, nupb)
     solve_augsys_hsd!(
-        A, F, θ, θwz, uind,
-        p, q, r,
+        hx, hy, hz,
+        hsd.ls, θwz, uind,
         b, c, uval
     )
-    ρ = (pt.k / pt.t) - dot(c, p) + dot(b, q) - dot(uval, r)
+    # Recover h0 = ρg + κ / τ - c'hx + b'hy - u'hz
+    h0 = (
+        hsd.regG + pt.k / pt.t
+        - dot(c, hx)
+        + dot(b, hy)
+        - dot(uval, hz)
+    )
 
     # Affine-scaling direction
     solve_newton_hsd!(
-        A, F, b, c, uind, uval, θ, θwz,
-        p, q, r, ρ,
-        pt,
         Δ,
+        hsd.ls, θwz, b, c, uind, uval,
+        hx, hy, hz, h0, pt,
         # Right-hand side of Newton system
         res.rp, res.ru, res.rd, res.rg,
         -pt.x .* pt.s,
@@ -86,12 +101,11 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     γ = Tv((oneunit(Tv) - α)^2 * min(oneunit(Tv) - α, env.beta1))
     η = oneunit(Tv) - γ
     
-    # Mehrothra corrector
+    # Mehrotra corrector
     solve_newton_hsd!(
-        A, F, b, c, uind, uval, θ, θwz,
-        p, q, r, ρ,
-        pt,
         Δ,
+        hsd.ls, θwz, b, c, uind, uval,
+        hx, hy, hz, h0, pt,
         # Right-hand side of Newton system
         η .* res.rp, η .* res.ru, η .* res.rd, η * res.rg,
         -pt.x .* pt.s .+ γ * pt.μ .- Δ.x .* Δ.s,
@@ -110,14 +124,11 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
         ncor += 1
 
         # TODO: Compute extra-corrector
-        αc = compute_higher_corrector_hsd_!(
-            ncon, nvar, nupb,
-            η, γ,
-            A, F, b, c, uval, uind, θ, θwz,
-            p, q, r, ρ,
-            pt,
+        αc = compute_higher_corrector_hsd!(
+            Δc, γ,
+            hsd.ls, θwz, b, c, uind, uval,
+            hx, hy, hz, h0, pt,
             Δ, α_,
-            Δc,
             env.beta1, env.beta2, env.beta3, env.beta4,
         )
         if αc > α_
@@ -143,7 +154,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
         
     end
     # Update current iterate
-    α *= Tv(0.99995)
+    α *= Tv(0.9995)
     pt.x .+= α .* Δ.x
     pt.w .+= α .* Δ.w
     pt.t  += α  * Δ.t
@@ -158,70 +169,70 @@ end
 
 
 """
-    solve_newton_hsd!(...)
+    solve_newton_hsd!
 
-Solve Newton system
-     A*dx           -b*dt                                   = ξp
-     U*dx   +  dw   -u*dt                                   = ξu
-                    -c*dt   +A'dy   +  ds   +U'dz           = ξd
-    -c'dx                   +b'dy           -u'dz   -  dk   = ξg
-     S*dx                           +X*ds                   = ξxs
-            +Z*dw                          +W*dz            = ξwz
-                     k*dt                           +t*dk   = ξtk
-
-This version assumes that the augmented system below has been solved first.
+Solve the Newton system for `dx, dw, dy, ds, dz, dτ, dκ`
+```
+-Rp*dx        + A'dy  +   ds - U'dz -  c*dτ        = ξd
+  A*dx        + Rd*dy               -  b*dτ        = ξp
+  U*dx +   dw                       -  u*dτ        = ξu
+ -c'dx        + b'dy         - u'dz + Rg*dτ -   dκ = ξg
+  S*dx                + X*ds                       = ξxs
+         Z*dw                + W*dz                = ξwz
+                                       k*dτ + τ*dκ = ξτκ
+```
 
 # Arguments
-- A: Matrix
-- `F`: Factorization of the normal equations matrix
+- `Δ`: Search direction, modified
+- `ls`: Linear solver for the augmented system
+- `θwz`: Diagonal scaling term
 - `b`: Right-hand side of primal constraints
 - `c`: Primal objective term
 - `uind`: Indices of upper-bounded variables
 - `uval`: Upper bound values
-- `θ`: Diagonal scaling term
-- `θwz`: Diagonal scaling term
-- `p, q, r, ρ`: Terms obtained in the preliminary augmented system solve
-- `x, w, y, s, z, t, k`: Primal and dual iterates
-- `dx, dw, dy, ds, dz, dt, dk`: Primal and dual directions, modified in-place
-- `ξp, ξd, ξu, ξg, ξxs, ξwz, ξtk`: 
+- `hx, hy, hz, h0`: Terms obtained in the preliminary augmented system solve
+- `pt`: Current primal-dual iterate
+- `ξp, ξd, ξu, ξg, ξxs, ξwz, ξtk`: Right-hand side vectors
 """
 function solve_newton_hsd!(
-    A, F, b, c, uind::Vector{Int}, uval, θ, θwz,
-    p, q, r, ρ,
-    pt::Point{Tv},
     Δ::Point{Tv},
-    ξp, ξu, ξd, ξg::Tv, ξxs, ξwz, ξtk::Tv
+    ls, θwz, b, c, uind::Vector{Int}, uval,
+    hx::Vector{Tv}, hy::Vector{Tv}, hz::Vector{Tv}, h0::Tv, pt::Point{Tv},
+    ξp::Vector{Tv}, ξu::Vector{Tv}, ξd::Vector{Tv}, ξg::Tv,
+    ξxs::Vector{Tv}, ξwz::Vector{Tv}, ξtk::Tv
 ) where{Tv<:Real}
+
     # Solve reduced newton system
     solve_augsys_hsd!(
-        A, F, θ, θwz, uind,
         Δ.x, Δ.y, Δ.z,
-        ξp, 
-        ξd .- (ξxs ./ pt.x),
-        ξu .- (ξwz ./ pt.z)
+        ls, θwz, uind,
+        ξp, ξd .- (ξxs ./ pt.x), ξu .- (ξwz ./ pt.z)
     )
 
     # Compute Δτ
     Δ.t = (
-        ξg + (ξtk / pt.t) + dot(c, Δ.x) - dot(b, Δ.y) + dot(uval, Δ.z)
-    ) / ρ
+        ξg + (ξtk / pt.t)
+        + dot(c, Δ.x)
+        - dot(b, Δ.y)
+        + dot(uval, Δ.z)
+    ) / h0
     
     # Compute Δx, Δy, Δz
-    Δ.x .+= Δ.t .* p
-    Δ.y .+= Δ.t .* q
-    Δ.z .+= Δ.t .* r
+    Δ.x .+= Δ.t .* hx
+    Δ.y .+= Δ.t .* hy
+    Δ.z .+= Δ.t .* hz
     # TODO: use functions below
-    # axpy!(Δ.t, p, Δ.x)
-    # axpy!(Δ.t, q, Δ.y)
-    # axpy!(Δ.t, r, Δ.z)
+    # axpy!(Δ.t, hx, Δ.x)
+    # axpy!(Δ.t, hy, Δ.y)
+    # axpy!(Δ.t, hz, Δ.z)
 
-    # Compute Δs, Δκ, Δw
-    # ds  .= (rxs .- s  .* dx)   ./ x
-    # dw  .= (rwz .- w  .* dz)   ./ z
+    # Recover Δs, Δw and Δk
+    # Δs = (ξxs - s .* Δx) ./ x
     Δ.s  .= ξxs
     Δ.s .-= pt.s .* Δ.x
     Δ.s ./= pt.x
 
+    # Δw = (ξwz - w .* Δx) ./ z
     Δ.w  .= ξwz
     Δ.w .-= pt.w .* Δ.z
     Δ.w ./= pt.z
@@ -233,42 +244,36 @@ end
 
 
 """
-    solve_augsys_hsd!(...)
+    solve_augsys_hsd!
 
-Solve the augmented system below, and overwrite `dx, dy, dz` with the result.
-    -(S/X)*dx  + A'dy  -    U'dz    = ξd
-         A*dx                       = ξp
-         U*dx          -(Z/W)*dz    = ξu
-The augmented system is solved by direct resolution of the normal equations, for
-    which a factorization is provided.
+Solve the augmented system for `dx, dy, dz`
+```
+-(S/X + Rp)*dx +  A'dy     - U'dz = ξd
+          A*dx + Rd*dy            = ξp
+          U*dx          -(Z/W)*dz = ξu
+```
 
 # Arguments
-- `A`: Matrix
-- `F`: Factorization of the matrix `A*Θ*A'`
-- `θ`: Diagonal scaling
-- `θwz`: Diagonal scaling
-- `uind`: Vector of indices of upper-bounded variables
 - `dx, dy, dz`: Vectors of unknowns, modified in-place
+- `ls`: Linear solver for the augmented system
+- `θwz`: Diagonal scaling `z ./ w`
+- `uind`: Vector of indices of upper-bounded variables
 - `ξp, ξd, ξu`: Right-hand-side vectors
 """
 function solve_augsys_hsd!(
-    A::AbstractMatrix{Tv}, F, θ::Vector{Tv}, θwz::Vector{Tv}, uind::Vector{Int},
     dx::Vector{Tv}, dy::Vector{Tv}, dz::Vector{Tv},
+    ls::AbstractLinearSolver{Tv},
+    θwz::Vector{Tv}, uind::Vector{Int},
     ξp::Vector{Tv}, ξd::Vector{Tv}, ξu::Vector{Tv}
 ) where{Tv<:Real}
-    ξu_ = ξu .* θwz
-    ξp_ = copy(ξd)
-    @views ξp_[uind] .-= ξu_
-    ξp_ .*= θ
-    mul!(dy, A, ξp_)
-    dy .+= ξp
+    
+    # Set-up right-hand side
+    ξd_ = copy(ξd)
+    @views ξd_[uind] .-= (ξu .* θwz)
 
-    dy .= (F \ dy)
-    mul!(dx, transpose(A), dy)
-    dx .-= ξd
-    @views dx[uind] .+= ξu_
-    dx .*= θ
+    solve_augmented_system!(dx, dy, ls, ξp, ξd_)
 
+    # Recover dz
     dz .= zero(Tv)
     dz .-= ξu
     @views dz .+= dx[uind]
@@ -319,35 +324,39 @@ end
 
 
 """
-    compute_higher_corrector(...)
+    compute_higher_corrector_hsd!
 
-Compute corrected Newton direction.
+Compute higher-order corrected direction.
+
+Requires the solution of one Newton system.
 
 # Arguments
-- `numvar, numvarub, numcon`: Number of variables and constraints
-- `A, F, b, c, uval, uind`: Problem data
-- `θ, θwz`: Diagonal scaling
-- `p, q, r, ρ`: Vectors from initial augmented system
-- `rp, ru, rd, rg`: Current primal and dual residuals
-- `μ`: Current centering parameter
-- `x, w, y, s, z, t, k`: Primal-dual iterate
-- `dx, dw, dy, ds, dz, dt, dk`: Predictor direction (modified) 
+- `Δc`: Corrected search direction, modified in-place
+- `γ`
+- `ls`: Linear solver for the augmented system
+- `θwz`: Diagonal scaling term
+- `b`: Right-hand side of primal constraints
+- `c`: Primal objective term
+- `uind`: Indices of upper-bounded variables
+- `uval`: Upper bound values
+- `hx, hy, hz, h0`: Terms obtained in the preliminary augmented system solve
+- `regP, regD`: Primal and dual regularizers
+- `x̄, ȳ`: Primal and dual proximal points
+- `pt`: Current primal-dual iterate
+- `Δ`: Current predictor direction
 - `α`: Maximum step length in predictor direction 
-- `dxc, dwc, dyc, dsc, dzc, dtc, dkc`: Corrector direction (modified)
-- `beta1, beta2, beta3, beta4`: Numerical parameters
+- `β1, β2, β3, β4`: Numerical parameters
 """
-function compute_higher_corrector_hsd_!(
-    ncon::Int, nvar::Int, nupb::Int,
-    η::Tv, γ::Tv,
-    A, F, b, c, uval, uind::Vector{Int}, θ, θwz,
-    p, q, r, ρ,
-    pt::Point{Tv},
-    Δ::Point{Tv}, α::Tv,
+function compute_higher_corrector_hsd!(
     Δc::Point{Tv},
-    beta1::Float64, beta2::Float64, beta3::Float64, beta4::Float64,
+    γ::Tv,
+    ls, θwz, b, c, uind::Vector{Int}, uval,
+    hx, hy, hz, h0, pt::Point{Tv},
+    Δ::Point{Tv}, α::Tv,
+    β1::Tv, β2::Tv, β3::Tv, β4::Tv,
 ) where{Tv<:Real}
     # TODO: Sanity checks
-
+    
     # Tentative step length
     α_ = min(oneunit(Tv), Tv(2)*α)
 
@@ -357,9 +366,9 @@ function compute_higher_corrector_hsd_!(
     vt = (pt.t  + α_  * Δ.t)  * (pt.k  + α_  * Δ.k)
 
     # Compute target cross-products
-    mu_l = Tv(beta4 * pt.μ * γ)
-    mu_u = Tv(γ * pt.μ / beta4)
-    #=@inbounds=# for i in 1:nvar
+    mu_l = β4 * pt.μ * γ
+    mu_u = γ * pt.μ / β4
+    for i in 1:pt.n
         if vx[i] < mu_l
             vx[i] = mu_l - vx[i]
         elseif vx[i] > mu_u
@@ -368,7 +377,7 @@ function compute_higher_corrector_hsd_!(
             vx[i] = zero(Tv)
         end
     end
-    #=@inbounds=# for i in 1:nupb
+    for i in 1:pt.p
         if vw[i] < mu_l
             vw[i] = mu_l - vw[i]
         elseif vx[i] > mu_u
@@ -386,18 +395,18 @@ function compute_higher_corrector_hsd_!(
     end
 
     # Shift target cross-product to satisfy `v' * e = 0`
-    δ = (sum(vx) + sum(vw) + vt) / (nvar + nupb + 1)
+    δ = (sum(vx) + sum(vw) + vt) / (pt.n + pt.p + 1)
     vx .-= δ
     vw .-= δ
     vt  -= δ
 
     # Compute corrector
     solve_newton_hsd!(
-        A, F, b, c, uind, uval, θ, θwz,
-        p, q, r, ρ,
-        pt,
         Δc,
-        zeros(Tv, ncon), zeros(Tv, nupb), zeros(Tv, nvar), zero(Tv),
+        ls, θwz, b, c, uind, uval,
+        hx, hy, hz, h0, pt,
+        # Right-hand sides
+        zeros(Tv, pt.m), zeros(Tv, pt.p), zeros(Tv, pt.n), zero(Tv),
         vx,
         vw,
         vt
