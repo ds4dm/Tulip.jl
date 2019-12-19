@@ -40,6 +40,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     ls::AbstractLinearSolver{Tv}
     regP::Vector{Tv}  # primal regularization
     regD::Vector{Tv}  # dual regularization
+    regG::Tv  # gap regularization
 
     # rxs::Tv  # rhs for complimentary products
     # rwz::Tv  # rhs for complimentary products
@@ -84,6 +85,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         # Initial regularizations
         hsd.regP = ones(Tv, nvar)
         hsd.regD = ones(Tv, ncon)
+        hsd.regG = one(Tv)
 
         return hsd
     end
@@ -189,9 +191,7 @@ function update_solver_status!(
     end
     
     # Check for infeasibility certificates
-    if (max(norm(A*pt.x, Inf), norm(pt.x[uind] + pt.w, Inf)) * (norm(c, Inf) / max(1, norm(b, Inf))) < - ϵi * dot(c, pt.x)
-        || max(norm(pt.x[uind] .+ pt.w, Inf), norm(A*pt.x, Inf)) < -ϵi * dot(c, pt.x)
-    )
+    if max(norm(A*pt.x, Inf), norm(pt.x[uind] + pt.w, Inf)) * (norm(c, Inf) / max(1, norm(b, Inf))) < - ϵi * dot(c, pt.x)
         # Dual infeasible, i.e., primal unbounded
         hsd.primal_status = Sln_InfeasibilityCertificate
         hsd.solver_status = TerminationStatus(3)
@@ -200,9 +200,7 @@ function update_solver_status!(
 
     δ = A'pt.y + pt.s
     δ[uind] .-= pt.z
-    if (norm(δ, Inf) * norm(b, Inf) / (max(1, norm(c, Inf)))  < (dot(b, pt.y) - dot(uval, pt.z)) * ϵi ||
-        norm(δ, Inf) < (dot(b, pt.y) - dot(uval, pt.z)) * ϵi
-    )
+    if norm(δ, Inf) * norm(b, Inf) / (max(1, norm(c, Inf)))  < (dot(b, pt.y) - dot(uval, pt.z)) * ϵi
         # Primal infeasible
         hsd.dual_status = Sln_InfeasibilityCertificate
         hsd.solver_status = TerminationStatus(2)
@@ -228,7 +226,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
 
     # IPM LOG
     if env.verbose != 0
-        @printf "%4s  %16s%16s %9s%9s%9s  %7s  %4s\n" "Itn" "PObj" "DObj" "PFeas" "DFeas" "GFeas" "Mu" "Time"
+        @printf "%4s  %14s  %14s  %8s %8s %8s  %7s  %4s\n" "Itn" "PObj" "DObj" "PFeas" "DFeas" "GFeas" "Mu" "Time"
     end
 
     # TODO: set starting point
@@ -268,18 +266,17 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
             @printf "%4d" hsd.niter
             
             # Objectives
-            @printf "  %+16.7e" dot(hsd.c, hsd.pt.x) / hsd.pt.t + hsd.c0
-            @printf "%+16.7e" (dot(hsd.b, hsd.pt.y) - dot(hsd.uval, hsd.pt.z)) / hsd.pt.t + hsd.c0
+            @printf "  %+14.7e" dot(hsd.c, hsd.pt.x) / hsd.pt.t + hsd.c0
+            @printf "  %+14.7e" (dot(hsd.b, hsd.pt.y) - dot(hsd.uval, hsd.pt.z)) / hsd.pt.t + hsd.c0
             
             # Residuals
-            @printf " %9.2e" max(hsd.res.rp_nrm, hsd.res.ru_nrm)
-            @printf "%9.2e" hsd.res.rd_nrm
-            @printf "%9.2e" hsd.res.rg_nrm
+            @printf "  %8.2e" max(hsd.res.rp_nrm, hsd.res.ru_nrm)
+            @printf " %8.2e" hsd.res.rd_nrm
+            @printf " %8.2e" hsd.res.rg_nrm
 
             # Mu
             @printf "  %7.1e" hsd.pt.μ
-            @printf "  %8.2e" hsd.pt.t
-            @printf "  %2.2e" hsd.pt.k
+
             # Time
             @printf "  %.2f" ttot
 

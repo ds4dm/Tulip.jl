@@ -31,10 +31,6 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     uind = hsd.uind
     uval = hsd.uval
 
-    # Proximal points
-    x̄ = hsd.pt.x ./ hsd.pt.t
-    ȳ = hsd.pt.y ./ hsd.pt.t
-
     # Compute scaling
     θ   = pt.s ./ pt.x
     θwz = pt.z ./ pt.w
@@ -43,8 +39,10 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     # Update regularizations
     rd_min = sqrt(eps(Tv))
     rp_min = sqrt(eps(Tv))
+    rg_min = sqrt(eps(Tv))
     hsd.regP .= max.(rp_min, hsd.regP ./ 10)
     hsd.regD .= max.(rd_min, hsd.regD ./ 10)
+    hsd.regG  = max( rg_min, hsd.regG  / 10)
 
     # Update factorization
     nbump = 0
@@ -58,6 +56,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
             # Increase regularization
             hsd.regD .*= 100
             hsd.regP .*= 100
+            hsd.regG  *= 100
             nbump += 1
         end
     end
@@ -75,25 +74,21 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     solve_augsys_hsd!(
         hx, hy, hz,
         hsd.ls, θwz, uind,
-        -b - hsd.regD .* ȳ,
-        - c + hsd.regP .* x̄,
-        -uval
+        b, c, uval
     )
-    # Recover h0 = κ / τ + (c + ρp*x̄)'hx - (b - ρd*ȳ)'hy + u'hz
+    # Recover h0 = ρg + κ / τ - c'hx + b'hy - u'hz
     h0 = (
-        dot(hsd.regP .* x̄, x̄) + dot(hsd.regD .* ȳ, ȳ)
-        + pt.k / pt.t
-        + dot(c .+ hsd.regP .* x̄, hx)
-        - dot(b .- hsd.regD .* ȳ, hy)
-        + dot(uval, hz)
+        hsd.regG + pt.k / pt.t
+        - dot(c, hx)
+        + dot(b, hy)
+        - dot(uval, hz)
     )
 
     # Affine-scaling direction
     solve_newton_hsd!(
         Δ,
         hsd.ls, θwz, b, c, uind, uval,
-        hx, hy, hz, h0,
-        hsd.regP, hsd.regD, x̄, ȳ, pt,
+        hx, hy, hz, h0, pt,
         # Right-hand side of Newton system
         res.rp, res.ru, res.rd, res.rg,
         -pt.x .* pt.s,
@@ -110,8 +105,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
     solve_newton_hsd!(
         Δ,
         hsd.ls, θwz, b, c, uind, uval,
-        hx, hy, hz, h0,
-        hsd.regP, hsd.regD, x̄, ȳ, pt,
+        hx, hy, hz, h0, pt,
         # Right-hand side of Newton system
         η .* res.rp, η .* res.ru, η .* res.rd, η * res.rg,
         -pt.x .* pt.s .+ γ * pt.μ .- Δ.x .* Δ.s,
@@ -133,8 +127,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
         αc = compute_higher_corrector_hsd!(
             Δc, γ,
             hsd.ls, θwz, b, c, uind, uval,
-            hx, hy, hz, h0,
-            hsd.regP, hsd.regD, x̄, ȳ, pt,
+            hx, hy, hz, h0, pt,
             Δ, α_,
             env.beta1, env.beta2, env.beta3, env.beta4,
         )
@@ -178,15 +171,15 @@ end
 """
     solve_newton_hsd!
 
-Solve the Newton system for `dx, dw, dy, ds, dz, dt, dk`
+Solve the Newton system for `dx, dw, dy, ds, dz, dτ, dκ`
 ```
-    A*dx + Rd*dy -(b + Rd*ȳ)*dt                 = ξp
-    U*dx + dw - u*dt                            = ξu
-    -Rp*dx + A'dy + ds - U'dz -(c - Rp*x̄)*dt    = ξd
-    -(c + Rp*x̄)'dx + (b - Rd*ȳ)'dy - u'dz - dk  = ξg
-    S*dx + X*ds                                 = ξxs
-    Z*dw + W*dz                                 = ξwz
-    k*dt + t*dk                                 = ξtk
+-Rp*dx        + A'dy  +   ds - U'dz -  c*dτ        = ξd
+  A*dx        + Rd*dy               -  b*dτ        = ξp
+  U*dx +   dw                       -  u*dτ        = ξu
+ -c'dx        + b'dy         - u'dz + Rg*dτ -   dκ = ξg
+  S*dx                + X*ds                       = ξxs
+         Z*dw                + W*dz                = ξwz
+                                       k*dτ + τ*dκ = ξτκ
 ```
 
 # Arguments
@@ -198,16 +191,13 @@ Solve the Newton system for `dx, dw, dy, ds, dz, dt, dk`
 - `uind`: Indices of upper-bounded variables
 - `uval`: Upper bound values
 - `hx, hy, hz, h0`: Terms obtained in the preliminary augmented system solve
-- `regP, regD`: Primal and dual regularizers
-- `x̄, ȳ`: Primal and dual proximal points
 - `pt`: Current primal-dual iterate
 - `ξp, ξd, ξu, ξg, ξxs, ξwz, ξtk`: Right-hand side vectors
 """
 function solve_newton_hsd!(
     Δ::Point{Tv},
     ls, θwz, b, c, uind::Vector{Int}, uval,
-    hx::Vector{Tv}, hy::Vector{Tv}, hz::Vector{Tv}, h0::Tv,
-    regP::Vector{Tv}, regD::Vector{Tv}, x̄::Vector{Tv}, ȳ::Vector{Tv}, pt::Point{Tv},
+    hx::Vector{Tv}, hy::Vector{Tv}, hz::Vector{Tv}, h0::Tv, pt::Point{Tv},
     ξp::Vector{Tv}, ξu::Vector{Tv}, ξd::Vector{Tv}, ξg::Tv,
     ξxs::Vector{Tv}, ξwz::Vector{Tv}, ξtk::Tv
 ) where{Tv<:Real}
@@ -222,15 +212,15 @@ function solve_newton_hsd!(
     # Compute Δτ
     Δ.t = (
         ξg + (ξtk / pt.t)
-        + dot(c + regP .* x̄, Δ.x)
-        - dot(b - regD .* ȳ, Δ.y)
+        + dot(c, Δ.x)
+        - dot(b, Δ.y)
         + dot(uval, Δ.z)
     ) / h0
     
     # Compute Δx, Δy, Δz
-    Δ.x .-= Δ.t .* hx
-    Δ.y .-= Δ.t .* hy
-    Δ.z .-= Δ.t .* hz
+    Δ.x .+= Δ.t .* hx
+    Δ.y .+= Δ.t .* hy
+    Δ.z .+= Δ.t .* hz
     # TODO: use functions below
     # axpy!(Δ.t, hx, Δ.x)
     # axpy!(Δ.t, hy, Δ.y)
@@ -361,8 +351,7 @@ function compute_higher_corrector_hsd!(
     Δc::Point{Tv},
     γ::Tv,
     ls, θwz, b, c, uind::Vector{Int}, uval,
-    hx, hy, hz, h0,
-    regP::Vector{Tv}, regD::Vector{Tv}, x̄::Vector{Tv}, ȳ::Vector{Tv}, pt::Point{Tv},
+    hx, hy, hz, h0, pt::Point{Tv},
     Δ::Point{Tv}, α::Tv,
     β1::Tv, β2::Tv, β3::Tv, β4::Tv,
 ) where{Tv<:Real}
@@ -415,8 +404,7 @@ function compute_higher_corrector_hsd!(
     solve_newton_hsd!(
         Δc,
         ls, θwz, b, c, uind, uval,
-        hx, hy, hz, h0,
-        regP, regD, x̄, ȳ, pt,
+        hx, hy, hz, h0, pt,
         # Right-hand sides
         zeros(Tv, pt.m), zeros(Tv, pt.p), zeros(Tv, pt.n), zero(Tv),
         vx,
