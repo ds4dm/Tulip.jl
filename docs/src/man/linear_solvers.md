@@ -48,11 +48,12 @@ One can pivot out the upper-left diagonal block to obtain the positive-definite
 
 Here is a list of currently supported linear solvers:
 
-| Linear solver type | type of ``A`` | System | Method | 
-|:--------------------|:------:|:--:|:--|
-| [`DenseLinearSolver`](@ref) | `Matrix` | Normal Eqn | Direct (Cholesky) |
-| [`SparseIndefLinearSolver`](@ref) | `SparseMatricCSC` | Augm. Sys | Direct (LDLt) |
-| [`SparsePosDefLinearSolver`](@ref) | `SparseMatricCSC` | Normal Eqn | Direct (Cholesky) |
+| Linear solver type | type of ``A`` | System | Method | Backend |
+|:--------------------|:------:|:--:|:--|:--|
+| [`DenseLinearSolver`](@ref) | `Matrix` | Normal Eqn | Direct (Cholesky) | LAPACK |
+| [`SparseIndefLinearSolver`](@ref) | `SparseMatricCSC` | Augm. Sys | Direct (LDLt) | SuiteSparse |
+| [`SparsePosDefLinearSolver`](@ref) | `SparseMatricCSC` | Normal Eqn | Direct (Cholesky) | SuiteSparse |
+| [`LDLFLinearSolver`](@ref) | `SparseMatricCSC` | Augm. Sys | Direct (LDLt) | [LDLFactorizations](https://github.com/JuliaSmoothOptimizers/LDLFactorizations.jl) |
 
 ### AbstractLinearSolver
 
@@ -117,4 +118,18 @@ update_linear_solver!(::SparsePosDefLinearSolver{Tv},::AbstractVector{Tv},::Abst
 
 ```@docs
 solve_augmented_system!(::Vector{Tv},::Vector{Tv},::SparsePosDefLinearSolver{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:BlasReal}
+```
+
+### LDLFLinearSolver
+
+```@docs
+LDLFLinearSolver
+```
+
+```@docs
+update_linear_solver!(::LDLFLinearSolver{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:Real}
+```
+
+```@docs
+solve_augmented_system!(::Vector{Tv},::Vector{Tv},::LDLFLinearSolver{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:Real}
 ```
