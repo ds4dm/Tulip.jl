@@ -10,7 +10,7 @@ const LDLF = LDLFactorizations
 
 Linear solver for the 2x2 augmented system with ``A`` sparse.
 
-Uses an LDLt factorization of the quasi-definite augmented system.
+Uses LDLFactorizations.jl to compute an LDLt factorization of the quasi-definite augmented system.
 """
 mutable struct LDLFLinearSolver{Tv<:Real, Ta<:SparseMatrixCSC{Tv, <:Integer}} <: IndefLinearSolver{Tv, Ta}
     m::Int  # Number of rows
@@ -85,7 +85,12 @@ function update_linear_solver!(
     ]
 
     # TODO: PSD-ness checks
-    ls.F = LDLF.ldl(S)
+    try
+        ls.F = LDLF.ldl(S)
+    catch err
+        isa(err, LDLF.SQDException) && throw(PosDefException(-1))
+        rethrow(err)
+    end
 
     return nothing
 end
@@ -94,11 +99,6 @@ end
     solve_augmented_system!(dx, dy, ls, ξp, ξd)
 
 Solve the augmented system, overwriting `dx, dy` with the result.
-
-# Arguments
-- `dx, dy`: Vectors of unknowns, modified in-place
-- `ls::SparseIndefLinearSolver`: Linear solver for the augmented system
-- `ξp, ξd`: Right-hand-side vectors
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
