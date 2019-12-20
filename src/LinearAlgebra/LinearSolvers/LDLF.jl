@@ -6,7 +6,7 @@ const LDLF = LDLFactorizations
 # ==============================================================================
 
 """
-LDLFLinearSolver{Tv}
+    LDLFLinearSolver{Tv}
 
 Linear solver for the 2x2 augmented system with ``A`` sparse.
 
@@ -26,7 +26,7 @@ mutable struct LDLFLinearSolver{Tv<:Real, Ta<:SparseMatrixCSC{Tv, <:Integer}} <:
     regD::Vector{Tv}  # dual regularization
 
     # Factorization
-    F
+    F::LDLF.LDLFactorization{Tv}
 
     # TODO: constructor with initial memory allocation
     function LDLFLinearSolver(A::SparseMatrixCSC{Tv, Int}) where{Tv<:Real}
