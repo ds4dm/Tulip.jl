@@ -65,9 +65,13 @@ function solve_augmented_system! end
 # 
 include("dense.jl")
 include("sparse.jl")
+include("LDLF.jl")
 
 # TODO: use parameter to choose between Indef/PosDef system
 AbstractLinearSolver(A::Matrix{Tv}) where{Tv<:Real} = DenseLinearSolver(A)
 AbstractLinearSolver(
     A::SparseMatrixCSC{Tv, Int64}
 ) where{Tv<:BlasReal} = SparseIndefLinearSolver(A)
+AbstractLinearSolver(
+    A::SparseMatrixCSC{Tv, Int64}
+) where{Tv<:Real} = LDLFLinearSolver(A)
