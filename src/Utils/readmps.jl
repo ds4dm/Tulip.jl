@@ -35,6 +35,28 @@ function MPSSection(sec)
     end
 end
 
+
+"""
+    split_mps_line(s::String)
+
+More efficient implementation than Julia's Base.split
+"""
+function split_mps_line(s::String)   
+    buf = IOBuffer(s)
+    S = String[]
+    while !eof(buf)
+        # Skip chars and read word
+        skipchars(isspace, buf)
+        n = position(buf)
+        skipchars(!isspace, buf)
+        m = position(buf)
+        m > n || break
+        push!(S, s[1+n:m])
+    end
+    
+    return S
+end
+
 """
     readmps!(m::Model{Tv}, filename)
 
@@ -73,7 +95,7 @@ function readmps!(m::Model{Tv}, fname::String) where{Tv<:Real}
                 continue
             end
 
-            fields = split(ln)
+            fields = split_mps_line(ln)
 
             # check for indicators
             if ln[1] != ' '
