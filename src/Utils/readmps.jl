@@ -1,34 +1,20 @@
-abstract type MPSSectionTrait end
+abstract type MPSSection end
 
-struct MPSNoSection <: MPSSectionTrait end
-struct MPSName <: MPSSectionTrait end
-struct MPSObjsense <: MPSSectionTrait end
-struct MPSObjName <: MPSSectionTrait end
-struct MPSRows <: MPSSectionTrait end
-struct MPSColumns <: MPSSectionTrait end
-struct MPSRhs <: MPSSectionTrait end
-struct MPSRanges <: MPSSectionTrait end
-struct MPSBounds <: MPSSectionTrait end
-struct MPSEndata <: MPSSectionTrait end
+struct MPSNoSection <: MPSSection end
+struct MPSName <: MPSSection end
+struct MPSObjsense <: MPSSection end
+struct MPSRows <: MPSSection end
+struct MPSColumns <: MPSSection end
+struct MPSRhs <: MPSSection end
+struct MPSRanges <: MPSSection end
+struct MPSBounds <: MPSSection end
+struct MPSEndata <: MPSSection end
 
-@enum MPSSection begin
-    NAME
-    OBJSENSE
-    ROWS
-    COLUMNS
-    RHS
-    RANGES
-    BOUNDS
-    ENDATA
-end
-
-function MPSSectionTrait(sec::String)
+function MPSSection(sec::String)
     if sec == "NAME"
         return MPSName()
     elseif sec == "OBJSENSE"
         return MPSObjsense()
-    elseif sec == "OBJNAME"
-        return MPSObjName()
     elseif sec == "ROWS"
         return MPSRows()
     elseif sec == "COLUMNS"
@@ -59,6 +45,8 @@ mutable struct MPSData{Tv<:Real}
     boundsname::String  # name of BOUNDS field
     rangename::String  # nae of RANGES field
 
+    sec::MPSSection
+
     varnames::Vector{String}  # idx -> name
     var2idx::Dict{String, Int}  # name -> index
     connames::Vector{String}  # idx -> name
@@ -78,21 +66,17 @@ mutable struct MPSData{Tv<:Real}
     aV::Vector{Tv}
 
     # Bounds
-    lcon::Vector{Tv}  # constraints lower bounds
-    ucon::Vector{Tv}  # constraints upper bounds
-    lvar::Vector{Tv}  # variables lower bounds
-    uvar::Vector{Tv}  # variables upper bounds
     conbounds::Vector{Tuple{BoundType, Tv, Tv}}
     varbounds::Vector{Tuple{BoundType, Tv, Tv}}
 
     MPSData{Tv}() where{Tv<:Real}= new{Tv}(
         :Free,
-        "", "", "", "", "",
+        "", "", "", "", "", MPSNoSection(),
         String[], Dict{String, Int}(), String[], Dict{String, Int}(),
         0, 0,
         :Min, Tv[], zero(Tv),
         Int[], Int[], Tv[],
-        Tv[], Tv[], Tv[], Tv[], Tuple{BoundType, Tv, Tv}[], Tuple{BoundType, Tv, Tv}[]
+        Tuple{BoundType, Tv, Tv}[], Tuple{BoundType, Tv, Tv}[]
     )
 end
 
@@ -104,6 +88,7 @@ More efficient implementation than Julia's Base.split
 function split_mps_line(s::String)   
     buf = IOBuffer(s)
     S = String[]
+    sizehint!(S, 5)
     while !eof(buf)
         # Skip chars and read word
         skipchars(isspace, buf)
@@ -162,8 +147,6 @@ end
 
 """
 function readmps(fname::String)
-    sec = MPSNoSection()
-
     # MPS files have double float precision at most
     dat = MPSData{Float64}()
 
@@ -181,15 +164,15 @@ function readmps(fname::String)
             if !isspace(ln[1])
                 # Section header
                 fields = split_mps_line(ln)
-                sec = MPSSectionTrait(fields[1])
-                isa(sec, MPSEndata) && break
-                if isa(sec, MPSName)
+                dat.sec = MPSSection(fields[1])
+                isa(dat.sec, MPSEndata) && break
+                if isa(dat.sec, MPSName)
                     dat.name = length(fields) >= 2 ? fields[2] : ""
                 end
                 continue
             end
 
-            parseline!(sec, dat, ln)
+            parseline!(dat.sec, dat, ln)
         end
     catch err
         close(mps)
@@ -199,18 +182,9 @@ function readmps(fname::String)
     close(mps)
 
     # End of file reached
-    isa(sec, MPSEndata) || error("File ended without EOF flag.")
+    isa(dat.sec, MPSEndata) || error("File ended without EOF flag.")
 
     return dat
-end
-
-"""
-    parseline!(::MPSNoSection, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub)
-
-This should never be called.
-"""
-function parseline!(::MPSNoSection, m::Model{Tv}, fields, d, var2idx, con2idx, lb, ub) where{Tv<:Real}
-    error()
 end
 
 function parseline!(::MPSName, dat::MPSData, ln::String)
@@ -260,16 +234,10 @@ function parseline!(::MPSRows, dat::MPSData{Tv}, ln::String) where{Tv<:Real}
 
         # Create default bounds
         if c == 'E'
-            push!(dat.lcon, zero(Tv))
-            push!(dat.ucon, zero(Tv))
             push!(dat.conbounds, (TLP_FX, zero(Tv), zero(Tv)))
         elseif c == 'L'
-            push!(dat.lcon, Tv(-Inf))
-            push!(dat.ucon, zero(Tv))
             push!(dat.conbounds, (TLP_UP, Tv(-Inf), zero(Tv)))
         elseif c == 'G'
-            push!(dat.lcon, zero(Tv))
-            push!(dat.ucon, Tv(Inf))
             push!(dat.conbounds, (TLP_LO, zero(Tv), Tv(Inf)))
         end
     else
@@ -306,9 +274,6 @@ function parseline!(::MPSColumns, dat::MPSData{Tv}, ln::String) where{Tv<:Real}
         push!(dat.varnames, vname)
 
         # Create default bounds and zero objective coeff
-        push!(dat.lvar, zero(Tv))
-        push!(dat.uvar, Tv(Inf))
-
         push!(dat.varbounds, (TLP_LO, zero(Tv), Tv(Inf)))
 
         push!(dat.c, zero(Tv))
