@@ -48,6 +48,52 @@ mutable struct Model{Tv<:Real}
         return m
     end
 end
+ 
+"""
+    loadprolem!(m, filename)
+
+Read problem from file `filename` and load it into `m`.
+"""
+function readmps!(m::Model{Tv}, filename::String) where{Tv<:Real}
+    empty!(m)
+
+    pb = ProblemData{Tv}()
+
+    dat = readmps(filename)
+
+    # Create rows
+    conidx = ConstrId[]
+    sizehint!(conidx, dat.ncon)
+    for (i, (cname, (bt, lb, ub))) in enumerate(zip(dat.connames, dat.conbounds))
+        cidx = new_constraint_index!(pb)
+        constr = LinearConstraint{Tv}(cidx, cname, lb, ub)
+        add_constraint!(pb, constr)
+        push!(conidx, cidx)
+    end
+
+    # Create variables
+    varidx = VarId[]
+    sizehint!(varidx, dat.nvar)
+    for (j, (vname, c, (bt, lb, ub))) in enumerate(zip(dat.varnames, dat.c, dat.varbounds))
+        vidx = new_variable_index!(pb)
+        var = Variable{Tv}(vidx, vname, c, lb, ub)
+        add_variable!(pb, var)
+        push!(varidx, vidx)
+    end
+
+    # Add coefficients
+    for (i, j, v) in zip(dat.aI, dat.aJ, dat.aV)
+        set_coeff!(pb, varidx[j], conidx[i], v)
+    end
+
+    # Set objective sense and offset
+    pb.obj_const = dat.c0
+    
+    m.name = dat.name
+    m.pbdata_raw = pb
+
+    return m
+end
 
 function empty!(m::Model{Tv}) where{Tv<:Real}
     # Empty model
