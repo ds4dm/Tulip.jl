@@ -54,7 +54,7 @@ end
 
 Read problem from file `filename` and load it into `m`.
 """
-function readmps!(m::Model{Tv}, filename::String) where{Tv<:Real}
+function loadproblem!(m::Model{Tv}, filename::String) where{Tv<:Real}
     empty!(m)
 
     pb = ProblemData{Tv}()

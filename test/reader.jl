@@ -1,7 +1,7 @@
 function run_tests_mps_reader(::Tv) where{Tv<:Real}
     m = TLP.Model{Tv}()
 
-    TLP.readmps!(m, joinpath(@__DIR__, "test_lp.mps"))
+    TLP.loadproblem!(m, joinpath(@__DIR__, "test_lp.mps"))
 
     @testset "Name" begin
         @test m.name == "TESTLP"
