@@ -20,7 +20,7 @@ function ex_optimal(::Tv) where{Tv<:Real}
     m.env.verbose = 1
 
     # Read problem and solve
-    TLP.readmps!(m, joinpath(INSTANCE_DIR, "lpex_opt.mps"))
+    TLP.loadproblem!(m, joinpath(INSTANCE_DIR, "lpex_opt.mps"))
     TLP.optimize!(m)
 
     # Check status

@@ -19,7 +19,7 @@ function ex_unbounded(::Tv) where{Tv<:Real}
     m.env.verbose = 1
 
     # Read problem from .mps file and solve    
-    TLP.readmps!(m, joinpath(INSTANCE_DIR, "lpex_ubd.mps"))
+    TLP.loadproblem!(m, joinpath(INSTANCE_DIR, "lpex_ubd.mps"))
     TLP.optimize!(m)
 
     # Check status
