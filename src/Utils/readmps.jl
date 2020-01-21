@@ -146,9 +146,22 @@ function readmps(fname::String)
     return dat
 end
 
+function parseline!(::MPSObjsense, dat::MPSData, ln::String)
+    # parse the name
+    s = split_mps_line(ln)[1]
+    if s == "MIN"
+        dat.objsense = :Min
+    elseif s == "MAX"
+        dat.objsense = :Max
+    else
+        error("Unkown objective sense: $s")
+    end
+    return nothing
+end
+
 function parseline!(::MPSName, dat::MPSData, ln::String)
     # parse the name
-    dat.name = split_mps_line(ln)[2]
+    dat.objsense = split_mps_line(ln)[2]
     return nothing
 end
 

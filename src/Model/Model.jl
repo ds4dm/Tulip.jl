@@ -87,6 +87,13 @@ function loadproblem!(m::Model{Tv}, filename::String) where{Tv<:Real}
     end
 
     # Set objective sense and offset
+    if dat.objsense == :Min
+        pb.obj_sense = TLP_MIN
+    elseif dat.objsense == :Max
+        pb.obj_sense = TLP_MAX
+    else
+        error("Unknown objective sense: $(dat.objsense)")
+    end
     pb.obj_const = dat.c0
     
     m.name = dat.name
