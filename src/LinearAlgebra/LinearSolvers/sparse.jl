@@ -12,7 +12,7 @@ Linear solver for the 2x2 augmented system with ``A`` sparse.
 
 Uses an LDLt factorization of the quasi-definite augmented system.
 """
-mutable struct SparseIndefLinearSolver{Tv<:BlasReal} <: IndefLinearSolver{Tv}
+mutable struct SparseIndefLinearSolver{Tv<:BlasReal} <: AbstractLinearSolver{Tv}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -164,7 +164,7 @@ Uses a Cholesky factorization of the positive definite normal equations system
                                 dx = (Θ^{-1} + Rp)^{-1} * (A' dy - xi_d)
 ```
 """
-mutable struct SparsePosDefLinearSolver{Tv<:BlasReal} <: PosDefLinearSolver{Tv}
+mutable struct SparsePosDefLinearSolver{Tv<:BlasReal} <: AbstractLinearSolver{Tv}
     m::Int  # Number of rows
     n::Int  # Number of columns
 

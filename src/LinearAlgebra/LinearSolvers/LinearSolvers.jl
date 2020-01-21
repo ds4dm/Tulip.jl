@@ -10,20 +10,6 @@ abstract type AbstractLinearSolver{Tv<:Real} end
     * Numerical precision (Tv)
     * Augmented system vs Normal equations systems
 =#
-"""
-    IndefLinearSolver{Tv, Ta}
-
-Abstract container for linear solver working on the indefinite augmented system.
-"""
-abstract type IndefLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv} end
-
-"""
-    PosDefLinearSolver{Tv, Ta}
-
-Abstract container for linear solver working on the PSD normal equations system.
-"""
-abstract type PosDefLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv} end
-
 
 # 
 # Specialized implementations should extend the two functions below.

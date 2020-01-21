@@ -13,7 +13,7 @@ with ``A`` dense.
 The augmented system is automatically reduced to the normal equations system.
 BLAS/LAPACK functions are used whenever applicable.
 """
-mutable struct DenseLinearSolver{Tv<:Real} <: PosDefLinearSolver{Tv}
+mutable struct DenseLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv}
     m::Int  # Number of rows in A
     n::Int  # Number of columns in A
 
