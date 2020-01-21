@@ -1,7 +1,12 @@
 """
     AbstractLinearSolver{Tv}
 
-Abstract container for linear solver used in solving the augmented system.
+Abstract container for solving an augmented system
+```
+    [-(Θ^{-1} + Rp)   A'] [dx] = [ξd]
+    [   A             Rd] [dy] = [ξp]
+```
+where `ξd` and `ξp` are given right-hand side.
 """
 abstract type AbstractLinearSolver{Tv<:Real} end
 
@@ -12,7 +17,7 @@ abstract type AbstractLinearSolver{Tv<:Real} end
 =#
 
 # 
-# Specialized implementations should extend the two functions below.
+# Specialized implementations should extend the functions below
 # 
 
 """
