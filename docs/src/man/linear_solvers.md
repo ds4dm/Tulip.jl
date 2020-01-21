@@ -97,11 +97,11 @@ SparseIndefLinearSolver
 ```
 
 ```@docs
-update_linear_solver!(::SparseIndefLinearSolver{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:BlasReal}
+update_linear_solver!(::SparseIndefLinearSolver,::AbstractVector{Float64},::AbstractVector{Float64},::AbstractVector{Float64})
 ```
 
 ```@docs
-solve_augmented_system!(::Vector{Tv},::Vector{Tv},::SparseIndefLinearSolver{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:BlasReal}
+solve_augmented_system!(::Vector{Float64},::Vector{Float64},::SparseIndefLinearSolver, ::Vector{Float64}, ::Vector{Float64})
 ```
 
 
@@ -113,11 +113,11 @@ SparsePosDefLinearSolver
 ```
 
 ```@docs
-update_linear_solver!(::SparsePosDefLinearSolver{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:BlasReal}
+update_linear_solver!(::SparsePosDefLinearSolver,::AbstractVector{Float64},::AbstractVector{Float64},::AbstractVector{Float64})
 ```
 
 ```@docs
-solve_augmented_system!(::Vector{Tv},::Vector{Tv},::SparsePosDefLinearSolver{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:BlasReal}
+solve_augmented_system!(::Vector{Float64},::Vector{Float64},::SparsePosDefLinearSolver, ::Vector{Float64}, ::Vector{Float64})
 ```
 
 ### LDLFLinearSolver
