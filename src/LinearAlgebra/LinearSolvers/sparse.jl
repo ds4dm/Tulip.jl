@@ -1,5 +1,5 @@
 using SparseArrays
-using SuiteSparse
+using SuiteSparse.CHOLMOD
 
 # ==============================================================================
 #   SparseIndefLinearSolver
@@ -22,11 +22,14 @@ mutable struct SparseIndefLinearSolver{Tv<:BlasReal} <: IndefLinearSolver{Tv}
     # Problem data
     A::SparseMatrixCSC{Tv}
     θ::Vector{Tv}
-    regP::Vector{Tv}  # primal regularization
+    regP::Vector{Tv}  # primal-dual regularization
     regD::Vector{Tv}  # dual regularization
 
+    # Left-hand side matrix
+    S::SparseMatrixCSC{Tv, Int}  # TODO: use `CHOLMOD.Sparse` instead
+
     # Factorization
-    F
+    F::CHOLMOD.Factor{Tv}
 
     # TODO: constructor with initial memory allocation
     function SparseIndefLinearSolver(A::SparseMatrixCSC{Tv, Int}) where{Tv<:BlasReal}
@@ -35,12 +38,18 @@ mutable struct SparseIndefLinearSolver{Tv<:BlasReal} <: IndefLinearSolver{Tv}
 
         S = [
             spdiagm(0 => -θ)  A';
-            A spdiagm(0 => ones(m))
+            spzeros(Tv, m, n) spdiagm(0 => ones(m))
         ]
 
-        # TODO: PSD-ness checks
-        F = ldlt(Symmetric(S))
-        return new{Tv}(m, n, A, θ, ones(Tv, n), ones(Tv, m), F)
+        # Symbolic factorization
+        # See code in src/cholmod.jl of SuiteSparse.jl for `ldlt` function
+        cm = CHOLMOD.defaults(CHOLMOD.common_struct)
+        CHOLMOD.set_print_level(cm, 0)
+        unsafe_store!(CHOLMOD.common_final_ll[], 0)
+        unsafe_store!(CHOLMOD.common_supernodal[], 0)
+        F = CHOLMOD.fact_(CHOLMOD.Sparse(Symmetric(S)), cm)
+
+        return new{Tv}(m, n, A, θ, ones(Tv, n), ones(Tv, m), S, F)
     end
 
 end
@@ -77,15 +86,19 @@ function update_linear_solver!(
     ls.regP .= regP
     ls.regD .= regD
 
-    # Re-compute factorization
-    # TODO: Keep S in memory, only change diagonal
-    S = [
-        spdiagm(0 => -ls.θ .- regP)  ls.A';
-        ls.A spdiagm(0 => regD)
-    ]
+    # Update S. S is stored as upper-triangular and only its diagonal changes.
+    @inbounds for j in 1:ls.n
+        k = ls.S.colptr[1+j] - 1
+        ls.S.nzval[k] = -ls.θ[j] - regP[j]
+    end
+    @inbounds for i in 1:ls.m
+        k = ls.S.colptr[1+ls.n+i] - 1
+        ls.S.nzval[k] = regD[i]
+    end
 
-    # TODO: PSD-ness checks
-    ldlt!(ls.F, Symmetric(S))
+    # `S` is first converted into CHOLMOD's internal data structure,
+    # so this line allocates.
+    ldlt!(ls.F, Symmetric(ls.S))
 
     return nothing
 end
@@ -166,7 +179,7 @@ mutable struct SparsePosDefLinearSolver{Tv<:BlasReal} <: PosDefLinearSolver{Tv}
     regD::Vector{Tv}  # dual
 
     # Factorization
-    F
+    F::CHOLMOD.Factor{Tv}
 
     # Constructor and initial memory allocation
     # TODO: symbolic only + allocation
