@@ -12,7 +12,7 @@ Linear solver for the 2x2 augmented system with ``A`` sparse.
 
 Uses an LDLt factorization of the quasi-definite augmented system.
 """
-mutable struct SparseIndefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:Integer}} <: IndefLinearSolver{Tv, Ta}
+mutable struct SparseIndefLinearSolver{Tv<:BlasReal} <: IndefLinearSolver{Tv}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -20,7 +20,7 @@ mutable struct SparseIndefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:I
     #   and add flag (default to false) to know whether user ordering should be used
 
     # Problem data
-    A::Ta
+    A::SparseMatrixCSC{Tv}
     θ::Vector{Tv}
     regP::Vector{Tv}  # primal regularization
     regD::Vector{Tv}  # dual regularization
@@ -40,7 +40,7 @@ mutable struct SparseIndefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:I
 
         # TODO: PSD-ness checks
         F = ldlt(Symmetric(S))
-        return new{Tv, SparseMatrixCSC{Tv, Int}}(m, n, A, θ, ones(Tv, n), ones(Tv, m), F)
+        return new{Tv}(m, n, A, θ, ones(Tv, n), ones(Tv, m), F)
     end
 
 end
@@ -55,11 +55,11 @@ Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
 Throws a `PosDefException` if matrix is not quasi-definite.
 """
 function update_linear_solver!(
-    ls::SparseIndefLinearSolver{Tv, Ta},
+    ls::SparseIndefLinearSolver{Tv},
     θ::AbstractVector{Tv},
     regP::AbstractVector{Tv},
     regD::AbstractVector{Tv}
-) where{Tv<:BlasReal, Ta<:AbstractMatrix{Tv}}
+) where{Tv<:BlasReal}
     # Sanity checks
     length(θ)  == ls.n || throw(DimensionMismatch(
         "θ has length $(length(θ)) but linear solver is for n=$(ls.n)."
@@ -151,7 +151,7 @@ Uses a Cholesky factorization of the positive definite normal equations system
                                 dx = (Θ^{-1} + Rp)^{-1} * (A' dy - xi_d)
 ```
 """
-mutable struct SparsePosDefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:Integer}} <: PosDefLinearSolver{Tv, Ta}
+mutable struct SparsePosDefLinearSolver{Tv<:BlasReal} <: PosDefLinearSolver{Tv}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -159,7 +159,7 @@ mutable struct SparsePosDefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:
     #   and add flag (default to false) to know whether user ordering should be used
 
     # Problem data
-    A::Ta
+    A::SparseMatrixCSC{Tv, Int}
     θ::Vector{Tv}   # Diagonal scaling
     # Regularization
     regP::Vector{Tv}  # primal
@@ -179,7 +179,7 @@ mutable struct SparsePosDefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:
         # TODO: PSD-ness checks
         F = cholesky(Symmetric(S))
 
-        return new{Tv, SparseMatrixCSC{Tv, Int}}(m, n, A, θ, zeros(Tv, n), ones(Tv, m), F)
+        return new{Tv}(m, n, A, θ, zeros(Tv, n), ones(Tv, m), F)
     end
 
 end

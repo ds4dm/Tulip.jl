@@ -1,9 +1,9 @@
 """
-    AbstractLinearSolver{Tv, Ta}
+    AbstractLinearSolver{Tv}
 
 Abstract container for linear solver used in solving the augmented system.
 """
-abstract type AbstractLinearSolver{Tv<:Real, Ta<:AbstractMatrix{Tv}} end
+abstract type AbstractLinearSolver{Tv<:Real} end
 
 #= TODO: Use traits instead, e.g.
     * Direct vs indirect method
@@ -15,14 +15,14 @@ abstract type AbstractLinearSolver{Tv<:Real, Ta<:AbstractMatrix{Tv}} end
 
 Abstract container for linear solver working on the indefinite augmented system.
 """
-abstract type IndefLinearSolver{Tv<:Real, Ta<:AbstractMatrix{Tv}} <: AbstractLinearSolver{Tv, Ta} end
+abstract type IndefLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv} end
 
 """
     PosDefLinearSolver{Tv, Ta}
 
 Abstract container for linear solver working on the PSD normal equations system.
 """
-abstract type PosDefLinearSolver{Tv<:Real, Ta<:AbstractMatrix{Tv}} <: AbstractLinearSolver{Tv, Ta} end
+abstract type PosDefLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv} end
 
 
 # 
