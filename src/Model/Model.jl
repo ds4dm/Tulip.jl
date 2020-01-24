@@ -125,6 +125,8 @@ include("API/api.jl")
 
 function optimize!(m::Model{Tv}) where{Tv<:Real}
 
+    ts = time()
+
     # Parameters
     m.env.threads > 0 || error("Invalid thread count: $(m.env.threads).")
     BLAS.set_num_threads(m.env.threads)
@@ -146,6 +148,10 @@ function optimize!(m::Model{Tv}) where{Tv<:Real}
 
     # Solve problem
     optimize!(m.solver, m.env)
+
+    te = time()
+
+    m.env.verbose != 0 && @printf("Total time (s): %.2f\n\n", te - ts)
 
     # TODO: post-crush solution
     return m.solver.solver_status
