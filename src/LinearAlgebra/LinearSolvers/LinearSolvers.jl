@@ -71,6 +71,8 @@ and over-write `dx`, `dy` with the result.
 function solve_augmented_system! end
 
 
+include("test.jl")
+
 # 
 include("dense.jl")
 include("sparse.jl")
