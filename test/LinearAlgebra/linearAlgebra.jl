@@ -20,33 +20,33 @@ function test_linalg(A::AbstractMatrix{Tv}) where{Tv<:Real}
     end
 
     # Cholesky factorization
-    @testset "AbstractLinearSolver" begin
-        # Initialize linear solver
-        ls = TLP.AbstractLinearSolver(A)
+    # @testset "AbstractLinearSolver" begin
+    #     # Initialize linear solver
+    #     ls = TLP.AbstractLinearSolver(A)
 
-        # Update factorization
-        θ = Tv(2) .* ones(Tv, n)
-        regP = ones(Tv, n)
-        regD = ones(Tv, m)
+    #     # Update factorization
+    #     θ = Tv(2) .* ones(Tv, n)
+    #     regP = ones(Tv, n)
+    #     regD = ones(Tv, m)
 
-        TLP.TLPLinearAlgebra.update_linear_solver!(ls, θ, regP, regD)
+    #     TLP.TLPLinearAlgebra.update_linear_solver!(ls, θ, regP, regD)
 
-        # solve linear system
-        dx = zeros(Tv, n)
-        dy = zeros(Tv, m)
-        ξp = ones(Tv, m)
-        ξd = ones(Tv, n)
-        TLP.TLPLinearAlgebra.solve_augmented_system!(
-            dx, dy, ls, ξp, ξd
-        )
+    #     # solve linear system
+    #     dx = zeros(Tv, n)
+    #     dy = zeros(Tv, m)
+    #     ξp = ones(Tv, m)
+    #     ξd = ones(Tv, n)
+    #     TLP.TLPLinearAlgebra.solve_augmented_system!(
+    #         dx, dy, ls, ξp, ξd
+    #     )
 
-        # Check accuracy of solution
-        resP = norm(ξp - A * dx - regD .* dy, Inf)
-        resD = norm(ξd - dx ./ (θ .+ regP) - A' * dy, Inf)
+    #     # Check accuracy of solution
+    #     resP = norm(ξp - A * dx - regD .* dy, Inf)
+    #     resD = norm(ξd - dx ./ (θ .+ regP) - A' * dy, Inf)
 
-        @test resP <= sqrt(eps(Tv))
-        @test resD <= sqrt(eps(Tv))
-    end
+    #     @test resP <= sqrt(eps(Tv))
+    #     @test resD <= sqrt(eps(Tv))
+    # end
 
     return true
 end

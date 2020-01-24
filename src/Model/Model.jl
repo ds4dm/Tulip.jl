@@ -137,6 +137,7 @@ function optimize!(m::Model{Tv}) where{Tv<:Real}
     # Instantiate HSD solver
     # TODO: only re-compute what is necessary`
     hsd = HSDSolver{Tv}(
+        m.env,
         m.pbdata_std.ncon, m.pbdata_std.nvar, m.pbdata_std.nupb,
         m.pbdata_std.A, m.pbdata_std.b, m.pbdata_std.c, m.pbdata_std.c0,
         m.pbdata_std.uind, m.pbdata_std.uval

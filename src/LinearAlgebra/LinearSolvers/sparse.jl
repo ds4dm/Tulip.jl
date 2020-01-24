@@ -1,6 +1,18 @@
 using SparseArrays
 using SuiteSparse.CHOLMOD
 
+"""
+    Cholmod <: LSBackend
+
+Use CHOLMOD backend.
+
+Options available:
+* `Float64` only
+* Augmented system with LDL factorization
+* Normal equations with Cholesky factorization
+"""
+struct Cholmod <: LSBackend end
+
 # ==============================================================================
 #   SparseIndefLinearSolver
 # ==============================================================================
@@ -53,6 +65,21 @@ mutable struct SparseIndefLinearSolver <: AbstractLinearSolver{Float64}
     end
 
 end
+
+AbstractLinearSolver(
+    ::Cholmod,
+    ::AugmentedSystem,
+    A::AbstractMatrix{Float64}
+) = SparseIndefLinearSolver(sparse(A))
+
+AbstractLinearSolver(
+    ::Cholmod,
+    ::DefaultSystem,
+    A::AbstractMatrix{Float64}
+) = SparseIndefLinearSolver(sparse(A))
+
+backend(::SparseIndefLinearSolver) = "CHOLMOD"
+linear_system(::SparseIndefLinearSolver) = "Augmented system"
 
 """
     update_linear_solver!(ls, θ, regP, regD)
@@ -196,6 +223,15 @@ mutable struct SparsePosDefLinearSolver <: AbstractLinearSolver{Float64}
     end
 
 end
+
+AbstractLinearSolver(
+    ::Cholmod,
+    ::NormalEquations,
+    A::AbstractMatrix{Float64}
+) = SparsePosDefLinearSolver(sparse(A))
+
+backend(::SparsePosDefLinearSolver) = "CHOLMOD - Cholesky"
+linear_system(::SparsePosDefLinearSolver) = "Normal equations"
 
 """
     update_linear_solver!(ls, θ, regP, regD)

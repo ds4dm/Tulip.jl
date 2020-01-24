@@ -1,6 +1,18 @@
 import LDLFactorizations
 const LDLF = LDLFactorizations
 
+
+"""
+    LDLFact <: LSBackend
+
+Use LDLFactorizations backend.
+
+Options available:
+* Any numerical type `T`
+* Augmented system with LDL factorization
+"""
+struct LDLFact <: LSBackend end
+
 # ==============================================================================
 #   LDLFLinearSolver
 # ==============================================================================
@@ -44,6 +56,15 @@ mutable struct LDLFLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv}
     end
 
 end
+
+AbstractLinearSolver(
+    ::LDLFact,
+    ::AugmentedSystem,
+    A::AbstractMatrix{Tv}
+) where{Tv<:Real} = LDLFLinearSolver(sparse(A))
+
+backend(::LDLFLinearSolver) = "LDLFactorizations.jl"
+linear_system(::LDLFLinearSolver) = "Augmented system"
 
 """
     update_linear_solver!(ls, θ, regP, regD)

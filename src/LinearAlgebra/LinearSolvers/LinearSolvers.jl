@@ -10,11 +10,29 @@ where `ξd` and `ξp` are given right-hand side.
 """
 abstract type AbstractLinearSolver{Tv<:Real} end
 
-#= TODO: Use traits instead, e.g.
-    * Direct vs indirect method
-    * Numerical precision (Tv)
-    * Augmented system vs Normal equations systems
-=#
+
+"""
+    LinearSystem
+
+Indicates which linear system is solved
+* `DefaultSystem`: default 
+* `AugmentedSystem`: solve the symmetric quasi-definite augmented system
+* `NormalEquations`: solve the symmetric positive-definite normal equations 
+"""
+abstract type LinearSystem end
+
+struct DefaultSystem <: LinearSystem end
+struct AugmentedSystem <: LinearSystem end
+struct NormalEquations <: LinearSystem end
+
+"""
+    LSBackend
+
+Backend used for solving linear systems.
+"""
+abstract type LSBackend end
+
+struct DefaultBackend <: LSBackend end
 
 # 
 # Specialized implementations should extend the functions below
@@ -58,11 +76,21 @@ include("dense.jl")
 include("sparse.jl")
 include("LDLF.jl")
 
-# TODO: use parameter to choose between Indef/PosDef system
-AbstractLinearSolver(A::Matrix{Tv}) where{Tv<:Real} = DenseLinearSolver(A)
+# Default settings
 AbstractLinearSolver(
-    A::SparseMatrixCSC{Float64, Int64}
-) = SparseIndefLinearSolver(A)
+    ::DefaultBackend,
+    ::DefaultSystem,
+    A::Matrix{Tv}
+) where{Tv<:Real} = AbstractLinearSolver(Lapack(), NormalEquations(), A)
+
 AbstractLinearSolver(
-    A::SparseMatrixCSC{Tv, Int64}
-) where{Tv<:Real} = LDLFLinearSolver(A)
+    ::DefaultBackend,
+    ::DefaultSystem,
+    A::AbstractMatrix{Float64}
+) = AbstractLinearSolver(Cholmod(), AugmentedSystem(), A)
+
+AbstractLinearSolver(
+    ::DefaultBackend,
+    ::DefaultSystem,
+    A::AbstractMatrix{Tv}
+) where{Tv<:Real} = AbstractLinearSolver(LDLFact(), AugmentedSystem(), A)

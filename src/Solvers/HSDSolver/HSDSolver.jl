@@ -47,7 +47,9 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     # rtk::T          # rhs for homogeneous complimentary products
 
     # TODO: Constructor
-    function HSDSolver{Tv}(ncon::Int, nvar::Int, nupb::Int,
+    function HSDSolver{Tv}(
+        env::Env{Tv},
+        ncon::Int, nvar::Int, nupb::Int,
         A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv}, c0::Tv,
         uind::Vector{Int}, uval::Vector{Tv}
     ) where{Tv<:Real}
@@ -80,7 +82,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
             zero(Tv), zero(Tv), zero(Tv), zero(Tv)
         )
 
-        hsd.ls = AbstractLinearSolver(A)
+        hsd.ls = AbstractLinearSolver(env.ls_backend, env.ls_system, A)
 
         # Initial regularizations
         hsd.regP = ones(Tv, nvar)

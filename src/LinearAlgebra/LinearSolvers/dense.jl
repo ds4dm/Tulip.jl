@@ -1,6 +1,18 @@
 using LinearAlgebra.LAPACK
 
 """
+    Lapack <: LSBackend
+
+Use LAPACK backend.
+
+Options available:
+* `Float32` and `Float64` will use LAPACK. Other numerical types will use Julia's
+    generic cholesky factorization.
+* Normal equations with Cholesky factorization
+"""
+struct Lapack <: LSBackend end
+
+"""
     DenseLinearSolver{Tv}
 
 Linear solver for the 2x2 augmented system
@@ -42,6 +54,15 @@ mutable struct DenseLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv}
         return new{Tv}(m, n, A, θ, zeros(Tv, n), zeros(Tv, m), copy(A), S)
     end
 end
+
+AbstractLinearSolver(
+    ::Lapack,
+    ::NormalEquations,
+    A::AbstractMatrix{Tv}
+) where{Tv<:Real} = DenseLinearSolver(Matrix(A))
+
+backend(::DenseLinearSolver) = "LAPACK"
+linear_system(::DenseLinearSolver) = "Normal equations"
 
 """
     update_linear_solver!(ls::DenseLinearSolver{<:Real}, θ, regP, regD)

@@ -1,6 +1,9 @@
 import Tulip: HSDSolver, optimize!
 
 function run_tests_hsd(::Tv) where{Tv<:Real}
+
+    env = TLP.Env{Tv}()
+
     @testset "step length" begin
         m, n, p = 2, 2, 1
         pt = TLP.Point{Tv}(m, n, p)
@@ -53,7 +56,7 @@ function run_tests_hsd(::Tv) where{Tv<:Real}
         uind = [1, 2]
         uval = Vector{Tv}([2.0, 2.0])
 
-        hsd = TLP.HSDSolver{Tv}(m, n, p, A, b, c, c0, uind, uval)
+        hsd = TLP.HSDSolver{Tv}(env, m, n, p, A, b, c, c0, uind, uval)
 
         # Primal-dual optimal solution
         # x1 = x2 = 0.5; w1 = w2 = 1.5; t = 1
@@ -104,7 +107,7 @@ function run_tests_hsd(::Tv) where{Tv<:Real}
         uind = [1, 2]
         uval = Vector{Tv}([2.0, 2.0])
 
-        hsd = TLP.HSDSolver{Tv}(m, n, p, A, b, c, c0, uind, uval)
+        hsd = TLP.HSDSolver{Tv}(env, m, n, p, A, b, c, c0, uind, uval)
 
         # Primal-dual optimal solution
         # x1 = x2 = 0.5; w1 = w2 = 1.5; t = 1
