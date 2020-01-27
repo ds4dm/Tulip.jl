@@ -74,9 +74,9 @@ function solve_augmented_system! end
 include("test.jl")
 
 # 
-include("dense.jl")
-include("sparse.jl")
-include("LDLF.jl")
+include("lapack.jl")
+include("cholmod.jl")
+include("ldlfact.jl")
 
 # Default settings
 AbstractLinearSolver(
