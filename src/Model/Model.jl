@@ -125,6 +125,8 @@ include("API/api.jl")
 
 function optimize!(m::Model{Tv}) where{Tv<:Real}
 
+    ts = time()
+
     # Parameters
     m.env.threads > 0 || error("Invalid thread count: $(m.env.threads).")
     BLAS.set_num_threads(m.env.threads)
@@ -137,6 +139,7 @@ function optimize!(m::Model{Tv}) where{Tv<:Real}
     # Instantiate HSD solver
     # TODO: only re-compute what is necessary`
     hsd = HSDSolver{Tv}(
+        m.env,
         m.pbdata_std.ncon, m.pbdata_std.nvar, m.pbdata_std.nupb,
         m.pbdata_std.A, m.pbdata_std.b, m.pbdata_std.c, m.pbdata_std.c0,
         m.pbdata_std.uind, m.pbdata_std.uval
@@ -145,6 +148,10 @@ function optimize!(m::Model{Tv}) where{Tv<:Real}
 
     # Solve problem
     optimize!(m.solver, m.env)
+
+    te = time()
+
+    m.env.verbose != 0 && @printf("Total time (s): %.2f\n\n", te - ts)
 
     # TODO: post-crush solution
     return m.solver.solver_status

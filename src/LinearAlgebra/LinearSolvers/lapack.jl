@@ -1,6 +1,19 @@
 using LinearAlgebra.LAPACK
 
 """
+    Lapack <: LSBackend
+
+Use LAPACK backend.
+
+Options available:
+* Numerical precision: `Tv<:Real`
+    * `Float32` and `Float64` will use LAPACK.
+    * Other numerical types will use Julia's generic cholesky factorization.
+* [`NormalEquations`](@ref) only, with Cholesky factorization
+"""
+struct Lapack <: LSBackend end
+
+"""
     DenseLinearSolver{Tv}
 
 Linear solver for the 2x2 augmented system
@@ -13,7 +26,7 @@ with ``A`` dense.
 The augmented system is automatically reduced to the normal equations system.
 BLAS/LAPACK functions are used whenever applicable.
 """
-mutable struct DenseLinearSolver{Tv<:Real} <: PosDefLinearSolver{Tv, Matrix{Tv}}
+mutable struct DenseLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv}
     m::Int  # Number of rows in A
     n::Int  # Number of columns in A
 
@@ -42,6 +55,15 @@ mutable struct DenseLinearSolver{Tv<:Real} <: PosDefLinearSolver{Tv, Matrix{Tv}}
         return new{Tv}(m, n, A, θ, zeros(Tv, n), zeros(Tv, m), copy(A), S)
     end
 end
+
+AbstractLinearSolver(
+    ::Lapack,
+    ::NormalEquations,
+    A::AbstractMatrix{Tv}
+) where{Tv<:Real} = DenseLinearSolver(Matrix(A))
+
+backend(::DenseLinearSolver) = "LAPACK"
+linear_system(::DenseLinearSolver) = "Normal equations"
 
 """
     update_linear_solver!(ls::DenseLinearSolver{<:Real}, θ, regP, regD)

@@ -8,6 +8,7 @@ include("LinearAlgebra/LinearAlgebra.jl")
 import .TLPLinearAlgebra:
     construct_matrix,
     AbstractLinearSolver, update_linear_solver!, solve_augmented_system!
+const TLA = TLPLinearAlgebra
 
 # package code goes here
 include("env.jl")       # Parameters

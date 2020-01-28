@@ -1,32 +1,64 @@
 """
-    AbstractLinearSolver{Tv, Ta}
+    AbstractLinearSolver{Tv}
 
-Abstract container for linear solver used in solving the augmented system.
+Abstract container for solving an augmented system
+```
+    [-(Θ^{-1} + Rp)   A'] [dx] = [ξd]
+    [   A             Rd] [dy] = [ξp]
+```
+where `ξd` and `ξp` are given right-hand side.
 """
-abstract type AbstractLinearSolver{Tv<:Real, Ta<:AbstractMatrix{Tv}} end
+abstract type AbstractLinearSolver{Tv<:Real} end
 
-#= TODO: Use traits instead, e.g.
-    * Direct vs indirect method
-    * Numerical precision (Tv)
-    * Augmented system vs Normal equations systems
-=#
-"""
-    IndefLinearSolver{Tv, Ta}
-
-Abstract container for linear solver working on the indefinite augmented system.
-"""
-abstract type IndefLinearSolver{Tv<:Real, Ta<:AbstractMatrix{Tv}} <: AbstractLinearSolver{Tv, Ta} end
 
 """
-    PosDefLinearSolver{Tv, Ta}
+    LinearSystem
 
-Abstract container for linear solver working on the PSD normal equations system.
+Indicates which linear system is solved.
 """
-abstract type PosDefLinearSolver{Tv<:Real, Ta<:AbstractMatrix{Tv}} <: AbstractLinearSolver{Tv, Ta} end
+abstract type LinearSystem end
 
+"""
+    DefaultSystem
+
+Choose linear system to be solved using default option.
+"""
+struct DefaultSystem <: LinearSystem end
+
+"""
+    AugmentedSystem
+
+Solve the augmented system, i.e., without reducing to normal equations.
+"""
+struct AugmentedSystem <: LinearSystem end
+
+"""
+    NormalEquations
+
+Solve the normal equations system.
+"""
+struct NormalEquations <: LinearSystem end
+
+"""
+    LSBackend
+
+Backend used for solving linear systems.
+"""
+abstract type LSBackend end
+
+"""
+    DefaultBackend
+
+Chose linear solver backend automatically.
+
+* For `A::Matrix{Tv}`, defaults to [`Lapack`](@ref) (i.e., dense solver).
+* For `A::AbstractMatrix{Float64}`, defaults to [`Cholmod`](@ref)
+* Otherwise, defaults to [`LDLFact`](@ref)
+"""
+struct DefaultBackend <: LSBackend end
 
 # 
-# Specialized implementations should extend the two functions below.
+# Specialized implementations should extend the functions below
 # 
 
 """
@@ -62,16 +94,28 @@ and over-write `dx`, `dy` with the result.
 function solve_augmented_system! end
 
 
-# 
-include("dense.jl")
-include("sparse.jl")
-include("LDLF.jl")
+include("test.jl")
 
-# TODO: use parameter to choose between Indef/PosDef system
-AbstractLinearSolver(A::Matrix{Tv}) where{Tv<:Real} = DenseLinearSolver(A)
+# 
+include("lapack.jl")
+include("cholmod.jl")
+include("ldlfact.jl")
+
+# Default settings
 AbstractLinearSolver(
-    A::SparseMatrixCSC{Tv, Int64}
-) where{Tv<:BlasReal} = SparseIndefLinearSolver(A)
+    ::DefaultBackend,
+    ::DefaultSystem,
+    A::Matrix{Tv}
+) where{Tv<:Real} = AbstractLinearSolver(Lapack(), NormalEquations(), A)
+
 AbstractLinearSolver(
-    A::SparseMatrixCSC{Tv, Int64}
-) where{Tv<:Real} = LDLFLinearSolver(A)
+    ::DefaultBackend,
+    ::DefaultSystem,
+    A::AbstractMatrix{Float64}
+) = AbstractLinearSolver(Cholmod(), AugmentedSystem(), A)
+
+AbstractLinearSolver(
+    ::DefaultBackend,
+    ::DefaultSystem,
+    A::AbstractMatrix{Tv}
+) where{Tv<:Real} = AbstractLinearSolver(LDLFact(), AugmentedSystem(), A)

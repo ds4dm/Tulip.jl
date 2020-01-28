@@ -1,4 +1,4 @@
-# Formulations
+# Problem formulation
 
 ## Model input
 

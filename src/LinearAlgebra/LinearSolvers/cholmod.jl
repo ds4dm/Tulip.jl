@@ -1,18 +1,30 @@
 using SparseArrays
-using SuiteSparse
+using SuiteSparse.CHOLMOD
+
+"""
+    Cholmod <: LSBackend
+
+Use CHOLMOD backend.
+
+Options available:
+* `Float64` only
+* Augmented system with LDL factorization
+* Normal equations with Cholesky factorization
+"""
+struct Cholmod <: LSBackend end
 
 # ==============================================================================
 #   SparseIndefLinearSolver
 # ==============================================================================
 
 """
-    SparseIndefLinearSolver{Tv}
+    SparseIndefLinearSolver
 
 Linear solver for the 2x2 augmented system with ``A`` sparse.
 
 Uses an LDLt factorization of the quasi-definite augmented system.
 """
-mutable struct SparseIndefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:Integer}} <: IndefLinearSolver{Tv, Ta}
+mutable struct SparseIndefLinearSolver <: AbstractLinearSolver{Float64}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -20,30 +32,54 @@ mutable struct SparseIndefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:I
     #   and add flag (default to false) to know whether user ordering should be used
 
     # Problem data
-    A::Ta
-    θ::Vector{Tv}
-    regP::Vector{Tv}  # primal regularization
-    regD::Vector{Tv}  # dual regularization
+    A::SparseMatrixCSC{Float64}
+    θ::Vector{Float64}
+    regP::Vector{Float64}  # primal-dual regularization
+    regD::Vector{Float64}  # dual regularization
+
+    # Left-hand side matrix
+    S::SparseMatrixCSC{Float64, Int}  # TODO: use `CHOLMOD.Sparse` instead
 
     # Factorization
-    F
+    F::CHOLMOD.Factor{Float64}
 
     # TODO: constructor with initial memory allocation
-    function SparseIndefLinearSolver(A::SparseMatrixCSC{Tv, Int}) where{Tv<:BlasReal}
+    function SparseIndefLinearSolver(A::SparseMatrixCSC{Float64, Int})
         m, n = size(A)
-        θ = ones(Tv, n)
+        θ = ones(Float64, n)
 
         S = [
             spdiagm(0 => -θ)  A';
-            A spdiagm(0 => ones(m))
+            spzeros(Float64, m, n) spdiagm(0 => ones(m))
         ]
 
-        # TODO: PSD-ness checks
-        F = ldlt(Symmetric(S))
-        return new{Tv, SparseMatrixCSC{Tv, Int}}(m, n, A, θ, ones(Tv, n), ones(Tv, m), F)
+        # Symbolic factorization
+        # See code in src/cholmod.jl of SuiteSparse.jl for `ldlt` function
+        cm = CHOLMOD.defaults(CHOLMOD.common_struct)
+        CHOLMOD.set_print_level(cm, 0)
+        unsafe_store!(CHOLMOD.common_final_ll[], 0)
+        unsafe_store!(CHOLMOD.common_supernodal[], 0)
+        F = CHOLMOD.fact_(CHOLMOD.Sparse(Symmetric(S)), cm)
+
+        return new(m, n, A, θ, ones(Float64, n), ones(Float64, m), S, F)
     end
 
 end
+
+AbstractLinearSolver(
+    ::Cholmod,
+    ::AugmentedSystem,
+    A::AbstractMatrix{Float64}
+) = SparseIndefLinearSolver(sparse(A))
+
+AbstractLinearSolver(
+    ::Cholmod,
+    ::DefaultSystem,
+    A::AbstractMatrix{Float64}
+) = SparseIndefLinearSolver(sparse(A))
+
+backend(::SparseIndefLinearSolver) = "CHOLMOD"
+linear_system(::SparseIndefLinearSolver) = "Augmented system"
 
 """
     update_linear_solver!(ls, θ, regP, regD)
@@ -55,11 +91,11 @@ Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
 Throws a `PosDefException` if matrix is not quasi-definite.
 """
 function update_linear_solver!(
-    ls::SparseIndefLinearSolver{Tv, Ta},
-    θ::AbstractVector{Tv},
-    regP::AbstractVector{Tv},
-    regD::AbstractVector{Tv}
-) where{Tv<:BlasReal, Ta<:AbstractMatrix{Tv}}
+    ls::SparseIndefLinearSolver,
+    θ::AbstractVector{Float64},
+    regP::AbstractVector{Float64},
+    regD::AbstractVector{Float64}
+)
     # Sanity checks
     length(θ)  == ls.n || throw(DimensionMismatch(
         "θ has length $(length(θ)) but linear solver is for n=$(ls.n)."
@@ -77,15 +113,19 @@ function update_linear_solver!(
     ls.regP .= regP
     ls.regD .= regD
 
-    # Re-compute factorization
-    # TODO: Keep S in memory, only change diagonal
-    S = [
-        spdiagm(0 => -ls.θ .- regP)  ls.A';
-        ls.A spdiagm(0 => regD)
-    ]
+    # Update S. S is stored as upper-triangular and only its diagonal changes.
+    @inbounds for j in 1:ls.n
+        k = ls.S.colptr[1+j] - 1
+        ls.S.nzval[k] = -ls.θ[j] - regP[j]
+    end
+    @inbounds for i in 1:ls.m
+        k = ls.S.colptr[1+ls.n+i] - 1
+        ls.S.nzval[k] = regD[i]
+    end
 
-    # TODO: PSD-ness checks
-    ldlt!(ls.F, Symmetric(S))
+    # `S` is first converted into CHOLMOD's internal data structure,
+    # so this line allocates.
+    ldlt!(ls.F, Symmetric(ls.S))
 
     return nothing
 end
@@ -96,10 +136,10 @@ end
 Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve_augmented_system!(
-    dx::Vector{Tv}, dy::Vector{Tv},
-    ls::SparseIndefLinearSolver{Tv},
-    ξp::Vector{Tv}, ξd::Vector{Tv}
-) where{Tv<:BlasReal}
+    dx::Vector{Float64}, dy::Vector{Float64},
+    ls::SparseIndefLinearSolver,
+    ξp::Vector{Float64}, ξd::Vector{Float64}
+)
     m, n = ls.m, ls.n
     
     # Set-up right-hand side
@@ -136,7 +176,7 @@ end
 # ==============================================================================
 
 """
-    SparsePosDefLinearSolver{Tv}
+    SparsePosDefLinearSolver
 
 Linear solver for the 2x2 augmented system
 ```math
@@ -151,7 +191,7 @@ Uses a Cholesky factorization of the positive definite normal equations system
                                 dx = (Θ^{-1} + Rp)^{-1} * (A' dy - xi_d)
 ```
 """
-mutable struct SparsePosDefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:Integer}} <: PosDefLinearSolver{Tv, Ta}
+mutable struct SparsePosDefLinearSolver <: AbstractLinearSolver{Float64}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -159,30 +199,39 @@ mutable struct SparsePosDefLinearSolver{Tv<:BlasReal, Ta<:SparseMatrixCSC{Tv, <:
     #   and add flag (default to false) to know whether user ordering should be used
 
     # Problem data
-    A::Ta
-    θ::Vector{Tv}   # Diagonal scaling
+    A::SparseMatrixCSC{Float64, Int}
+    θ::Vector{Float64}   # Diagonal scaling
     # Regularization
-    regP::Vector{Tv}  # primal
-    regD::Vector{Tv}  # dual
+    regP::Vector{Float64}  # primal
+    regD::Vector{Float64}  # dual
 
     # Factorization
-    F
+    F::CHOLMOD.Factor{Float64}
 
     # Constructor and initial memory allocation
     # TODO: symbolic only + allocation
-    function SparsePosDefLinearSolver(A::SparseMatrixCSC{Tv, Int}) where{Tv<:BlasReal}
+    function SparsePosDefLinearSolver(A::SparseMatrixCSC{Float64, Int})
         m, n = size(A)
-        θ = ones(Tv, n)
+        θ = ones(Float64, n)
 
         S = A * A' + spdiagm(0 => ones(m))
 
         # TODO: PSD-ness checks
         F = cholesky(Symmetric(S))
 
-        return new{Tv, SparseMatrixCSC{Tv, Int}}(m, n, A, θ, zeros(Tv, n), ones(Tv, m), F)
+        return new(m, n, A, θ, zeros(Float64, n), ones(Float64, m), F)
     end
 
 end
+
+AbstractLinearSolver(
+    ::Cholmod,
+    ::NormalEquations,
+    A::AbstractMatrix{Float64}
+) = SparsePosDefLinearSolver(sparse(A))
+
+backend(::SparsePosDefLinearSolver) = "CHOLMOD - Cholesky"
+linear_system(::SparsePosDefLinearSolver) = "Normal equations"
 
 """
     update_linear_solver!(ls, θ, regP, regD)
@@ -190,11 +239,11 @@ end
 Compute normal equation system matrix, and update the factorization.
 """
 function update_linear_solver!(
-    ls::SparsePosDefLinearSolver{Tv},
-    θ::AbstractVector{Tv},
-    regP::AbstractVector{Tv},
-    regD::AbstractVector{Tv}
-) where{Tv<:BlasReal}
+    ls::SparsePosDefLinearSolver,
+    θ::AbstractVector{Float64},
+    regP::AbstractVector{Float64},
+    regD::AbstractVector{Float64}
+)
     
     # Sanity checks
     length(θ) == ls.n || throw(DimensionMismatch(
@@ -213,7 +262,7 @@ function update_linear_solver!(
 
     # Re-compute factorization
     # D = (Θ^{-1} + Rp)^{-1}
-    D = Diagonal(one(Tv) ./ (ls.θ .+ ls.regP))
+    D = Diagonal(one(Float64) ./ (ls.θ .+ ls.regP))
     Rd = spdiagm(0 => ls.regD)
     S = ls.A * D * ls.A' + Rd
 
@@ -230,13 +279,13 @@ end
 Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve_augmented_system!(
-    dx::Vector{Tv}, dy::Vector{Tv},
-    ls::SparsePosDefLinearSolver{Tv},
-    ξp::Vector{Tv}, ξd::Vector{Tv}
-) where{Tv<:BlasReal}
+    dx::Vector{Float64}, dy::Vector{Float64},
+    ls::SparsePosDefLinearSolver,
+    ξp::Vector{Float64}, ξd::Vector{Float64}
+)
     m, n = ls.m, ls.n
 
-    d = one(Tv) ./ (ls.θ .+ ls.regP)
+    d = one(Float64) ./ (ls.θ .+ ls.regP)
     D = Diagonal(d)
     
     # Set-up right-hand side

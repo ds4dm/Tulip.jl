@@ -1,6 +1,18 @@
 import LDLFactorizations
 const LDLF = LDLFactorizations
 
+
+"""
+    LDLFact <: LSBackend
+
+Use LDLFactorizations backend.
+
+Options available:
+* Any numerical type `T`
+* Augmented system with LDL factorization
+"""
+struct LDLFact <: LSBackend end
+
 # ==============================================================================
 #   LDLFLinearSolver
 # ==============================================================================
@@ -12,7 +24,7 @@ Linear solver for the 2x2 augmented system with ``A`` sparse.
 
 Uses LDLFactorizations.jl to compute an LDLt factorization of the quasi-definite augmented system.
 """
-mutable struct LDLFLinearSolver{Tv<:Real, Ta<:SparseMatrixCSC{Tv, <:Integer}} <: IndefLinearSolver{Tv, Ta}
+mutable struct LDLFLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -20,7 +32,7 @@ mutable struct LDLFLinearSolver{Tv<:Real, Ta<:SparseMatrixCSC{Tv, <:Integer}} <:
     #   and add flag (default to false) to know whether user ordering should be used
 
     # Problem data
-    A::Ta
+    A::SparseMatrixCSC{Tv, Int}
     θ::Vector{Tv}
     regP::Vector{Tv}  # primal regularization
     regD::Vector{Tv}  # dual regularization
@@ -40,10 +52,19 @@ mutable struct LDLFLinearSolver{Tv<:Real, Ta<:SparseMatrixCSC{Tv, <:Integer}} <:
 
         # TODO: PSD-ness checks
         F = LDLF.ldl(S)
-        return new{Tv, SparseMatrixCSC{Tv, Int}}(m, n, A, θ, ones(Tv, n), ones(Tv, m), F)
+        return new{Tv}(m, n, A, θ, ones(Tv, n), ones(Tv, m), F)
     end
 
 end
+
+AbstractLinearSolver(
+    ::LDLFact,
+    ::AugmentedSystem,
+    A::AbstractMatrix{Tv}
+) where{Tv<:Real} = LDLFLinearSolver(sparse(A))
+
+backend(::LDLFLinearSolver) = "LDLFactorizations.jl"
+linear_system(::LDLFLinearSolver) = "Augmented system"
 
 """
     update_linear_solver!(ls, θ, regP, regD)
@@ -55,11 +76,11 @@ Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
 Throws a `PosDefException` if matrix is not quasi-definite.
 """
 function update_linear_solver!(
-    ls::LDLFLinearSolver{Tv, Ta},
+    ls::LDLFLinearSolver{Tv},
     θ::AbstractVector{Tv},
     regP::AbstractVector{Tv},
     regD::AbstractVector{Tv}
-) where{Tv<:Real, Ta<:AbstractMatrix{Tv}}
+) where{Tv<:Real}
     # Sanity checks
     length(θ)  == ls.n || throw(DimensionMismatch(
         "θ has length $(length(θ)) but linear solver is for n=$(ls.n)."

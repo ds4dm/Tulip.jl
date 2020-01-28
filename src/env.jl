@@ -8,13 +8,16 @@ mutable struct Env{Tv<:Real}
     algo::Int   # Which interior-point algorithm
     matrix_type::Type  # Type of constraint matrix
 
+    ls_backend::TLA.LSBackend
+    ls_system::TLA.LinearSystem
+
 
     #=======================================================
         Stopping criteria & tolerances
     =======================================================#
 
     barrier_iter_max::Int          # Maximum number of barrier iterations
-    time_limit::Float64              # Time limit (in seconds)
+    time_limit::Float64            # Time limit (in seconds)
 
     barrier_tol_pfeas::Tv       # Primal feasibility tolerance
     barrier_tol_dfeas::Tv       # Dual feasibility tolerance
@@ -43,6 +46,9 @@ mutable struct Env{Tv<:Real}
 
         env.algo = 1
         env.matrix_type = SparseMatrixCSC
+
+        env.ls_backend = TLPLinearAlgebra.DefaultBackend()
+        env.ls_system = TLPLinearAlgebra.DefaultSystem()
         
         env.verbose = 0
         env.threads = 1
