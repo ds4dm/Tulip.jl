@@ -14,15 +14,29 @@ abstract type AbstractLinearSolver{Tv<:Real} end
 """
     LinearSystem
 
-Indicates which linear system is solved
-* `DefaultSystem`: default 
-* `AugmentedSystem`: solve the symmetric quasi-definite augmented system
-* `NormalEquations`: solve the symmetric positive-definite normal equations 
+Indicates which linear system is solved.
 """
 abstract type LinearSystem end
 
+"""
+    DefaultSystem
+
+Choose linear system to be solved using default option.
+"""
 struct DefaultSystem <: LinearSystem end
+
+"""
+    AugmentedSystem
+
+Solve the augmented system, i.e., without reducing to normal equations.
+"""
 struct AugmentedSystem <: LinearSystem end
+
+"""
+    NormalEquations
+
+Solve the normal equations system.
+"""
 struct NormalEquations <: LinearSystem end
 
 """
@@ -32,6 +46,15 @@ Backend used for solving linear systems.
 """
 abstract type LSBackend end
 
+"""
+    DefaultBackend
+
+Chose linear solver backend automatically.
+
+* For `A::Matrix{Tv}`, defaults to [`Lapack`](@ref) (i.e., dense solver).
+* For `A::AbstractMatrix{Float64}`, defaults to [`Cholmod`](@ref)
+* Otherwise, defaults to [`LDLFact`](@ref)
+"""
 struct DefaultBackend <: LSBackend end
 
 # 

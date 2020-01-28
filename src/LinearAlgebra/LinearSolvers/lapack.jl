@@ -6,9 +6,10 @@ using LinearAlgebra.LAPACK
 Use LAPACK backend.
 
 Options available:
-* `Float32` and `Float64` will use LAPACK. Other numerical types will use Julia's
-    generic cholesky factorization.
-* Normal equations with Cholesky factorization
+* Numerical precision: `Tv<:Real`
+    * `Float32` and `Float64` will use LAPACK.
+    * Other numerical types will use Julia's generic cholesky factorization.
+* [`NormalEquations`](@ref) only, with Cholesky factorization
 """
 struct Lapack <: LSBackend end
 
