@@ -5,7 +5,7 @@ using Test
 import Tulip
 TLP = Tulip
 
-INSTANCE_DIR = joinpath(@__DIR__, "../dat/dummy")
+INSTANCE_DIR = joinpath(@__DIR__, "dat")
 
 function ex_infeasible(::Tv) where{Tv<:Real}
     #=

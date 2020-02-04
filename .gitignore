@@ -4,10 +4,6 @@
 *.jl.mem
 Manifest.toml
 
-# Ignore data files
-dat/*
-*.csv
-
 # Docs
 docs/build
 docs/Manifest.toml
