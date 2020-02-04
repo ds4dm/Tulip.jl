@@ -55,11 +55,7 @@ mutable struct SparseIndefLinearSolver <: AbstractLinearSolver{Float64}
 
         # Symbolic factorization
         # See code in src/cholmod.jl of SuiteSparse.jl for `ldlt` function
-        cm = CHOLMOD.defaults(CHOLMOD.common_struct)
-        CHOLMOD.set_print_level(cm, 0)
-        unsafe_store!(CHOLMOD.common_final_ll[], 0)
-        unsafe_store!(CHOLMOD.common_supernodal[], 0)
-        F = CHOLMOD.fact_(CHOLMOD.Sparse(Symmetric(S)), cm)
+        F = ldlt(Symmetric(S))
 
         return new(m, n, A, θ, ones(Float64, n), ones(Float64, m), S, F)
     end
