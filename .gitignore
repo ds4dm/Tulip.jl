@@ -3,7 +3,3 @@
 *.jl.*.cov
 *.jl.mem
 Manifest.toml
-
-# Docs
-docs/build
-docs/Manifest.toml
