@@ -9,7 +9,7 @@ Use LDLFactorizations backend.
 
 Options available:
 * Any numerical type `T`
-* Augmented system with LDL factorization
+* Augmented system with LDLᵀ factorization
 """
 struct LDLFact <: LSBackend end
 
@@ -22,7 +22,7 @@ struct LDLFact <: LSBackend end
 
 Linear solver for the 2x2 augmented system with ``A`` sparse.
 
-Uses LDLFactorizations.jl to compute an LDLt factorization of the quasi-definite augmented system.
+Uses LDLFactorizations.jl to compute an LDLᵀ factorization of the quasi-definite augmented system.
 """
 mutable struct LDLFLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv}
     m::Int  # Number of rows
@@ -69,7 +69,7 @@ linear_system(::LDLFLinearSolver) = "Augmented system"
 """
     update_linear_solver!(ls, θ, regP, regD)
 
-Update LDLt factorization of the augmented system.
+Update LDLᵀ factorization of the augmented system.
 
 Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
     the factorization.

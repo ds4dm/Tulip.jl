@@ -97,9 +97,9 @@ Here is a list of currently supported linear solvers:
 | Linear solver type | `Tv` | System | `LSBackend` | Method |
 |:-------------------|:----:|:------:|:-------:|:-------|
 | [`DenseLinearSolver`](@ref) | `Real` | `NormalEquations` | `Lapack` | Cholesky
-| [`SparseIndefLinearSolver`](@ref) | `Float64` | `AugmentedSystem` | `Cholmod` | LDL
+| [`SparseIndefLinearSolver`](@ref) | `Float64` | `AugmentedSystem` | `Cholmod` | LDLᵀ
 | [`SparsePosDefLinearSolver`](@ref) | `Float64` | `NormalEquations` | `Cholmod` | Cholesky
-| [`LDLFLinearSolver`](@ref) | `Real` | `AugmentedSystem` | `LDLFact` | LDL
+| [`LDLFLinearSolver`](@ref) | `Real` | `AugmentedSystem` | `LDLFact` | LDLᵀ
 
 ### Default options
 If no option is specified, then the linear solver is chosen as follows:

@@ -8,7 +8,7 @@ Use CHOLMOD backend.
 
 Options available:
 * `Float64` only
-* Augmented system with LDL factorization
+* Augmented system with LDLᵀ factorization
 * Normal equations with Cholesky factorization
 """
 struct Cholmod <: LSBackend end
@@ -22,7 +22,7 @@ struct Cholmod <: LSBackend end
 
 Linear solver for the 2x2 augmented system with ``A`` sparse.
 
-Uses an LDLt factorization of the quasi-definite augmented system.
+Uses an LDLᵀ factorization of the quasi-definite augmented system.
 """
 mutable struct SparseIndefLinearSolver <: AbstractLinearSolver{Float64}
     m::Int  # Number of rows
@@ -84,7 +84,7 @@ linear_system(::SparseIndefLinearSolver) = "Augmented system"
 """
     update_linear_solver!(ls, θ, regP, regD)
 
-Update LDLt factorization of the augmented system.
+Update LDLᵀ factorization of the augmented system.
 
 Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
     the factorization.
@@ -179,16 +179,16 @@ end
     SparsePosDefLinearSolver
 
 Linear solver for the 2x2 augmented system
-```math
-    [-(Θ^{-1} + Rp)   A'] [dx] = [xi_d]
-    [   A             Rd] [dy] = [xi_p]
+```
+    [-(Θ⁻¹ + Rp)   Aᵀ] [dx] = [xi_d]
+    [   A          Rd] [dy]   [xi_p]
 ```
 with ``A`` sparse.
 
 Uses a Cholesky factorization of the positive definite normal equations system
 ```
-(A*(Θ^{-1} + Rp)^{-1}*A' + Rd)  dy = xi_p + A*(Θ^{-1} + Rp)^{-1}*xi_d
-                                dx = (Θ^{-1} + Rp)^{-1} * (A' dy - xi_d)
+(A * ((Θ⁻¹ + Rp)⁻¹ * Aᵀ + Rd) dy = xi_p + A * (θ⁻¹ + Rp)⁻¹ * xi_d
+                              dx = (Θ⁻¹ + Rp)⁻¹ * (Aᵀ * dy - xi_d)
 ```
 """
 mutable struct SparsePosDefLinearSolver <: AbstractLinearSolver{Float64}
