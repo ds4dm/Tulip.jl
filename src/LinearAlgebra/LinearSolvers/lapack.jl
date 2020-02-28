@@ -18,8 +18,8 @@ struct Lapack <: LSBackend end
 
 Linear solver for the 2x2 augmented system
 ```
-    [-(Θ^{-1} + Rp)   A'] [dx] = [xi_d]
-    [   A             Rd] [dy] = [xi_p]
+    [-(Θ⁻¹ + Rp)   Aᵀ] [dx] = [xi_d]
+    [   A          Rd] [dy]   [xi_p]
 ```
 with ``A`` dense.
 

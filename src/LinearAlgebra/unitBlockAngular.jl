@@ -367,7 +367,7 @@ end
 """
     mul!(y, A, x)
 
-In-place computation of `y = A*x`
+In-place computation of `y = A * x`
 """
 function mul!(
     y::Vector,
@@ -386,9 +386,9 @@ function mul!(
 end
 
 """
-    mul!(x, At, y)
+    mul!(x, Aᵀ, y)
 
-Compute Matrix-vector product `A'*y` and overwrites the result in `x`.
+Compute Matrix-vector product `Aᵀ * y` and overwrites the result in `x`.
 """
 function mul!(
     x::Vector,
@@ -520,7 +520,7 @@ end
 """
     factor_normaleq(A, θ)
 
-Compute Cholesky factorization of `A*Θ*A'`, where `Θ = Diag(θ)`.
+Compute Cholesky factorization of `A*Θ*Aᵀ`, where `Θ = Diag(θ)`.
 """
 function factor_normaleq(A::UnitBlockAngular{Tv}, θ::Vector{Tv}) where Tv<:Real
 
@@ -556,7 +556,7 @@ end
 """
     factor_normaleq!(F, A, θ)
 
-In-place computation of Cholesky factorization of `A*Θ*A'`, where `Θ = Diag(θ)`.
+In-place computation of Cholesky factorization of `A*Θ*Aᵀ`, where `Θ = Diag(θ)`.
 """
 function factor_normaleq!(
     A::UnitBlockAngular{Tv},

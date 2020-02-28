@@ -3,8 +3,8 @@
 
 Abstract container for solving an augmented system
 ```
-    [-(Θ^{-1} + Rp)   A'] [dx] = [ξd]
-    [   A             Rd] [dy] = [ξp]
+    [-(Θ⁻¹ + Rp)   Aᵀ] [dx] = [ξd]
+    [   A          Rd] [dy]   [ξp]
 ```
 where `ξd` and `ξp` are given right-hand side.
 """
@@ -68,8 +68,8 @@ Update internal data, and re-compute factorization/pre-conditioner.
 
 After this call, `ls` can be used to solve the augmented system
 ```
-    [-(Θ^{-1} + Rp)   A'] [dx] = [ξd]
-    [   A             Rd] [dy] = [ξp]
+    [-(Θ⁻¹ + Rp)   Aᵀ] [dx] = [ξd]
+    [   A          Rd] [dy]   [ξp]
 ```
 for given right-hand sides `ξd` and `ξp`.
 """
@@ -81,8 +81,8 @@ function update_linear_solver! end
 
 Solve the symmetric quasi-definite augmented system
 ```
-    [-(Θ^{-1} + Rp)   A'] [dx] = [ξd]
-    [   A             Rd] [dy] = [ξp]
+    [-(Θ⁻¹ + Rp)   Aᵀ] [dx] = [ξd]
+    [   A          Rd] [dy]   [ξp]
 ```
 and over-write `dx`, `dy` with the result.
 
