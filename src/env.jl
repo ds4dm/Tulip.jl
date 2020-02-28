@@ -55,10 +55,11 @@ mutable struct Env{Tv<:Real}
         env.barrier_iter_max = 100
         env.time_limit = Inf
 
-        env.barrier_tol_pfeas  = Tv(1e-8)
-        env.barrier_tol_dfeas  = Tv(1e-8)
-        env.barrier_tol_conv   = Tv(1e-8)
-        env.barrier_tol_infeas = Tv(1e-8)
+        ϵ = sqrt(eps(Tv))
+        env.barrier_tol_pfeas  = Tv(ϵ)
+        env.barrier_tol_dfeas  = Tv(ϵ)
+        env.barrier_tol_conv   = Tv(ϵ)
+        env.barrier_tol_infeas = Tv(ϵ)
 
         env.beta1 = Tv(1e-1)
         env.beta2 = Tv(1e-8)
