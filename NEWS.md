@@ -1,5 +1,16 @@
 # Tulip release notes
 
+# v0.3.0 (February 29, 2020)
+
+* Improved documentation for parameter management (#43)
+* More flexible management of linear solvers (#37, #40)
+    * Introduce two new parameters to choose linear solver
+        * `ls_backend` specifies which backend is used to solve linear systems
+        * `ls_system` specifies which linear system (augmented system or normal equations) is solved
+    * Generic tests for custom linear solvers
+    * Performance improvements when using CHOLMOD
+* Improved MPS reader (#36)
+
 # v0.2.0 (December 26, 2019)
 
 * Switch type unions to constant in the MOI wrapper (#32)
