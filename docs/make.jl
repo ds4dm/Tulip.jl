@@ -7,6 +7,7 @@ makedocs(
     pages = [
         "Home" => "index.md",
         "User manual" => Any[
+            "Parameters" => "manual/parameters.md",
             "Problem formulation" => "manual/formulation.md",
             "Solving linear systems" => "manual/linear_systems.md"
         ],
