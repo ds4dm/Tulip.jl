@@ -654,7 +654,7 @@ function MOI.get(
 
     # Query row primal
     j = m.var_indices[MOI.VariableIndex(c.value)]
-    return m.inner.solution.col_primal[j]
+    return m.inner.solution.x[j]
 end
 
 function MOI.get(
@@ -666,7 +666,7 @@ function MOI.get(
 
     # Query from inner model
     i = m.con_indices[c]
-    return m.inner.solution.row_primal[i]
+    return m.inner.solution.Ax[i]
 end
 
 #
@@ -681,15 +681,14 @@ function MOI.get(
 
     # Get variable index
     j = m.var_indices[MOI.VariableIndex(c.value)]
-    rc = m.inner.solution.col_dual[j]
 
     # Extract reduced cost
     if S == MOI.LessThan{Tv}
-        return min(rc, 0)
+        return -m.inner.solution.s_upper[j]
     elseif S == MOI.GreaterThan{Tv}
-        return max(rc, 0)
+        return m.inner.solution.s_lower[j]
     else
-        return rc
+        return m.inner.solution.s_lower[j] - m.inner.solution.s_upper[j]
     end
 end
 
@@ -702,5 +701,11 @@ function MOI.get(
 
     # Get dual from inner model
     i = m.con_indices[c]
-    return m.inner.solution.row_dual[i]
+    if isa(S, MOI.LessThan)
+        return -m.inner.solution.y_upper[i]
+    elseif isa(S, MOI.GreaterThan)
+        return m.inner.solution.y_lower[i]
+    else
+        return m.inner.solution.y_lower[i] - m.inner.solution.y_upper[i]
+    end
 end

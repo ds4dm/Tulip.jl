@@ -14,11 +14,15 @@ but no result (e.g. certificate of infeasibility) is available.
 """
 @enum(TerminationStatus,
     Trm_Unknown,
+    # OK statuses
     Trm_Optimal,
     Trm_PrimalInfeasible,
     Trm_DualInfeasible,
+    Trm_PrimalDualInfeasible,
+    # Limits
     Trm_IterationLimit,
     Trm_TimeLimit,
+    # Errors
     Trm_MemoryLimit,
     Trm_NumericalProblem
 )
@@ -42,17 +46,3 @@ Solution Status code
     Sln_InfeasiblePoint,
     Sln_InfeasibilityCertificate
 )
-
-# TODO
-# @enum ModelStatus begin
-#     Loaded
-#     InProgress
-#     Optimal
-#     PrimalInfeasible
-#     DualInfeasible
-#     PrimalDualInfeasible
-#     IterationLimit
-#     TimeLimit
-#     MemoryLimit
-#     NumericalIssue
-# end

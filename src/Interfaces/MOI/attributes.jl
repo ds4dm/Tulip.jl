@@ -198,9 +198,26 @@ MOI.get(m::Optimizer, ::MOI.BarrierIterations) = get_attribute(m.inner, BarrierI
 #
 # TODO: use inner query
 function MOI.get(m::Optimizer, ::MOI.TerminationStatus)
-    isa(m.inner.solver, Nothing) && return MOI.OPTIMIZE_NOT_CALLED
 
-    st = m.inner.solver.solver_status
+    # Check for presolve
+    if isnothing(m.inner.presolve_data)
+        return MOI.OPTIMIZE_NOT_CALLED
+    end
+
+    ps::PresolveData = m.inner.presolve_data
+    st = ps.status
+
+    if st != Trm_Unknown
+        return MOITerminationStatus(st)
+    end
+
+    if isnothing(m.inner.solver)
+        @warn "Presolve was performed but IPM solver was not instantiated"
+        return MOI.OTHER_ERROR
+    end
+
+    solver::AbstractIPMSolver = m.inner.solver
+    st = solver.solver_status
     
     return MOITerminationStatus(st)
 end
@@ -212,7 +229,11 @@ end
 function MOI.get(m::Optimizer, attr::MOI.PrimalStatus)
     attr.N == 1 || return MOI.NO_SOLUTION
 
-    return MOISolutionStatus(m.inner.solver.primal_status)
+    if isnothing(m.inner.solution)
+        return MOI.NO_SOLUTION
+    else
+        MOISolutionStatus(m.inner.solution.primal_status)
+    end
 end
 
 #
@@ -222,5 +243,9 @@ end
 function MOI.get(m::Optimizer, attr::MOI.DualStatus)
     attr.N == 1 || return MOI.NO_SOLUTION
     
-    return MOISolutionStatus(m.inner.solver.dual_status)
+    if isnothing(m.inner.solution)
+        return MOI.NO_SOLUTION
+    else
+        MOISolutionStatus(m.inner.solution.dual_status)
+    end
 end

@@ -119,5 +119,5 @@ function MOI.get(m::Optimizer{Tv},
 
     # Query inner solution
     j = m.var_indices[x]
-    return m.inner.solution.col_primal[j]
+    return m.inner.solution.x[j]
 end

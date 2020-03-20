@@ -13,12 +13,16 @@ import .TLPLinearAlgebra:
 const TLA = TLPLinearAlgebra
 
 # Core data structures
+# TODO: put this in a module
+include("Core/utils.jl")
+include("Core/status.jl")    # Termination and solution statuses
 include("Core/problemData.jl")
 include("Core/parameters.jl")
-include("Core/status.jl")    # Termination and solution statuses
+include("Core/solution.jl")
 include("Core/attributes.jl")
 
-# TODO: Presolve module
+# Presolve module
+include("Presolve/Presolve.jl")
 
 # IPM solvers
 include("./Solvers/Solvers.jl")

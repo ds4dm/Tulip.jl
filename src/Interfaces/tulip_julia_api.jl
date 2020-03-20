@@ -192,10 +192,10 @@ set_attribute(m::Model{Tv}, ::ObjectiveConstant, obj0::Tv) where{Tv} = (m.pbdata
 Query the `ObjectiveValue` attribute from `model`
 """
 function get_attribute(m::Model{Tv}, ::ObjectiveValue) where{Tv}
-    if isnothing(m.solver)
-        error("No solver is attached to the model")
+    if isnothing(m.solution)
+        error("Model has no solution")
     else
-        z = m.solver.primal_bound_scaled
+        z = m.solution.z_primal
         return m.pbdata.objsense ? z : -z
     end
 end
@@ -206,10 +206,10 @@ end
 Query the `DualObjectiveValue` attribute from `model`
 """
 function get_attribute(m::Model{Tv}, ::DualObjectiveValue) where{Tv}
-    if isnothing(m.solver)
-        error("No solver is attached to the model")
+    if isnothing(m.solution)
+        error("Model has no solution")
     else
-        z = m.solver.dual_bound_scaled
+        z = m.solution.z_dual
         return m.pbdata.objsense ? z : -z
     end
 end
