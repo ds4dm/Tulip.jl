@@ -11,24 +11,21 @@ const TvTYPES = [Float64, BigFloat]
 # write your own tests here
 const testdir = dirname(@__FILE__)
 
-const test_files = [
-    # include test file name here (without .jl extension)
-    "env",
-    "bounds",
-    "LinearAlgebra/linearAlgebra",
-    "Solvers/HSD",
-    "Model/model",
-    "reader",
-    "examples"
-]
-
-@testset "Tulip Tests" begin 
-    for f in test_files
-        tp = joinpath(testdir, "$(f).jl")
-        include(tp)
+@testset "Tulip tests" begin
+    @testset "Unit tests" begin
+        include("Core/problemData.jl")
+        include("Solvers/HSD.jl")
     end
-end  # testset
 
-@testset "MathOptInterface Tests" begin
-    include("MOI_wrapper.jl")
+    @testset "Linear Algebra" begin
+        include("LinearAlgebra/linearAlgebra.jl")
+    end
+
+    @testset "Interfaces" begin
+        # include("Interfaces/MOI_wrapper.jl")
+    end
+
+    @testset "Examples" begin
+        include("examples.jl")
+    end
 end

@@ -7,7 +7,7 @@ TLP = Tulip
 
 INSTANCE_DIR = joinpath(@__DIR__, "dat")
 
-function ex_optimal(::Tv) where{Tv<:Real}
+function ex_optimal(Tv::Type)
     #=
     Bounded example
 
@@ -17,10 +17,10 @@ function ex_optimal(::Tv) where{Tv<:Real}
             0 <= x1, x2 <= 1
     =#
     m = TLP.Model{Tv}()
-    m.env.verbose = 1
+    m.params.OutputLevel = 1
 
     # Read problem and solve
-    TLP.loadproblem!(m, joinpath(INSTANCE_DIR, "lpex_opt.mps"))
+    TLP.load_problem!(m, joinpath(INSTANCE_DIR, "lpex_opt.mps"))
     TLP.optimize!(m)
 
     # Check status
@@ -30,4 +30,6 @@ function ex_optimal(::Tv) where{Tv<:Real}
     # TODO: check validity of optimal solution
 end
 
-ex_optimal(0.0)
+if abspath(PROGRAM_FILE) == @__FILE__
+    ex_optimal(Float64)
+end

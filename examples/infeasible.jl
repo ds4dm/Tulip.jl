@@ -7,7 +7,7 @@ TLP = Tulip
 
 INSTANCE_DIR = joinpath(@__DIR__, "dat")
 
-function ex_infeasible(::Tv) where{Tv<:Real}
+function ex_infeasible(Tv::Type)
     #=
     Infeasible example
 
@@ -18,10 +18,10 @@ function ex_infeasible(::Tv) where{Tv<:Real}
             x1, x2  >= 0
     =#
     m = TLP.Model{Tv}()
-    m.env.verbose = 1
+    m.params.OutputLevel = 1
 
     # Read problem from .mps file and solve    
-    TLP.loadproblem!(m, joinpath(INSTANCE_DIR, "lpex_inf.mps"))
+    TLP.load_problem!(m, joinpath(INSTANCE_DIR, "lpex_inf.mps"))
     TLP.optimize!(m)
 
     # Check status
@@ -31,4 +31,6 @@ function ex_infeasible(::Tv) where{Tv<:Real}
     # TODO: check validity of infeasibility certificate
 end
 
-ex_infeasible(0.0)
+if abspath(PROGRAM_FILE) == @__FILE__
+    ex_infeasible(Float64)
+end
