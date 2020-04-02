@@ -22,7 +22,6 @@ function ex_optimal(Tv::Type)
 
     # Read problem and solve
     TLP.load_problem!(m, joinpath(INSTANCE_DIR, "lpex_opt.mps"))
-    m.pbdata.objsense = false
     TLP.optimize!(m)
 
     # Check status
