@@ -180,11 +180,11 @@ end
 function MOI.add_constraint(
     m::Optimizer{Tv},
     f::MOI.ScalarAffineFunction{Tv},
-    s::S
-) where{Tv, S<:SCALAR_SETS{Tv}}
+    s::SCALAR_SETS{Tv}
+) where{Tv}
     # Check that constant term is zero
     if !iszero(f.constant)
-        throw(MOI.ScalarFunctionConstantNotZero{Tv, typeof(f), S}(f.constant))
+        throw(MOI.ScalarFunctionConstantNotZero{Tv, typeof(f), typeof(s)}(f.constant))
     end
 
     # Convert to canonical form
@@ -205,7 +205,7 @@ function MOI.add_constraint(
 
     # Create MOI index
     m.con_counter += 1
-    cidx = MOI.ConstraintIndex{typeof(f), S}(m.con_counter)
+    cidx = MOI.ConstraintIndex{typeof(f), typeof(s)}(m.con_counter)
 
     # Update constraint tracking
     m.con_indices[cidx] = i
