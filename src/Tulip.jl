@@ -27,6 +27,6 @@ include("./model.jl")
 
 # Interfaces
 include("Interfaces/tulip_julia_api.jl")
-include("Interfaces/MOI_wrapper.jl")
+include("Interfaces/MOI/MOI_wrapper.jl")
 
 end # module

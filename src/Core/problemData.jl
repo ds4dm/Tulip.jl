@@ -325,10 +325,15 @@ function delete_constraint!(pb::ProblemData{Tv}, rind::Int) where{Tv}
     deleteat!(pb.lcon, rind)
     deleteat!(pb.ucon, rind)
     
-    # Delete coeffs from columns
-    # TODO: delete zero coefficients from columns?
+    # Update columns
     for j in pb.arows[rind].nzind
-        _set_coeff!(pb.acols[j], rind, zero(Tv))
+        col = pb.acols[j]
+        k = searchsortedfirst(col.nzind, rind)
+        # Delete coefficient from column
+        deleteat!(col.nzind, k)
+        deleteat!(col.nzval, k)
+        # Update remaining indices
+        col.nzind[k:end] .-= 1
     end
 
     # Delete row
@@ -368,13 +373,18 @@ function delete_variable!(pb::ProblemData{Tv}, cind::Int) where{Tv}
     # Delete column name, objective and bounds
     deleteat!(pb.var_names, cind)
     deleteat!(pb.obj,  cind)
-    deleteat!(pb.lcon, cind)
-    deleteat!(pb.ucon, cind)
+    deleteat!(pb.lvar, cind)
+    deleteat!(pb.uvar, cind)
     
-    # Delete coeffs from rows
-    # TODO: delete zero coefficients from rows?
+    # Update rows
     for i in pb.acols[cind].nzind
-        _set_coeff!(pb.arows[i], cind, zero(Tv))
+        row = pb.arows[i]
+        k = searchsortedfirst(row.nzind, cind)
+        # Delete coeff from row
+        deleteat!(row.nzind, k)
+        deleteat!(row.nzval, k)
+        # Update remaining coefficients
+        row.nzind[k:end] .-= 1
     end
 
     # Delete column
@@ -403,7 +413,7 @@ function delete_variables!(pb::ProblemData{Tv}, cinds) where{Tv}
 end
 
 """
-    set_coeff!(pb, i, j, v)
+    set_coefficient!(pb, i, j, v)
 
 Set the coefficient `(i, j)` to value `v`.
 
@@ -413,33 +423,38 @@ Set the coefficient `(i, j)` to value `v`.
 * `j::Int`: column index
 * `v::Tv`: coefficient value
 """
-function set_coeff!(pb::ProblemData{Tv}, i::Int, j::Int, v::Tv) where{Tv}
+function set_coefficient!(pb::ProblemData{Tv}, i::Int, j::Int, v::Tv) where{Tv}
     # Sanity checks
     1 <= i <= pb.ncon && 1 <= j <= pb.nvar || error(
         "Cannot access coeff $((i, j)) in a model of size ($(pb.ncon), $(pb.nvar))"
     )
 
     # Update row and column
-    _set_coeff!(pb.arows[i], j, v)
-    _set_coeff!(pb.acols[j], i, v)
+    _set_coefficient!(pb.arows[i], j, v)
+    _set_coefficient!(pb.acols[j], i, v)
 
     return nothing
 end
 
 """
-    _set_coeff!(roc::RowOrCol{Tv}, ind::Int, v::Tv)
+    _set_coefficient!(roc::RowOrCol{Tv}, ind::Int, v::Tv)
 
 Set coefficient to value `v`.
 """
-function _set_coeff!(roc::RowOrCol{Tv}, ind::Int, v::Tv) where{Tv}
+function _set_coefficient!(roc::RowOrCol{Tv}, ind::Int, v::Tv) where{Tv}
     # Check if index already exists
     k = searchsortedfirst(roc.nzind, ind)
 
     if (1 <= k <= length(roc.nzind)) && roc.nzind[k] == ind
-        # TODO: drop hard zeros? (would trigger a delete!)
-        roc.nzval[k] = v
+        # This coefficient was a non-zero before
+        if iszero(v)
+            deleteat!(roc.nzind, k)
+            deleteat!(roc.nzval, k)
+        else
+            roc.nzval[k] = v
+        end
     else
-        # 
+        # Only add coeff if non-zero
         if !iszero(v)
             insert!(roc.nzind, k, ind)
             insert!(roc.nzval, k, v)

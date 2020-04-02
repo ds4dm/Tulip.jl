@@ -5,6 +5,8 @@ const MOIU = MOI.Utilities
 
 const OPTIMIZER = TLP.Optimizer()
 
+MOI.set(OPTIMIZER, MOI.Silent(), true)
+
 const CONFIG = MOIT.TestConfig(basis=false, atol=1e-6, rtol=1e-6)
 
 const MOI_EXCLUDE = [
@@ -12,6 +14,12 @@ const MOI_EXCLUDE = [
     "delete_nonnegative_variables",         # Requires Vector-Of-Variables
     "update_dimension_nonnegative_variables",
     "delete_soc_variables",
+    # Require SingleVariable objective function
+    "get_objective_function",
+    "solve_result_index",
+    "solve_singlevariable_obj",             
+    "solve_single_variable_dual_max",
+    "solve_single_variable_dual_min",
     "solve_integer_edge_cases",             # Requires integer variables
     "solve_qcp_edge_cases",                 # Requires quadratic constraints
     "solve_qp_edge_cases",                  # Requires quadratic objective
@@ -25,6 +33,7 @@ const MOI_EXCLUDE = [
     "raw_status_string",                    # TODO
     "solve_time",                           # TODO
     # Modifications
+    "delete_variable_with_single_variable_obj",  # Requires SingleVariable objective function
     "solve_const_vectoraffine_nonpos",      # Requires VectorAffineFunction-in-Nonpositives
     "solve_multirow_vectoraffine_nonpos",   # Requires VectorAffineFunction-in-Nonpositives
     # Linear tests
@@ -37,9 +46,11 @@ const MOI_EXCLUDE = [
     @testset "Basic constraint tests" begin
         MOIT.basic_constraint_tests(OPTIMIZER, CONFIG)
     end
+
     @testset "Other unit tests" begin
         MOIT.unittest(OPTIMIZER, CONFIG, MOI_EXCLUDE)
     end
+
     @testset "Modifications" begin
         MOIT.modificationtest(OPTIMIZER, CONFIG, MOI_EXCLUDE)
     end
@@ -55,6 +66,7 @@ MOI.set(BRIDGED, MOI.Silent(), true)
 
 @testset "Bridged tests" begin
     MOIT.unittest(BRIDGED, CONFIG, [
+        "get_objective_function",               # Requires SingleVariable objective
         "delete_soc_variables",                 # Requires SOC constraints
         "solve_integer_edge_cases",             # Requires integer variables
         "solve_qcp_edge_cases",                 # Requires quadratic constraints

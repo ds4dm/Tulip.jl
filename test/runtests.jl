@@ -22,7 +22,7 @@ const testdir = dirname(@__FILE__)
     end
 
     @testset "Interfaces" begin
-        # include("Interfaces/MOI_wrapper.jl")
+        include("Interfaces/MOI_wrapper.jl")
     end
 
     @testset "Examples" begin

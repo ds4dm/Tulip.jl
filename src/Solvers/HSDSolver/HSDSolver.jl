@@ -13,6 +13,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     nupb::Int  # Number of upper-bounded variables
     A::AbstractMatrix{Tv}  # Constraint matrix
     b::Vector{Tv}  # Right-hand side
+    objsense::Bool  # true if min, false if max
     c::Vector{Tv}  # Objective coefficients
     c0::Tv  # Objective offset
     uind::Vector{Int}  # Indices of upper-bounded variables
@@ -50,7 +51,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     function HSDSolver{Tv}(
         params::Parameters{Tv},
         ncon::Int, nvar::Int, nupb::Int,
-        A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv}, c0::Tv,
+        A::AbstractMatrix{Tv}, b::Vector{Tv}, objsense::Bool, c::Vector{Tv}, c0::Tv,
         uind::Vector{Int}, uval::Vector{Tv}
     ) where{Tv<:Real}
         hsd = new{Tv}()
@@ -60,6 +61,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         hsd.nupb = nupb
         hsd.A = A
         hsd.b = b
+        hsd.objsense = objsense
         hsd.c = c
         hsd.c0 = c0
         hsd.uind = uind
@@ -164,11 +166,13 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         # otherwise the right-hand side values are meaningless
         jslack = nvar + nfree  # index of slack variable
         jslackupb = nvarupb
+        # @info "Non-zeros before adding slacks" nz
         for (i, (l, u)) in enumerate(zip(pb.lcon, pb.ucon))
             if l == u
                 # `a'x == b`, nothing to do
                 b[i] = l
             elseif l == -Inf && isfinite(u)
+                # @info "Row: a'x <= $u"
                 # `a'x ⩽ u` becomes `a'x + s == u, s ⩾ 0`
                 nz += 1
                 jslack += 1
@@ -212,6 +216,8 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
                 error("Invalid bounds ($l, $u) for row $i")
             end
         end
+
+        # @info "Non-zeros after adding slacks" nz aI aJ aV
         
         # Populate objective, coefficients and bounds
         nz = 0
@@ -249,7 +255,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
                 for (i, v) in zip(col.nzind, col.nzval)
                     nz += 1
                     aI[nz] = i
-                    aJ[nz] = j + nfree + 1
+                    aJ[nz] = j + nfree
                     aV[nz] = -v
 
                     b[i] -= v * u
@@ -302,6 +308,13 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
                 error("Invalid bounds ($l, $u) for variable $j")
             end
         end
+        # @info "Non-zeros while populating matrix" nz
+        # @info "A" aI aJ aV
+        # If problem is maximization, flip objective
+        if !pb.objsense
+            c .= -c
+            c0 = -c0
+        end
 
         # Update dimensions
         nvar += nfree + nslack
@@ -315,7 +328,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         # TODO: log
         # @info "Standard form problem has $ncon constraints and $nvar variables ($nupb upper-bounds)"
         
-        return HSDSolver{Tv}(params, ncon, nvar, nupb, A, b, c, c0, uind, uval)
+        return HSDSolver{Tv}(params, ncon, nvar, nupb, A, b, pb.objsense, c, c0, uind, uval)
     end
 end
 
@@ -503,8 +516,9 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
             @printf "%4d" hsd.niter
             
             # Objectives
-            @printf "  %+14.7e" dot(hsd.c, hsd.pt.x) / hsd.pt.t + hsd.c0
-            @printf "  %+14.7e" (dot(hsd.b, hsd.pt.y) - dot(hsd.uval, hsd.pt.z)) / hsd.pt.t + hsd.c0
+            ϵ = hsd.objsense ? one(Tv) : -one(Tv)
+            @printf "  %+14.7e" ϵ * hsd.primal_bound_scaled
+            @printf "  %+14.7e" ϵ * hsd.dual_bound_scaled
             
             # Residuals
             @printf "  %8.2e" max(hsd.res.rp_nrm, hsd.res.ru_nrm)

@@ -56,7 +56,7 @@ function run_tests_hsd(Tv::Type)
         uind = [1, 2]
         uval = Vector{Tv}([2.0, 2.0])
 
-        hsd = TLP.HSDSolver{Tv}(params, m, n, p, A, b, c, c0, uind, uval)
+        hsd = TLP.HSDSolver{Tv}(params, m, n, p, A, b, true, c, c0, uind, uval)
 
         # Primal-dual optimal solution
         # x1 = x2 = 0.5; w1 = w2 = 1.5; t = 1
@@ -107,7 +107,7 @@ function run_tests_hsd(Tv::Type)
         uind = [1, 2]
         uval = Vector{Tv}([2.0, 2.0])
 
-        hsd = TLP.HSDSolver{Tv}(params, m, n, p, A, b, c, c0, uind, uval)
+        hsd = TLP.HSDSolver{Tv}(params, m, n, p, A, b, true, c, c0, uind, uval)
 
         # Primal-dual optimal solution
         # x1 = x2 = 0.5; w1 = w2 = 1.5; t = 1
