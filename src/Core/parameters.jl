@@ -13,7 +13,7 @@ Base.@kwdef mutable struct Parameters{Tv}
     # Numerical tolerances
     BarrierTolerancePFeas::Tv = sqrt(eps(Tv))  # primal feasibility
     BarrierToleranceDFeas::Tv = sqrt(eps(Tv))  # dual feasibility
-    BarrierToleranceGFeas::Tv = sqrt(eps(Tv))  # optimality
+    BarrierToleranceRGap::Tv = sqrt(eps(Tv))  # optimality
     BarrierToleranceIFeas::Tv = sqrt(eps(Tv))  # infeasibility
 
     # Regularizations
@@ -52,7 +52,7 @@ Base.@kwdef mutable struct Parameters{Tv}
     # TODO: iterative refinement
 
     # I/O
-    OutputLevel::Int = 1
+    OutputLevel::Int = 0
     LogLevel::Int = 0  # TODO: have different LogLevel for, e.g., presolve, optimize!, etc...
 
     # Others
@@ -60,5 +60,3 @@ Base.@kwdef mutable struct Parameters{Tv}
 end
 
 const PARAMS = Dict{String, Symbol}(String(f) => f for f in fieldnames(Parameters))
-
-# TODO: query/modify parameters by name

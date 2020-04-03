@@ -5,31 +5,15 @@ using QPSReader
 # TODO: docstrings
 # TODO: define Traits on attributes (e.g.: IsModifiable, IsNumeric, etc..)
 #   for error messages
-abstract type AbstractAttribute end
 
-# Model attributes
-struct ModelName          <: AbstractAttribute end
-struct NumberOfVariables  <: AbstractAttribute end
-struct ObjectiveValue     <: AbstractAttribute end
-struct DualObjectiveValue <: AbstractAttribute end
-struct ObjectiveConstant  <: AbstractAttribute end
-struct ObjectiveSense     <: AbstractAttribute end
-struct Status             <: AbstractAttribute end
-struct BarrierIterations  <: AbstractAttribute end
-struct SolutionTime       <: AbstractAttribute end
 
-# Variable attributes
-struct VariableLowerBound <: AbstractAttribute end
-struct VariableUpperBound <: AbstractAttribute end
-struct VariableObjective  <: AbstractAttribute end
-struct VariableName       <: AbstractAttribute end
+"""
+    load_problem!(m::Model{Tv}, fname::String)
 
-# Constraint attributes
-struct ConstraintLowerBound <: AbstractAttribute end
-struct ConstraintUpperBound <: AbstractAttribute end
-struct ConstraintName       <: AbstractAttribute end
+Read a model from file `fname` and load it into model `m`.
 
-# Model creation and modification
+Only free MPS files are currently supported.
+"""
 function load_problem!(m::Model{Tv}, fname::String) where{Tv}
     Base.empty!(m)
 
@@ -51,6 +35,25 @@ function load_problem!(m::Model{Tv}, fname::String) where{Tv}
     return m
 end
 
+"""
+    get_attribute(model::Model, ::ModelName)
+
+Query the `ModelName` attribute from `model`
+"""
+get_attribute(m::Model, ::ModelName) = m.pbdata.name
+
+"""
+    set_attribute(model::Model, ::ModelName, name::String)
+
+Set the `ModelName` attribute in `model`
+"""
+set_attribute(m::Model, ::ModelName, name::String) = (m.pbdata.name = name; return nothing)
+
+"""
+    set_attribute(m::Model{Tv}, ::VariableLowerBound, j::Int, lb::Tv)
+
+Set the lower bound of variable `j` in model `m` to `lb`.
+"""
 function set_attribute(m::Model{Tv}, ::VariableLowerBound, j::Int, lb::Tv) where{Tv}
     # sanity checks
     1 <= j <= m.pbdata.nvar || error("Invalid variable index $j")
@@ -60,6 +63,24 @@ function set_attribute(m::Model{Tv}, ::VariableLowerBound, j::Int, lb::Tv) where
     return nothing
 end
 
+"""
+    get_attribute(m::Model{Tv}, ::VariableLowerBound, j::Int)
+
+Query the lower bound of variable `j` in model `m`.
+"""
+function get_attribute(m::Model, ::VariableLowerBound, j::Int)
+    # sanity checks
+    1 <= j <= m.pbdata.nvar || error("Invalid variable index $j")
+
+    # Update bound
+    return m.pbdata.lvar[j]
+end
+
+"""
+    set_attribute(m::Model{Tv}, ::VariableUpperBound, j::Int, ub::Tv)
+
+Set the upper bound of variable `j` in model `m` to `ub`.
+"""
 function set_attribute(m::Model{Tv}, ::VariableUpperBound, j::Int, ub::Tv) where{Tv}
     # sanity checks
     1 <= j <= m.pbdata.nvar || error("Invalid variable index $j")
@@ -69,6 +90,11 @@ function set_attribute(m::Model{Tv}, ::VariableUpperBound, j::Int, ub::Tv) where
     return nothing
 end
 
+"""
+    set_attribute(m::Model{Tv}, ::ConstraintLowerBound, i::Int, lb::Tv)
+
+Set the lower bound of constraint `i` in model `m` to `lb`.
+"""
 function set_attribute(m::Model{Tv}, ::ConstraintLowerBound, i::Int, lb::Tv) where{Tv}
     # sanity checks
     1 <= i <= m.pbdata.nvar || error("Invalid constraint index $i")
@@ -78,6 +104,11 @@ function set_attribute(m::Model{Tv}, ::ConstraintLowerBound, i::Int, lb::Tv) whe
     return nothing
 end
 
+"""
+    set_attribute(m::Model{Tv}, ::ConstraintUpperBound, i::Int, ub::Tv)
+
+Set the upper bound of constraint `i` in model `m` to `ub`.
+"""
 function set_attribute(m::Model{Tv}, ::ConstraintUpperBound, i::Int, ub::Tv) where{Tv}
     # sanity checks
     1 <= i <= m.pbdata.nvar || error("Invalid constraint index $i")
@@ -87,11 +118,21 @@ function set_attribute(m::Model{Tv}, ::ConstraintUpperBound, i::Int, ub::Tv) whe
     return nothing
 end
 
+"""
+    get_attribute(m::Model, ::VariableName, j::Int)
+
+Query the name of variable `j` in model `m`
+"""
 function get_attribute(m::Model, ::VariableName, j::Int)
     1 <= j <= m.pbdata.nvar || error("Invalid variable index $j")
     return m.pbdata.var_names[j]
 end
 
+"""
+    set_attribute(m::Model, ::VariableName, j::Int, name::String)
+
+Set the name of variable `j` in model `m` to `name`.
+"""
 function set_attribute(m::Model, ::VariableName, j::Int, name::String)
     1 <= j <= m.pbdata.nvar || error("Invalid variable index $j")
     # TODO: ensure that no two variables have the same name
@@ -99,11 +140,21 @@ function set_attribute(m::Model, ::VariableName, j::Int, name::String)
     return nothing
 end
 
+"""
+    get_attribute(m::Model, ::ConstraintName, i::Int)
+
+Query the name of constraint `i` in model `m`
+"""
 function get_attribute(m::Model, ::ConstraintName, i::Int)
     1 <= i <= m.pbdata.ncon || error("Invalid constraint index $i")
     return m.pbdata.con_names[i]
 end
 
+"""
+    set_attribute(m::Model, ::ConstraintName, i::Int, name::String)
+
+Set the name of constraint `i` in model `m` to `name`.
+"""
 function set_attribute(m::Model, ::ConstraintName, i::Int, name::String)
     1 <= i <= m.pbdata.ncon || error("Invalid constraint index $i")
     m.pbdata.con_names[i] = name
@@ -111,12 +162,35 @@ function set_attribute(m::Model, ::ConstraintName, i::Int, name::String)
 end
 
 # TODO: Set/get parameters
+"""
+    get_parameter(m::Model, pname::String)
 
-# TODO: Query solution value and attributes
+Query the value of parameter `pname` in model `m`.
+"""
+function get_parameter(m::Model, pname::String)
+    return getfield(m.params, Symbol(pname))
+end
+
+"""
+    set_parameter(m::Model, pname::String, val)
+
+Set the value of parameter `pname` in model `m` to `val`
+"""
+function set_parameter(m::Model, pname::String, val)
+    setfield!(m.params, Symbol(pname), val)
+    return nothing
+end
+
+
+# TODO: Query solution value
 get_attribute(m::Model, ::ObjectiveConstant) = m.pbdata.obj0
 set_attribute(m::Model{Tv}, ::ObjectiveConstant, obj0::Tv) where{Tv} = (m.pbdata.obj0 = obj0; return nothing)
 
+"""
+    get_attribute(model::Model, ::ObjectiveValue)
 
+Query the `ObjectiveValue` attribute from `model`
+"""
 function get_attribute(m::Model{Tv}, ::ObjectiveValue) where{Tv}
     if isnothing(m.solver)
         error("No solver is attached to the model")
@@ -126,6 +200,11 @@ function get_attribute(m::Model{Tv}, ::ObjectiveValue) where{Tv}
     end
 end
 
+"""
+    get_attribute(model::Model, ::DualObjectiveValue)
+
+Query the `DualObjectiveValue` attribute from `model`
+"""
 function get_attribute(m::Model{Tv}, ::DualObjectiveValue) where{Tv}
     if isnothing(m.solver)
         error("No solver is attached to the model")

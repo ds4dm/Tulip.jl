@@ -16,6 +16,7 @@ const TLA = TLPLinearAlgebra
 include("Core/problemData.jl")
 include("Core/parameters.jl")
 include("Core/status.jl")    # Termination and solution statuses
+include("Core/attributes.jl")
 
 # TODO: Presolve module
 

@@ -4,7 +4,6 @@ CurrentModule = Tulip
 
 # Tulip.jl
 
-
 ## Overview
 
 Tulip is an open-source interior-point solver for linear programming.

@@ -7,11 +7,13 @@ makedocs(
     pages = [
         "Home" => "index.md",
         "User manual" => Any[
-            "Parameters" => "manual/parameters.md",
             "Problem formulation" => "manual/formulation.md",
             "Solving linear systems" => "manual/linear_systems.md"
         ],
         "Reference" => Any[
+            "Julia API" => "reference/API.md",
+            "Attributes" => "reference/attributes.md",
+            "Parameters" => "reference/parameters.md",
             "Linear solvers" => "reference/linear_solvers.md"
         ],
     ]

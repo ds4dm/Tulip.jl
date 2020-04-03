@@ -14,16 +14,14 @@ const Col = RowOrCol
 Data structure for storing problem data in precision `Tv`.
 
 The LP is represented in canonical form
+
 ```math
-\\begin{align}
-    \\min_{x} \\ \\ \\ & c^{T} x + c_0\\\\
-    s.t. \\ \\ \\
-    & l_r \\leq A x \\leq u_r \\\\
-    & l_c \\leq x \\leq u_c
-\\end{align}
+\\begin{array}{rl}
+    \\displaystyle \\min_{x} \\ \\ \\ & c^{T} x + c_{0} \\\\
+    s.t. \\ \\ \\ & l_{r} \\leq A x \\leq u_{r} \\\\
+    & l_{c} \\leq x \\leq u_{c}
+\\end{array}
 ```
-
-
 """
 mutable struct ProblemData{Tv}
 

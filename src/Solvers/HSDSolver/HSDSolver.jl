@@ -544,7 +544,7 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
             hsd.A, hsd.b, hsd.c, hsd.c0, hsd.uind, hsd.uval,
             params.BarrierTolerancePFeas,
             params.BarrierToleranceDFeas,
-            params.BarrierToleranceGFeas,
+            params.BarrierToleranceRGap,
             params.BarrierToleranceIFeas
         )
 
