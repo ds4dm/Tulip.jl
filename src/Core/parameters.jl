@@ -58,5 +58,3 @@ Base.@kwdef mutable struct Parameters{Tv}
     # Others
     Threads::Int = 1
 end
-
-const PARAMS = Dict{String, Symbol}(String(f) => f for f in fieldnames(Parameters))

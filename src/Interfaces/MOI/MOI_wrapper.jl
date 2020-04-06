@@ -102,8 +102,8 @@ mutable struct Optimizer{Tv} <: MOI.AbstractOptimizer
     # Keep track of bound constraints
     var2bndtype::Dict{MOI.VariableIndex, Set{Type{<:MOI.AbstractScalarSet}}}
 
-    function Optimizer{Tv}() where{Tv}
-        return new{Tv}(
+    function Optimizer{Tv}(;kwargs...) where{Tv}
+        m = new{Tv}(
             Model{Tv}(), false,
             # Variable and constraint counters
             0, 0, 
@@ -115,11 +115,16 @@ mutable struct Optimizer{Tv} <: MOI.AbstractOptimizer
             Dict{MOI.ConstraintIndex, String}(),  # Variable bounds tracking
             Dict{MOI.VariableIndex, Set{Type{<:MOI.AbstractScalarSet}}}()
         )
+
+        for (k, v) in kwargs
+            set_parameter(m.inner, string(k), v)
+        end
+
+        return m
     end
 end
 
-# TODO: set parameters via kw arguments
-Optimizer() = Optimizer{Float64}()
+Optimizer(;kwargs...) = Optimizer{Float64}(;kwargs...)
 
 function MOI.empty!(m::Optimizer)
     # Inner model

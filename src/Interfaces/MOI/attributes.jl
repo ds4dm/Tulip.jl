@@ -3,9 +3,10 @@
 # =============================================
 const SUPPORTED_OPTIMIZER_ATTR = Union{
     MOI.NumberOfThreads,
+    MOI.RawParameter,
     MOI.SolverName,
     MOI.Silent,
-    MOI.TimeLimitSec,
+    MOI.TimeLimitSec
 }
 
 MOI.supports(::Optimizer, ::A) where{A<:SUPPORTED_OPTIMIZER_ATTR} = true
@@ -52,6 +53,14 @@ function MOI.set(m::Optimizer, ::MOI.TimeLimitSec, t)
     return nothing
 end
 
+#
+#   RawParameter
+#
+MOI.get(m::Optimizer, attr::MOI.RawParameter) = get_parameter(m.inner, attr.name)
+
+MOI.set(m::Optimizer, attr::MOI.RawParameter, val) = set_parameter(m.inner, attr.name, val)
+
+
 # =============================================
 #   2. Model attributes
 # =============================================
@@ -84,7 +93,7 @@ MOI.supports(::Optimizer, ::SUPPORTED_MODEL_ATTR) = true
 #   ListOfVariableIndices
 #
 function MOI.get(m::Optimizer, ::MOI.ListOfVariableIndices)
-    return collect(keys(m.var_indices))
+    return copy(m.var_indices_moi)
 end
 
 #
