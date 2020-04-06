@@ -43,14 +43,16 @@ Solution Status code
     Sln_InfeasibilityCertificate
 )
 
-"""
-    ModelStatus
-
-Model status codes.
-- `Mdl_Unknown`: Status of the model is unknown.
-- `Mdl_StandardForm`: Model is in standard form.
-"""
-@enum(ModelStatus,
-    Mdl_Unknown,
-    Mdl_StandardForm
-)
+# TODO
+# @enum ModelStatus begin
+#     Loaded
+#     InProgress
+#     Optimal
+#     PrimalInfeasible
+#     DualInfeasible
+#     PrimalDualInfeasible
+#     IterationLimit
+#     TimeLimit
+#     MemoryLimit
+#     NumericalIssue
+# end

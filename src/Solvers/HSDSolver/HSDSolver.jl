@@ -13,6 +13,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     nupb::Int  # Number of upper-bounded variables
     A::AbstractMatrix{Tv}  # Constraint matrix
     b::Vector{Tv}  # Right-hand side
+    objsense::Bool  # true if min, false if max
     c::Vector{Tv}  # Objective coefficients
     c0::Tv  # Objective offset
     uind::Vector{Int}  # Indices of upper-bounded variables
@@ -48,9 +49,9 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
 
     # TODO: Constructor
     function HSDSolver{Tv}(
-        env::Env{Tv},
+        params::Parameters{Tv},
         ncon::Int, nvar::Int, nupb::Int,
-        A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv}, c0::Tv,
+        A::AbstractMatrix{Tv}, b::Vector{Tv}, objsense::Bool, c::Vector{Tv}, c0::Tv,
         uind::Vector{Int}, uval::Vector{Tv}
     ) where{Tv<:Real}
         hsd = new{Tv}()
@@ -60,6 +61,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         hsd.nupb = nupb
         hsd.A = A
         hsd.b = b
+        hsd.objsense = objsense
         hsd.c = c
         hsd.c0 = c0
         hsd.uind = uind
@@ -82,7 +84,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
             zero(Tv), zero(Tv), zero(Tv), zero(Tv)
         )
 
-        hsd.ls = AbstractLinearSolver(env.ls_backend, env.ls_system, A)
+        hsd.ls = AbstractLinearSolver(params.LinearSolverBackend, params.LinearSolverSystem, A)
 
         # Initial regularizations
         hsd.regP = ones(Tv, nvar)
@@ -91,8 +93,244 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
 
         return hsd
     end
-end
 
+    function HSDSolver{Tv}(params::Parameters{Tv}, pb::ProblemData{Tv}) where{Tv}
+        nvar = pb.nvar
+        ncon = pb.ncon
+
+        # =============================================
+        #   Convert problem to standard form
+        # =============================================
+
+        # Count memory needed
+        nz = 0  # Non-zeros (excluding slacks)
+        nfree = 0  # Number of free variables
+        nvarupb = 0  # Upper-bounded variables (excluding slacks)
+        nslack = 0  # Slack variables
+        nslackupb = 0  # Upper-bounded slacks
+
+        # Count slacks
+        for (i, (l, u)) in enumerate(zip(pb.lcon, pb.ucon))
+            if l == u
+                # a'x == b
+            elseif l == -Inf && isfinite(u)
+                # `a'x ⩽ u` becomes `a'x + s == u, s ⩾ 0`
+                nslack += 1
+            elseif isfinite(l) && u == Inf
+                # `a'x ⩾ l` becomes `a'x - s == l, s ⩾ 0`
+                nslack += 1
+            elseif isfinite(l) && isfinite(u)
+                # `l ⩽ a'x ⩽ u` becomes `a'x - s == l, 0 ⩽ s ⩽ u-l`
+                nslack += 1
+                nslackupb += 1
+            else
+                error("Invalid bounds ($l, $u) for row $i")
+            end
+        end
+
+        # Count non-zeros coeffs, free & upper-bounded variables,
+        # and flag which columns need to be flipped
+        # TODO: handle free variables explicitly
+        nz = 0
+        for (j, (l, u)) in enumerate(zip(pb.lvar, pb.uvar))
+            if isfinite(l) && isfinite(u)
+                # l ⩽ x ⩽ u
+                nvarupb += 1
+            elseif l == -Inf && isfinite(u)
+                # x ⩽ u
+            elseif isfinite(l) && u == Inf
+                # l ⩽ x
+            elseif l == -Inf && u == Inf
+                # Free variable
+                # x is replaced by `x⁺ - x⁻`
+                nfree += 1
+                nz += length(pb.acols[j].nzind)
+            else
+                error("Invalid bounds ($l, $u) for variable $j")
+            end
+            nz += length(pb.acols[j].nzind)
+        end
+
+        # Allocate memory
+        c = Vector{Tv}(undef, nvar + nfree + nslack)
+        c0 = pb.obj0
+        b = Vector{Tv}(undef, ncon)
+        aI = Vector{Int}(undef, nz + nslack)
+        aJ = Vector{Int}(undef, nz + nslack)
+        aV = Vector{Tv}(undef, nz + nslack)
+        uind = Vector{Int}(undef, nvarupb + nslackupb)
+        uval = Vector{Tv}(undef, nvarupb + nslackupb)
+
+        # Populate right-hand side, slack coefficients and bounds
+        # This needs to happen before we populate the matrix,
+        # otherwise the right-hand side values are meaningless
+        jslack = nvar + nfree  # index of slack variable
+        jslackupb = nvarupb
+        # @info "Non-zeros before adding slacks" nz
+        for (i, (l, u)) in enumerate(zip(pb.lcon, pb.ucon))
+            if l == u
+                # `a'x == b`, nothing to do
+                b[i] = l
+            elseif l == -Inf && isfinite(u)
+                # @info "Row: a'x <= $u"
+                # `a'x ⩽ u` becomes `a'x + s == u, s ⩾ 0`
+                nz += 1
+                jslack += 1
+                # Right-hand side
+                b[i] = u
+                # Slack coefficient
+                aI[nz] = i
+                aJ[nz] = jslack
+                aV[nz] = one(Tv)
+                # Slack objective
+                c[jslack] = zero(Tv)
+            elseif isfinite(l) && u == Inf
+                # `a'x ⩾ l` becomes `a'x - s == l, s ⩾ 0`
+                nz += 1
+                jslack += 1
+                # Right-hand side
+                b[i] = l
+                # Slack coefficient
+                aI[nz] = i
+                aJ[nz] = jslack
+                aV[nz] = -one(Tv)
+                # Slack objective
+                c[jslack] = zero(Tv)
+            elseif isfinite(l) && isfinite(u)
+                # `l ⩽ a'x ⩽ u` becomes `a'x - s == l, 0 ⩽ s ⩽ u-l`
+                nz += 1
+                jslack += 1
+                jslackupb += 1
+                # Right-hand side
+                b[i] = l
+                # Slack coefficient
+                aI[nz] = i
+                aJ[nz] = jslack
+                aV[nz] = -one(Tv)
+                # Slack objective
+                c[jslack] = zero(Tv)
+                # TODO: slack upper bound
+                uind[jslackupb] = jslack
+                uval[jslackupb] = u - l
+            else
+                error("Invalid bounds ($l, $u) for row $i")
+            end
+        end
+
+        # @info "Non-zeros after adding slacks" nz aI aJ aV
+        
+        # Populate objective, coefficients and bounds
+        nz = 0
+        nvarupb = 0
+        nfree = 0
+        for (j, (l, u)) in enumerate(zip(pb.lvar, pb.uvar))
+            col = pb.acols[j]
+            if l == -Inf && u == Inf
+                # Free variable
+
+                # Positive part
+                c[j + nfree] = pb.obj[j]
+                for (i, v) in zip(col.nzind, col.nzval)
+                    nz += 1
+                    aI[nz] = i
+                    aJ[nz] = j + nfree
+                    aV[nz] = v
+                end
+
+                # Negative part
+                c[j + nfree + 1] = -pb.obj[j]
+                for (i, v) in zip(col.nzind, col.nzval)
+                    nz += 1
+                    aI[nz] = i
+                    aJ[nz] = j + nfree + 1
+                    aV[nz] = -v
+                end
+                nfree += 1
+
+            elseif l == -Inf && isfinite(u)
+                # `xj ⩽ uj` is flipped to `xj = uj - xj_, xj_ ⩾ 0`
+                # Thus, `aij xj == b` becomes `-aij*xj_ == b - aij*u`
+                
+                # Flip column and push new lower bound to zero
+                for (i, v) in zip(col.nzind, col.nzval)
+                    nz += 1
+                    aI[nz] = i
+                    aJ[nz] = j + nfree
+                    aV[nz] = -v
+
+                    b[i] -= v * u
+                end
+
+                # Populate objective
+                # `cj xj` becomes `-cj xj_ + cj uj`
+                c[j + nfree] = - pb.obj[j]
+                c0 += pb.obj[j] * u
+
+            elseif isfinite(l) && u == Inf
+                # `xj ⩾ lj` becomes `xj = lj + xj_, xj_ ⩾ 0`
+
+                # Push lower bound to zero
+                for (i, v) in zip(col.nzind, col.nzval)
+                    nz += 1
+                    aI[nz] = i
+                    aJ[nz] = j + nfree
+                    aV[nz] = v
+
+                    b[i] -= l * v
+                end
+
+                # Populate objective
+                c[j + nfree] = pb.obj[j]
+                c0 += pb.obj[j] * l
+
+            elseif isfinite(l) && isfinite(u)
+                # `l ⩽ x ⩽ u` becomes `0 ⩽ x_ ⩽ u-l`
+                nvarupb += 1
+
+                # Push lower bound to zero
+                for (i, v) in zip(col.nzind, col.nzval)
+                    nz += 1
+                    aI[nz] = i
+                    aJ[nz] = j + nfree
+                    aV[nz] = v
+
+                    b[i] -= l * v
+                end
+
+                # Populate objective
+                c[j + nfree] = pb.obj[j]
+                c0 += pb.obj[j] * l
+
+                # Record upper bound
+                uind[nvarupb] = j + nfree
+                uval[nvarupb] = u - l
+            else
+                error("Invalid bounds ($l, $u) for variable $j")
+            end
+        end
+        # @info "Non-zeros while populating matrix" nz
+        # @info "A" aI aJ aV
+        # If problem is maximization, flip objective
+        if !pb.objsense
+            c .= -c
+            c0 = -c0
+        end
+
+        # Update dimensions
+        nvar += nfree + nslack
+        nupb = nvarupb + nslackupb
+
+        # Build matrix
+        A = construct_matrix(params.MatrixType, ncon, nvar, aI, aJ, aV)
+
+        # TODO: setup linear solver
+
+        # TODO: log
+        # @info "Standard form problem has $ncon constraints and $nvar variables ($nupb upper-bounds)"
+        
+        return HSDSolver{Tv}(params, ncon, nvar, nupb, A, b, pb.objsense, c, c0, uind, uval)
+    end
+end
 
 include("./hsd_step.jl")
 
@@ -217,7 +455,7 @@ end
     optimize!
 
 """
-function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
+function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
 
     # TODO: pre-check whether model needs to be re-optimized.
     # This should happen outside of this function
@@ -227,7 +465,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
     hsd.niter = 0
 
     # Print information about the problem
-    if env.verbose != 0
+    if params.OutputLevel > 0
         @printf "Optimizer info\n"
         @printf "Linear solver options\n"
         @printf "  %-12s : %s\n" "Precision" "$Tv"
@@ -237,7 +475,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
     end
 
     # IPM LOG
-    if env.verbose != 0
+    if params.OutputLevel > 0
         @printf "%4s  %14s  %14s  %8s %8s %8s  %7s  %4s\n" "Itn" "PObj" "DObj" "PFeas" "DFeas" "GFeas" "Mu" "Time"
     end
 
@@ -273,13 +511,14 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
         # I.B - Log
         # TODO: Put this in a logging function
         ttot = time() - tstart
-        if env.verbose !=0
+        if params.OutputLevel > 0
             # Display log
             @printf "%4d" hsd.niter
             
             # Objectives
-            @printf "  %+14.7e" dot(hsd.c, hsd.pt.x) / hsd.pt.t + hsd.c0
-            @printf "  %+14.7e" (dot(hsd.b, hsd.pt.y) - dot(hsd.uval, hsd.pt.z)) / hsd.pt.t + hsd.c0
+            ϵ = hsd.objsense ? one(Tv) : -one(Tv)
+            @printf "  %+14.7e" ϵ * hsd.primal_bound_scaled
+            @printf "  %+14.7e" ϵ * hsd.dual_bound_scaled
             
             # Residuals
             @printf "  %8.2e" max(hsd.res.rp_nrm, hsd.res.ru_nrm)
@@ -303,10 +542,10 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
         update_solver_status!(
             hsd, hsd.pt, hsd.res,
             hsd.A, hsd.b, hsd.c, hsd.c0, hsd.uind, hsd.uval,
-            env.barrier_tol_pfeas,
-            env.barrier_tol_dfeas,
-            env.barrier_tol_conv,
-            env.barrier_tol_infeas
+            params.BarrierTolerancePFeas,
+            params.BarrierToleranceDFeas,
+            params.BarrierToleranceRGap,
+            params.BarrierToleranceIFeas
         )
 
         if (
@@ -315,10 +554,10 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
             || hsd.solver_status == TerminationStatus(3)  # Dual infeasible
         )
             break
-        elseif hsd.niter >= env.barrier_iter_max 
+        elseif hsd.niter >= params.BarrierIterationsLimit 
             hsd.solver_status = TerminationStatus(4)  # Iteration limit
             break
-        elseif ttot >= env.time_limit
+        elseif ttot >= params.TimeLimit
             hsd.solver_status = TerminationStatus(5)  # Iteration limit
             break
         end
@@ -328,7 +567,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
         # For now, include the factorization in the step function
         # Q: should we use more arguments here?
         try
-            compute_step!(hsd, env)
+            compute_step!(hsd, params)
         catch err
 
             if isa(err, PosDefException) || isa(err, SingularException)
@@ -354,7 +593,7 @@ function optimize!(hsd::HSDSolver{Tv}, env::Env{Tv}) where{Tv<:Real}
     end
 
     # TODO: print message based on termination status
-    env.verbose == 1 && println("Solver exited with status $((hsd.solver_status))")
+    params.OutputLevel > 0 && println("Solver exited with status $((hsd.solver_status))")
 
     return nothing
 

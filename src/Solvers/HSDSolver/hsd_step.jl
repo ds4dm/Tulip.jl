@@ -5,7 +5,7 @@ Compute next IP iterate for the HSD formulation.
 
 # Arguments
 - `model`: The optimization model
-- `env`: Optimization environment
+- `params`: Optimization parameters
 - `A`: Constraint matrix
 - `F`: Factorization of the normal equations' matrix
 - `b`: Right-hand side of primal constraints
@@ -15,7 +15,7 @@ Compute next IP iterate for the HSD formulation.
 - `rp, ru, rd, rg`: Primal, dual and optimality residuals
 - `x, w, y, s, z, t, k`: Primal-dual iterate
 """
-function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
+function compute_step!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
 
     # Names
     pt = hsd.pt
@@ -98,7 +98,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
 
     # Step length for affine-scaling direction
     α = max_step_length(pt, Δ)
-    γ = Tv((oneunit(Tv) - α)^2 * min(oneunit(Tv) - α, env.beta1))
+    γ = (oneunit(Tv) - α)^2 * min(oneunit(Tv) - α, params.BarrierGammaMin)
     η = oneunit(Tv) - γ
     
     # Mehrotra corrector
@@ -116,10 +116,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
 
     # Extra corrections
     ncor = 0
-    while (
-        ncor < env.barrier_max_num_cor
-        && α < Tv(0.999)    
-    )
+    while ncor < params.BarrierCorrectionLimit && α < Tv(999 // 1000)
         α_ = α
         ncor += 1
 
@@ -129,7 +126,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
             hsd.ls, θwz, b, c, uind, uval,
             hx, hy, hz, h0, pt,
             Δ, α_,
-            env.beta1, env.beta2, env.beta3, env.beta4,
+            params.BarrierCentralityOutlierThreshold,
         )
         if αc > α_
             # Use corrector
@@ -154,7 +151,7 @@ function compute_step!(hsd::HSDSolver{Tv}, env::Env) where{Tv<:Real}
         
     end
     # Update current iterate
-    α *= Tv(0.9995)
+    α *= params.BarrierStepDampFactor
     pt.x .+= α .* Δ.x
     pt.w .+= α .* Δ.w
     pt.t  += α  * Δ.t
@@ -345,7 +342,7 @@ Requires the solution of one Newton system.
 - `pt`: Current primal-dual iterate
 - `Δ`: Current predictor direction
 - `α`: Maximum step length in predictor direction 
-- `β1, β2, β3, β4`: Numerical parameters
+- `β`: Relative threshold for centrality outliers
 """
 function compute_higher_corrector_hsd!(
     Δc::Point{Tv},
@@ -353,7 +350,7 @@ function compute_higher_corrector_hsd!(
     ls, θwz, b, c, uind::Vector{Int}, uval,
     hx, hy, hz, h0, pt::Point{Tv},
     Δ::Point{Tv}, α::Tv,
-    β1::Tv, β2::Tv, β3::Tv, β4::Tv,
+    β::Tv,
 ) where{Tv<:Real}
     # TODO: Sanity checks
     
@@ -366,8 +363,8 @@ function compute_higher_corrector_hsd!(
     vt = (pt.t  + α_  * Δ.t)  * (pt.k  + α_  * Δ.k)
 
     # Compute target cross-products
-    mu_l = β4 * pt.μ * γ
-    mu_u = γ * pt.μ / β4
+    mu_l = β * pt.μ * γ
+    mu_u = γ * pt.μ / β
     for i in 1:pt.n
         if vx[i] < mu_l
             vx[i] = mu_l - vx[i]
