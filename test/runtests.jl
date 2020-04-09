@@ -23,6 +23,10 @@ const testdir = dirname(@__FILE__)
         include("LinearAlgebra/linearAlgebra.jl")
     end
 
+    @testset "Presolve" begin
+        include("Presolve/presolve.jl")
+    end
+
     @testset "Interfaces" begin
         include("Interfaces/MOI_wrapper.jl")
     end

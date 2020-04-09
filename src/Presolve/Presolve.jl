@@ -359,11 +359,7 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
     # TODO: check bound consistency on all rows/columns
     st = bounds_consistency_checks!(lp)
 
-    if lp.status == Trm_PrimalInfeasible
-        # Problem is infeasible => stop here
-        compute_index_mapping!(lp)
-        return lp.status
-    end
+    lp.status == Trm_PrimalInfeasible && return lp.status
 
     # I. Remove all fixed variables, empty rows and columns
     # remove_fixed_variables!(lp)
@@ -371,10 +367,7 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
     remove_empty_columns!(lp)
 
     # TODO: check status for potential early return
-    if lp.status != Trm_Unknown
-        compute_index_mapping!(lp)
-        return lp.status
-    end
+    lp.status == Trm_Unknown || return lp.status
 
     # Identify row singletons
     lp.row_singletons = [i for (i, nz) in enumerate(lp.nzrow) if lp.rowflag[i] && nz == 1]
@@ -388,15 +381,15 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
         @info "Presolve pass $npasses"
 
         bounds_consistency_checks!(lp)
-        lp.status == Trm_Unknown || break
+        lp.status == Trm_Unknown || return lp.status
 
         # Remove all fixed variables
         remove_fixed_variables!(lp)
-        lp.status == Trm_Unknown || break
+        lp.status == Trm_Unknown || return lp.status
 
         # Remove row singletons
         remove_row_singletons!(lp)
-        lp.status == Trm_Unknown || break
+        lp.status == Trm_Unknown || return lp.status
 
         # Remove forcing & dominated constraints
         # remove_forcing_constraints!(lp)
@@ -411,10 +404,10 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
 
         # TODO: fixed variables, empty row/column should be eliminated on the spot
         remove_empty_rows!(lp)
-        lp.status == Trm_Unknown || break
+        lp.status == Trm_Unknown || return lp.status
 
         remove_empty_columns!(lp)
-        lp.status == Trm_Unknown || break
+        lp.status == Trm_Unknown || return lp.status
 
     end
 
@@ -487,11 +480,12 @@ function bounds_consistency_checks!(lp::PresolveData{Tv}) where{Tv}
     for (i, (l, u)) in enumerate(zip(lp.lrow, lp.urow))
         if lp.rowflag[i] && l > u
             # Problem is primal infeasible
-            @info "Row $i is primal infeasible"
+            @debug "Row $i is primal infeasible"
             lp.status = Trm_PrimalInfeasible
             lp.updated = true
 
-            # Farkas ray: y⁺_i = y⁻_i = 1 (any > 0 value works)
+            # Resize problem            
+            compute_index_mapping!(lp)
             resize!(lp.solution, lp.nrow, lp.ncol)
             lp.solution.x .= zero(Tv)
             lp.solution.y_lower .= zero(Tv)
@@ -499,22 +493,26 @@ function bounds_consistency_checks!(lp::PresolveData{Tv}) where{Tv}
             lp.solution.s_lower .= zero(Tv)
             lp.solution.s_upper .= zero(Tv)
 
+            # Farkas ray: y⁺_i = y⁻_i = 1 (any > 0 value works)
             lp.solution.primal_status = Sln_Unknown
             lp.solution.dual_status = Sln_InfeasibilityCertificate
-            lp.solution.y_lower[i] = one(Tv)
-            lp.solution.y_upper[i] = one(Tv)
-
+            lp.solution.primal_status = lp.solution.dual_status = Tv(Inf)
+            i_ = lp.new_con_idx[i]
+            lp.solution.y_lower[i_] = one(Tv)
+            lp.solution.y_upper[i_] = one(Tv)
+            
             return
         end
     end
     for (j, (l, u)) in enumerate(zip(lp.lcol, lp.ucol))
         if lp.colflag[j] && l > u
             # Primal is primal infeasible
-            @info "Column $j is primal infeasible"
+            @debug "Column $j is primal infeasible"
             lp.status = Trm_PrimalInfeasible
             lp.updated = true
 
-            # Farkas ray
+            # Resize problem            
+            compute_index_mapping!(lp)
             resize!(lp.solution, lp.nrow, lp.ncol)
             lp.solution.x .= zero(Tv)
             lp.solution.y_lower .= zero(Tv)
@@ -522,10 +520,13 @@ function bounds_consistency_checks!(lp::PresolveData{Tv}) where{Tv}
             lp.solution.s_lower .= zero(Tv)
             lp.solution.s_upper .= zero(Tv)
 
+            # Farkas ray: y⁺_i = y⁻_i = 1 (any > 0 value works)
             lp.solution.primal_status = Sln_Unknown
             lp.solution.dual_status = Sln_InfeasibilityCertificate
-            lp.solution.s_lower[j] = one(Tv)
-            lp.solution.s_upper[j] = one(Tv)
+            lp.solution.primal_status = lp.solution.dual_status = Tv(Inf)
+            j_ = lp.new_var_idx[j]
+            lp.solution.s_lower[j_] = one(Tv)
+            lp.solution.s_upper[j_] = one(Tv)
             
             return
         end

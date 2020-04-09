@@ -21,11 +21,12 @@ function remove_empty_column!(lp::PresolveData{Tv}, j::Int) where{Tv}
             push!(lp.ops, EmptyColumn(j, lb, cj))
         else
             # Problem is dual infeasible
-            @info "Column $j is (lower) unbounded"
+            @debug "Column $j is (lower) unbounded"
             lp.status = Trm_DualInfeasible
             lp.updated = true
 
-            # Unbounded ray: xj = -1
+            # Resize problem
+            compute_index_mapping!(lp)
             resize!(lp.solution, lp.nrow, lp.ncol)
             lp.solution.x .= zero(Tv)
             lp.solution.y_lower .= zero(Tv)
@@ -33,9 +34,12 @@ function remove_empty_column!(lp::PresolveData{Tv}, j::Int) where{Tv}
             lp.solution.s_lower .= zero(Tv)
             lp.solution.s_upper .= zero(Tv)
 
+            # Unbounded ray: xj = -1
             lp.solution.primal_status = Sln_InfeasibilityCertificate
             lp.solution.dual_status = Sln_Unknown
-            lp.solution.x[j] = -one(Tv)
+            lp.solution.z_primal = lp.solution.z_dual = -Tv(Inf)
+            j_ = lp.new_var_idx[j]
+            lp.solution.x[j_] = -one(Tv)
 
             return nothing
         end
@@ -47,11 +51,12 @@ function remove_empty_column!(lp::PresolveData{Tv}, j::Int) where{Tv}
             push!(lp.ops, EmptyColumn(j, ub, cj))
         else
             # Problem is dual infeasible
-            @info "Column $j is (upper) unbounded"
+            @debug "Column $j is (upper) unbounded"
             lp.status = Trm_DualInfeasible
             lp.updated = true
 
-            # Unbounded ray: xj = 1
+            # Resize problem
+            compute_index_mapping!(lp)
             resize!(lp.solution, lp.nrow, lp.ncol)
             lp.solution.x .= zero(Tv)
             lp.solution.y_lower .= zero(Tv)
@@ -59,9 +64,12 @@ function remove_empty_column!(lp::PresolveData{Tv}, j::Int) where{Tv}
             lp.solution.s_lower .= zero(Tv)
             lp.solution.s_upper .= zero(Tv)
 
+            # Unbounded ray: xj = 1
             lp.solution.primal_status = Sln_InfeasibilityCertificate
             lp.solution.dual_status = Sln_Unknown
-            lp.solution.x[j] = one(Tv)
+            lp.solution.z_primal = lp.solution.z_dual = -Tv(Inf)
+            j_ = lp.new_var_idx[j]
+            lp.solution.x[j_] = one(Tv)
             
             return
         end
