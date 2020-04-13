@@ -283,6 +283,20 @@ function extract_reduced_problem!(dat::PresolveData{Tv}) where{Tv<:Real}
     end
 
     # Record scaling
+    @info "Scaling info" extrema(rscale) extrema(cscale)
+    # @info("Variable bounds",
+    #     extrema(dat.pb0.lvar[isfinite.(dat.pb0.lvar)]),
+    #     extrema(dat.pb0.uvar[isfinite.(dat.pb0.uvar)]),
+    #     extrema(pb.lvar[isfinite.(pb.lvar)]),
+    #     extrema(pb.uvar[isfinite.(pb.uvar)]),
+    # )
+    # @info("Constraint bounds",
+    #     extrema(dat.pb0.lcon[isfinite.(dat.pb0.lcon)]),
+    #     extrema(dat.pb0.ucon[isfinite.(dat.pb0.ucon)]),
+    #     extrema(pb.lcon[isfinite.(pb.lcon)]),
+    #     extrema(pb.ucon[isfinite.(pb.ucon)]),
+    # )
+    @info pb.obj0
     dat.row_scaling = rscale
     dat.col_scaling = cscale
 
@@ -296,6 +310,7 @@ include("empty_column.jl")
 include("fixed_variable.jl")
 include("row_singleton.jl")
 include("forcing_row.jl")
+include("free_column_singleton.jl")
 
 
 """
@@ -385,19 +400,23 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
         lp.status == Trm_Unknown || return lp.status
 
         # Remove all fixed variables
+        # TODO: remove empty variables as well
+        remove_row_singletons!(lp)
+        lp.status == Trm_Unknown || return lp.status
         remove_fixed_variables!(lp)
         lp.status == Trm_Unknown || return lp.status
 
-        # Remove row singletons
+        # Remove forcing & dominated constraints
         remove_row_singletons!(lp)
         lp.status == Trm_Unknown || return lp.status
-
-        # Remove forcing & dominated constraints
         remove_forcing_rows!(lp)
         lp.status == Trm_Unknown || return lp.status
 
         # Remove free and implied free column singletons
-        # remove_free_column_singletons!(lp)
+        remove_row_singletons!(lp)
+        lp.status == Trm_Unknown || return lp.status
+        remove_free_column_singletons!(lp)
+        lp.status == Trm_Unknown || return lp.status
 
         # TODO: remove column singleton with doubleton equation
 
@@ -598,9 +617,20 @@ end
 
 Remove forcing and dominated row
 """
-function remove_forcing_rows!(lp::PresolveData{Tv}) where{Tv}
+function remove_forcing_rows!(lp::PresolveData)
     for (i, flag) in enumerate(lp.rowflag)
         flag && remove_forcing_row!(lp, i)
+    end
+    return nothing
+end
+
+"""
+    remove_free_column_singletons!(lp)
+
+"""
+function remove_free_column_singletons!(lp::PresolveData)
+    for (j, flag) in enumerate(lp.colflag)
+        remove_free_column_singleton!(lp, j)
     end
     return nothing
 end
