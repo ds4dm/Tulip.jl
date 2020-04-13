@@ -295,6 +295,7 @@ include("empty_row.jl")
 include("empty_column.jl")
 include("fixed_variable.jl")
 include("row_singleton.jl")
+include("forcing_row.jl")
 
 
 """
@@ -378,7 +379,7 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
     while lp.updated && lp.status == Trm_Unknown
         npasses += 1
         lp.updated = false
-        @info "Presolve pass $npasses"
+        @info "Presolve pass $npasses" lp.nrow lp.ncol
 
         bounds_consistency_checks!(lp)
         lp.status == Trm_Unknown || return lp.status
@@ -392,7 +393,8 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
         lp.status == Trm_Unknown || return lp.status
 
         # Remove forcing & dominated constraints
-        # remove_forcing_constraints!(lp)
+        remove_forcing_rows!(lp)
+        lp.status == Trm_Unknown || return lp.status
 
         # Remove free and implied free column singletons
         # remove_free_column_singletons!(lp)
@@ -402,17 +404,14 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
         # Dual reductions
         # remove_dominated_columns!(lp)
 
-        # TODO: fixed variables, empty row/column should be eliminated on the spot
-        remove_empty_rows!(lp)
-        lp.status == Trm_Unknown || return lp.status
-
         remove_empty_columns!(lp)
         lp.status == Trm_Unknown || return lp.status
 
     end
 
     @info("Presolved model stats:",
-        sum(lp.rowflag), sum(lp.colflag)
+        lp.pb0.ncon, lp.nrow,
+        lp.pb0.nvar, lp.ncol
     )
 
     # TODO: check problem dimensions and declare optimality if problem is empty
@@ -496,7 +495,7 @@ function bounds_consistency_checks!(lp::PresolveData{Tv}) where{Tv}
             # Farkas ray: y⁺_i = y⁻_i = 1 (any > 0 value works)
             lp.solution.primal_status = Sln_Unknown
             lp.solution.dual_status = Sln_InfeasibilityCertificate
-            lp.solution.primal_status = lp.solution.dual_status = Tv(Inf)
+            lp.solution.z_primal = lp.solution.z_dual = Tv(Inf)
             i_ = lp.new_con_idx[i]
             lp.solution.y_lower[i_] = one(Tv)
             lp.solution.y_upper[i_] = one(Tv)
@@ -523,7 +522,7 @@ function bounds_consistency_checks!(lp::PresolveData{Tv}) where{Tv}
             # Farkas ray: y⁺_i = y⁻_i = 1 (any > 0 value works)
             lp.solution.primal_status = Sln_Unknown
             lp.solution.dual_status = Sln_InfeasibilityCertificate
-            lp.solution.primal_status = lp.solution.dual_status = Tv(Inf)
+            lp.solution.z_primal = lp.solution.z_dual = Tv(Inf)
             j_ = lp.new_var_idx[j]
             lp.solution.s_lower[j_] = one(Tv)
             lp.solution.s_upper[j_] = one(Tv)
@@ -591,5 +590,17 @@ function remove_row_singletons!(lp::PresolveData{Tv}) where{Tv}
         remove_row_singleton!(lp, i)
     end
     lp.row_singletons = Int[]
+    return nothing
+end
+
+"""
+    remove_forcing_rows!
+
+Remove forcing and dominated row
+"""
+function remove_forcing_rows!(lp::PresolveData{Tv}) where{Tv}
+    for (i, flag) in enumerate(lp.rowflag)
+        flag && remove_forcing_row!(lp, i)
+    end
     return nothing
 end
