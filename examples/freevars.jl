@@ -7,7 +7,10 @@ TLP = Tulip
 
 INSTANCE_DIR = joinpath(@__DIR__, "dat")
 
-function ex_freevars(Tv::Type)
+function ex_freevars(::Type{Tv};
+    atol::Tv = 100 * sqrt(eps(Tv)),
+    rtol::Tv = 100 * sqrt(eps(Tv))
+) where{Tv}
     #=
     Example with free variables
 
@@ -24,11 +27,31 @@ function ex_freevars(Tv::Type)
     TLP.optimize!(m)
 
     # Check status
-    hsd = m.solver
-    @test hsd.solver_status == TLP.Trm_Optimal
-    @test isapprox(hsd.primal_bound_scaled, 0, atol = sqrt(eps(Tv)))
+    @test TLP.get_attribute(m, TLP.Status()) == TLP.Trm_Optimal
+    z = TLP.get_attribute(m, TLP.ObjectiveValue())
+    @test isapprox(z, 0, atol=atol, rtol=rtol)
+    @test m.solution.primal_status == TLP.Sln_Optimal
+    @test m.solution.dual_status   == TLP.Sln_Optimal
 
-    # TODO: Check optimal solution
+    # Check optimal solution
+    x1 = m.solution.x[1]
+    x2 = m.solution.x[2]
+    x3 = m.solution.x[3]
+
+    # Check primal feasibility (note there's no unique solution)
+    @test 2*x1 +   x2      >= 2 - atol
+    @test   x1 + 2*x2      >= 2 - atol
+    @test   x1 +   x2 + x3 >= -atol
+    
+    # Free variables should have zero reduced cost
+    s1 = m.solution.s_lower[1] - m.solution.s_upper[1]
+    s2 = m.solution.s_lower[2] - m.solution.s_upper[2]
+    s3 = m.solution.s_lower[3] - m.solution.s_upper[3]
+    @test isapprox(s1, 0, atol=atol, rtol=rtol)
+    @test isapprox(s2, 0, atol=atol, rtol=rtol)
+    @test isapprox(s3, 0, atol=atol, rtol=rtol)
 end
 
-ex_freevars(Float64)
+if abspath(PROGRAM_FILE) == @__FILE__
+    ex_freevars(Float64)
+end

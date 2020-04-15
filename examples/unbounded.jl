@@ -7,7 +7,10 @@ TLP = Tulip
 
 INSTANCE_DIR = joinpath(@__DIR__, "dat")
 
-function ex_unbounded(Tv::Type)
+function ex_unbounded(::Type{Tv};
+    atol::Tv = 100 * sqrt(eps(Tv)),
+    rtol::Tv = 100 * sqrt(eps(Tv))
+) where{Tv}
     #=
     Unbounded example
 
@@ -23,10 +26,21 @@ function ex_unbounded(Tv::Type)
     TLP.optimize!(m)
 
     # Check status
-    hsd = m.solver
-    @test hsd.solver_status == TLP.Trm_DualInfeasible
+    @test TLP.get_attribute(m, TLP.Status()) == TLP.Trm_DualInfeasible
+    z = TLP.get_attribute(m, TLP.ObjectiveValue())
+    @test z == -Tv(Inf)
+    @test m.solution.primal_status == TLP.Sln_InfeasibilityCertificate
+    @test m.solution.dual_status   == TLP.Sln_Unknown
 
-    # TODO: check validity of infeasibility certificate
+    # Check unbounded ray
+    x1 = m.solution.x[1]
+    x2 = m.solution.x[2]
+    Ax1 = m.solution.Ax[1]
+
+    @test x1 >= -atol
+    @test x2 >= -atol
+    @test isapprox(Ax1, 0, atol=atol, rtol=rtol)
+    @test -x1 - x2 <= -atol
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
