@@ -58,14 +58,10 @@ mutable struct PresolveData{Tv<:Real}
     ucol::Vector{Tv}
 
     # Dual bounds
-    lyp::Vector{Tv}
-    uyp::Vector{Tv}
-    lym::Vector{Tv}
-    uym::Vector{Tv}
-    lsp::Vector{Tv}
-    usp::Vector{Tv}
-    lsm::Vector{Tv}
-    usm::Vector{Tv}
+    ly::Vector{Tv}
+    uy::Vector{Tv}
+    ls::Vector{Tv}
+    us::Vector{Tv}
 
     # Scaling
     row_scaling::Vector{Tv}
@@ -132,21 +128,17 @@ mutable struct PresolveData{Tv<:Real}
         ps.ucol = copy(pb.uvar)
 
         # Set dual bounds
-        ps.lyp = zeros(Tv, ps.nrow)
-        ps.uyp = Vector{Tv}(undef, ps.nrow)
-        ps.lym = zeros(Tv, ps.nrow)
-        ps.uym = Vector{Tv}(undef, ps.nrow)
-        ps.lsp = zeros(Tv, ps.ncol)
-        ps.usp = Vector{Tv}(undef, ps.ncol)
-        ps.lsm = zeros(Tv, ps.ncol)
-        ps.usm = Vector{Tv}(undef, ps.ncol)
+        ps.ly = Vector{Tv}(undef, ps.nrow)
+        ps.uy = Vector{Tv}(undef, ps.nrow)
+        ps.ls = Vector{Tv}(undef, ps.ncol)
+        ps.us = Vector{Tv}(undef, ps.ncol)
         for (i, (lc, uc)) in enumerate(zip(ps.lrow, ps.urow))
-            ps.uyp[i] = (lc == Tv(-Inf)) ? zero(Tv) : Tv(Inf)
-            ps.uym[i] = (uc == Tv( Inf)) ? zero(Tv) : Tv(Inf)
+            ps.ly[i] = (uc == Tv( Inf)) ? zero(Tv) : Tv(-Inf)
+            ps.uy[i] = (lc == Tv(-Inf)) ? zero(Tv) : Tv( Inf)
         end
         for (j, (lv, uv)) in enumerate(zip(ps.lcol, ps.ucol))
-            ps.usp[j] = (lv == Tv(-Inf)) ? zero(Tv) : Tv(Inf)
-            ps.usm[j] = (uv == Tv( Inf)) ? zero(Tv) : Tv(Inf)
+            ps.ls[j] = (uv == Tv( Inf)) ? zero(Tv) : Tv(-Inf)
+            ps.us[j] = (lv == Tv(-Inf)) ? zero(Tv) : Tv( Inf)
         end
 
         # Scalings
@@ -311,6 +303,7 @@ include("fixed_variable.jl")
 include("row_singleton.jl")
 include("forcing_row.jl")
 include("free_column_singleton.jl")
+include("dominated_column.jl")
 
 
 """
@@ -398,6 +391,9 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
 
         bounds_consistency_checks!(lp)
         lp.status == Trm_Unknown || return lp.status
+        remove_empty_columns!(lp)
+        lp.status == Trm_Unknown || return lp.status
+        
 
         # Remove all fixed variables
         # TODO: remove empty variables as well
@@ -421,12 +417,13 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
         # TODO: remove column singleton with doubleton equation
 
         # Dual reductions
-        # remove_dominated_columns!(lp)
-
-        remove_empty_columns!(lp)
+        remove_row_singletons!(lp)
         lp.status == Trm_Unknown || return lp.status
-
+        remove_dominated_columns!(lp)
+        lp.status == Trm_Unknown || return lp.status
     end
+
+    remove_empty_columns!(lp)
 
     @info("Presolved model stats:",
         lp.pb0.ncon, lp.nrow,
@@ -631,6 +628,72 @@ end
 function remove_free_column_singletons!(lp::PresolveData)
     for (j, flag) in enumerate(lp.colflag)
         remove_free_column_singleton!(lp, j)
+    end
+    return nothing
+end
+
+function remove_dominated_columns!(lp::PresolveData{Tv}) where{Tv}
+    # Strengthen dual bounds with column singletons
+    for (j, (l, u)) in enumerate(zip(lp.lcol, lp.ucol))
+        (lp.colflag[j] && lp.nzcol[j] == 1) || continue
+
+        col = lp.pb0.acols[j]
+        # Find non-zero index
+        nz = 0
+        i, aij = 0, zero(Tv)
+        for (i_, a_) in zip(col.nzind, col.nzval)
+            if lp.rowflag[i_] && !iszero(a_)
+                nz += 1; nz <= 1 || break
+                i = i_
+                aij = a_
+            end
+        end
+
+        nz == 1 || (@error "Expected singleton but column $j has $nz non-zeros"; continue)
+        iszero(aij) && continue  # empty column
+
+        # Strengthen dual bounds
+        #=
+
+        =#
+        cj = lp.obj[j]
+        y_ = cj / aij
+        if !isfinite(l) && !isfinite(u)
+            # Free variable. Should not happen but handle anyway
+            # TODO
+            @warn "TODO: dual bounds strengthening for column singletons"
+        elseif isfinite(l) && !isfinite(u)
+            # Lower-bounded variable: `aij * yi ≤ cj`
+            if aij > zero(Tv)
+                # yi ≤ cj / aij
+                @debug "Col $j forces y$i <= $y_"
+                lp.uy[i] = min(lp.uy[i],  y_)
+            else
+                # yi ≥ cj / aij
+                @debug "Col $j forces y$i >= $y_"
+                lp.ly[i] = max(lp.ly[i],  y_)
+            end
+        
+        elseif !isfinite(l) && isfinite(u)
+            # Upper-bounded variable: `aij * yi ≥ cj`
+            if aij > zero(Tv)
+                # yi ≥ cj / aij
+                @debug "Col $j forces y$i >= $y_"
+                lp.ly[i] = max(lp.ly[i],  y_)
+            else
+                # yi ≤ cj / aij
+                @debug "Col $j forces y$i <= $y_"
+                lp.uy[i] = min(lp.uy[i],  y_)
+            end
+        end
+
+        # TODO: dual feasibility check
+        lp.ly[i] <= lp.uy[i] || @warn "Inconsistent dual bounds for row $j: [$(lp.ly[i]), $(lp.uy[i])]"
+    end
+
+    for (j, flag) in enumerate(lp.colflag)
+        remove_dominated_column!(lp, j)
+        lp.status == Trm_Unknown || break
     end
     return nothing
 end
