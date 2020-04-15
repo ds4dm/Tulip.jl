@@ -413,13 +413,13 @@ function update_solver_status!(
     if ρp <= ϵp
         hsd.primal_status = Sln_FeasiblePoint
     else
-        hsd.primal_status = Sln_InfeasiblePoint
+        hsd.primal_status = Sln_Unknown
     end
 
     if ρd <= ϵd
         hsd.dual_status = Sln_FeasiblePoint
     else
-        hsd.dual_status = Sln_InfeasiblePoint
+        hsd.dual_status = Sln_Unknown
     end
     
     # Check for optimal solution

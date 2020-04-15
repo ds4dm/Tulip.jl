@@ -31,6 +31,8 @@ function remove_empty_row!(lp::PresolveData{Tv}, i::Int) where{Tv}
         # Farkas ray: y⁺_i = 1 (any > 0 value works)
         lp.solution.primal_status = Sln_Unknown
         lp.solution.dual_status = Sln_InfeasibilityCertificate
+        lp.solution.is_primal_ray = false
+        lp.solution.is_dual_ray = true
         lp.solution.z_primal = lp.solution.z_dual = Tv(Inf)
         i_ = lp.new_con_idx[i]
         lp.solution.y_upper[i] = one(Tv)
@@ -52,6 +54,8 @@ function remove_empty_row!(lp::PresolveData{Tv}, i::Int) where{Tv}
         # Farkas ray: y⁺_i = 1 (any > 0 value works)
         lp.solution.primal_status = Sln_Unknown
         lp.solution.dual_status = Sln_InfeasibilityCertificate
+        lp.solution.is_primal_ray = false
+        lp.solution.is_dual_ray = true
         lp.solution.z_primal = lp.solution.z_dual = Tv(Inf)
         i_ = lp.new_con_idx[i]
         lp.solution.y_lower[i_] = one(Tv)
@@ -66,7 +70,7 @@ function remove_empty_row!(lp::PresolveData{Tv}, i::Int) where{Tv}
     lp.nrow -= 1
 end
 
-function postsolve!(sol::Solution{Tv}, sol_::Solution{Tv}, op::EmptyRow{Tv}) where{Tv}
+function postsolve!(sol::Solution{Tv}, op::EmptyRow{Tv}) where{Tv}
     sol.y_lower[op.i] = pos_part(op.y)
     sol.y_upper[op.i] = neg_part(op.y)
     return nothing

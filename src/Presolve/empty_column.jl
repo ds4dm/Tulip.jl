@@ -37,6 +37,8 @@ function remove_empty_column!(lp::PresolveData{Tv}, j::Int) where{Tv}
             # Unbounded ray: xj = -1
             lp.solution.primal_status = Sln_InfeasibilityCertificate
             lp.solution.dual_status = Sln_Unknown
+            lp.solution.is_primal_ray = true
+            lp.solution.is_dual_ray = false
             lp.solution.z_primal = lp.solution.z_dual = -Tv(Inf)
             j_ = lp.new_var_idx[j]
             lp.solution.x[j_] = -one(Tv)
@@ -67,6 +69,8 @@ function remove_empty_column!(lp::PresolveData{Tv}, j::Int) where{Tv}
             # Unbounded ray: xj = 1
             lp.solution.primal_status = Sln_InfeasibilityCertificate
             lp.solution.dual_status = Sln_Unknown
+            lp.solution.is_primal_ray = true
+            lp.solution.is_dual_ray = false
             lp.solution.z_primal = lp.solution.z_dual = -Tv(Inf)
             j_ = lp.new_var_idx[j]
             lp.solution.x[j_] = one(Tv)
@@ -93,7 +97,7 @@ function remove_empty_column!(lp::PresolveData{Tv}, j::Int) where{Tv}
     return nothing
 end
 
-function postsolve!(sol::Solution{Tv}, sol_::Solution{Tv}, op::EmptyColumn{Tv}) where{Tv}
+function postsolve!(sol::Solution{Tv}, op::EmptyColumn{Tv}) where{Tv}
     sol.x[op.j] = op.x
     sol.s_lower[op.j] = pos_part(op.s)
     sol.s_upper[op.j] = neg_part(op.s)

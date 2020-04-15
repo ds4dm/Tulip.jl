@@ -55,9 +55,9 @@ function remove_fixed_variable!(lp::PresolveData, j::Int)
     return nothing
 end
 
-function postsolve!(sol::Solution{Tv}, sol_::Solution{Tv}, op::FixedVariable{Tv}) where{Tv}
+function postsolve!(sol::Solution{Tv}, op::FixedVariable{Tv}) where{Tv}
     sol.x[op.j] = op.x
-    s = op.c
+    s = sol.is_dual_ray ? zero(Tv) : op.c
     for (i, aij) in zip(op.col.nzind, op.col.nzval)
         s -= aij * (sol.y_lower[i] - sol.y_upper[i])
     end

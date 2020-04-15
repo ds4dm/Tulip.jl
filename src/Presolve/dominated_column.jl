@@ -43,6 +43,8 @@ function remove_dominated_column!(lp::PresolveData{Tv}, j::Int; tol::Tv=100*sqrt
             # Unbounded ray: xj = -1
             lp.solution.primal_status = Sln_InfeasibilityCertificate
             lp.solution.dual_status = Sln_Unknown
+            lp.solution.is_primal_ray = true
+            lp.solution.is_dual_ray = false
             lp.solution.z_primal = lp.solution.z_dual = -Tv(Inf)
             j_ = lp.new_var_idx[j]
             lp.solution.x[j_] = -one(Tv)
@@ -98,6 +100,8 @@ function remove_dominated_column!(lp::PresolveData{Tv}, j::Int; tol::Tv=100*sqrt
             # Unbounded ray: xj = -1
             lp.solution.primal_status = Sln_InfeasibilityCertificate
             lp.solution.dual_status = Sln_Unknown
+            lp.solution.is_primal_ray = true
+            lp.solution.is_dual_ray = false
             lp.solution.z_primal = lp.solution.z_dual = -Tv(Inf)
             j_ = lp.new_var_idx[j]
             lp.solution.x[j_] = one(Tv)
@@ -136,12 +140,12 @@ function remove_dominated_column!(lp::PresolveData{Tv}, j::Int; tol::Tv=100*sqrt
     return nothing
 end
 
-function postsolve!(sol::Solution{Tv}, sol_::Solution{Tv}, op::DominatedColumn{Tv}) where{Tv}
+function postsolve!(sol::Solution{Tv}, op::DominatedColumn{Tv}) where{Tv}
     # Primal value
     sol.x[op.j] = op.x
 
     # Reduced cost
-    s = op.cj * (sol.dual_status != Sln_InfeasibilityCertificate)
+    s = sol.is_dual_ray ? zero(Tv) : op.cj
     for (i, aij) in zip(op.col.nzind, op.col.nzval)
         s -= aij * (sol.y_lower[i] - sol.y_upper[i])
     end

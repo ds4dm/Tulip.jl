@@ -17,7 +17,7 @@ function remove_row_singleton!(lp::PresolveData{Tv}, i::Int) where{Tv}
     nz = 0
     j, aij = 0, zero(Tv)
     for (j_, aij_) in zip(row.nzind, row.nzval)
-        if lp.colflag[j_]
+        if lp.colflag[j_] && !iszero(aij_)
             nz += 1; nz <= 1 || break  # not a row singleton
 
             j = j_
@@ -78,10 +78,7 @@ function remove_row_singleton!(lp::PresolveData{Tv}, i::Int) where{Tv}
     return nothing
 end
 
-function postsolve!(
-    sol::Solution{Tv}, sol_::Solution{Tv},
-    op::RowSingleton{Tv}
-) where{Tv}
+function postsolve!(sol::Solution{Tv}, op::RowSingleton{Tv}) where{Tv}
 
     if op.force_lower
         if op.aij > zero(Tv)

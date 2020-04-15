@@ -175,14 +175,14 @@ function remove_forcing_row!(lp::PresolveData{Tv}, i::Int) where{Tv}
     return nothing
 end
 
-function postsolve!(sol::Solution{Tv}, sol_::Solution{Tv}, op::DominatedRow{Tv}) where{Tv}
+function postsolve!(sol::Solution{Tv}, op::DominatedRow{Tv}) where{Tv}
     sol.y_lower[op.i] = zero(Tv)
     sol.y_upper[op.i] = zero(Tv)
     return nothing
 end
 
 # TODO: postsolve of forcing rows
-function postsolve!(sol::Solution{Tv}, sol_::Solution{Tv}, op::ForcingRow{Tv}) where{Tv}
+function postsolve!(sol::Solution{Tv}, op::ForcingRow{Tv}) where{Tv}
 
     # Primal
     for (j, xj) in zip(op.row.nzind, op.xs)

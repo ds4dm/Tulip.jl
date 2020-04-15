@@ -127,6 +127,8 @@ function _extract_solution!(sol::Solution{Tv}, pb::ProblemData{Tv}, hsd::HSDSolv
 
     is_primal_ray = (sol.primal_status == Sln_InfeasibilityCertificate)
     is_dual_ray = (sol.dual_status == Sln_InfeasibilityCertificate)
+    sol.is_primal_ray = is_primal_ray
+    sol.is_dual_ray = is_dual_ray
     τ_ = (is_primal_ray || is_dual_ray) ? one(Tv) : inv(hsd.pt.t)
     
     nfree = 0

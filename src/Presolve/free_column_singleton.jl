@@ -108,7 +108,7 @@ function remove_free_column_singleton!(lp::PresolveData{Tv}, j::Int) where{Tv}
     return nothing
 end
 
-function postsolve!(sol::Solution{Tv}, sol_::Solution{Tv}, op::FreeColumnSingleton{Tv}) where{Tv}
+function postsolve!(sol::Solution{Tv}, op::FreeColumnSingleton{Tv}) where{Tv}
     # Dual
     y = op.y
     sol.y_lower[op.i] = pos_part(y)
@@ -117,7 +117,7 @@ function postsolve!(sol::Solution{Tv}, sol_::Solution{Tv}, op::FreeColumnSinglet
     sol.s_upper[op.j] = zero(Tv)
 
     # Primal
-    sol.x[op.j] = y >= zero(Tv) ? op.l : op.u
+    sol.x[op.j] = sol.is_primal_ray ? zero(Tv) : (y >= zero(Tv) ? op.l : op.u)
     for (k, aik) in zip(op.row.nzind, op.row.nzval)
         sol.x[op.j] -= aik * sol.x[k]
     end

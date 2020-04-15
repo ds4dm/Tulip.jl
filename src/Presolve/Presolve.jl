@@ -311,6 +311,8 @@ function postsolve!(sol::Solution{Tv}, sol_::Solution{Tv}, lp::PresolveData{Tv})
     # Copy solution status and objective values
     sol.primal_status = sol_.primal_status
     sol.dual_status = sol_.dual_status
+    sol.is_primal_ray = sol_.is_primal_ray
+    sol.is_dual_ray = sol_.is_dual_ray
     sol.z_primal = sol_.z_primal
     sol.z_dual = sol_.z_dual
 
@@ -328,7 +330,7 @@ function postsolve!(sol::Solution{Tv}, sol_::Solution{Tv}, lp::PresolveData{Tv})
 
     # Reverse transformations
     for op in Iterators.reverse(lp.ops)
-        postsolve!(sol, sol_, op)
+        postsolve!(sol, op)
     end
 
     # Compute row primals
@@ -427,6 +429,8 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
         resize!(lp.solution, 0, 0)
         lp.solution.primal_status = Sln_Optimal
         lp.solution.dual_status = Sln_Optimal
+        lp.solution.is_primal_ray = false
+        lp.solution.is_dual_ray = false
         lp.solution.z_primal = lp.obj0
         lp.solution.z_dual = lp.obj0
     end
@@ -499,6 +503,8 @@ function bounds_consistency_checks!(lp::PresolveData{Tv}) where{Tv}
             # Farkas ray: y⁺_i = y⁻_i = 1 (any > 0 value works)
             lp.solution.primal_status = Sln_Unknown
             lp.solution.dual_status = Sln_InfeasibilityCertificate
+            lp.solution.is_primal_ray = false
+            lp.solution.is_dual_ray = true
             lp.solution.z_primal = lp.solution.z_dual = Tv(Inf)
             i_ = lp.new_con_idx[i]
             lp.solution.y_lower[i_] = one(Tv)
@@ -526,6 +532,8 @@ function bounds_consistency_checks!(lp::PresolveData{Tv}) where{Tv}
             # Farkas ray: y⁺_i = y⁻_i = 1 (any > 0 value works)
             lp.solution.primal_status = Sln_Unknown
             lp.solution.dual_status = Sln_InfeasibilityCertificate
+            lp.solution.is_primal_ray = false
+            lp.solution.is_dual_ray = true
             lp.solution.z_primal = lp.solution.z_dual = Tv(Inf)
             j_ = lp.new_var_idx[j]
             lp.solution.s_lower[j_] = one(Tv)

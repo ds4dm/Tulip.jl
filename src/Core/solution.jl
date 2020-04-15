@@ -4,6 +4,8 @@ mutable struct Solution{Tv}
 
     primal_status::SolutionStatus
     dual_status::SolutionStatus
+    is_primal_ray::Bool
+    is_dual_ray::Bool
 
     z_primal::Tv
     z_dual::Tv
@@ -16,7 +18,8 @@ mutable struct Solution{Tv}
     s_upper::Vector{Tv}
 
     Solution{Tv}(m, n) where{Tv} = new{Tv}(
-        m, n, Sln_Unknown, Sln_Unknown, zero(Tv), zero(Tv),
+        m, n, Sln_Unknown, Sln_Unknown, false, false,
+        zero(Tv), zero(Tv),
         zeros(Tv, n), zeros(Tv, m),
         zeros(Tv, m), zeros(Tv, m),
         zeros(Tv, n), zeros(Tv, n)
