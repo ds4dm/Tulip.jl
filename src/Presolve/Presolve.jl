@@ -100,13 +100,13 @@ mutable struct PresolveData{Tv<:Real}
         ps.colflag = trues(ps.ncol)
 
         # Number of non-zeros in rows/columns
-        ps.nzrow = Vector{Int}(undef, ps.nrow)
-        ps.nzcol = Vector{Int}(undef, ps.ncol)
+        ps.nzrow = zeros(Int, ps.nrow)
+        ps.nzcol = zeros(Int, ps.ncol)
         for (j, col) in enumerate(pb.acols)
-            ps.nzcol[j] = length(col.nzind)
-        end
-        for (i, row) in enumerate(pb.arows)
-            ps.nzrow[i] = length(row.nzind)
+            for (i, aij) in zip(col.nzind, col.nzval)
+                ps.nzcol[j] += !iszero(aij)
+                ps.nzrow[i] += !iszero(aij)
+            end
         end
 
         # Objective
