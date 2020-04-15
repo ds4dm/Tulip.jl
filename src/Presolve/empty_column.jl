@@ -9,9 +9,9 @@ function remove_empty_column!(lp::PresolveData{Tv}, j::Int) where{Tv}
     (lp.colflag[j] && (lp.nzcol[j] == 0)) || return nothing
 
     # Remove column
-    @debug "Removing empty column $j"
     lb, ub = lp.lcol[j], lp.ucol[j]
     cj = lp.obj[j]
+    @debug "Removing empty column $j" cj lb ub
 
     if cj > zero(Tv)
         if isfinite(lb)

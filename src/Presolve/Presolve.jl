@@ -276,19 +276,6 @@ function extract_reduced_problem!(dat::PresolveData{Tv}) where{Tv<:Real}
 
     # Record scaling
     @info "Scaling info" extrema(rscale) extrema(cscale)
-    # @info("Variable bounds",
-    #     extrema(dat.pb0.lvar[isfinite.(dat.pb0.lvar)]),
-    #     extrema(dat.pb0.uvar[isfinite.(dat.pb0.uvar)]),
-    #     extrema(pb.lvar[isfinite.(pb.lvar)]),
-    #     extrema(pb.uvar[isfinite.(pb.uvar)]),
-    # )
-    # @info("Constraint bounds",
-    #     extrema(dat.pb0.lcon[isfinite.(dat.pb0.lcon)]),
-    #     extrema(dat.pb0.ucon[isfinite.(dat.pb0.ucon)]),
-    #     extrema(pb.lcon[isfinite.(pb.lcon)]),
-    #     extrema(pb.ucon[isfinite.(pb.ucon)]),
-    # )
-    @info pb.obj0
     dat.row_scaling = rscale
     dat.col_scaling = cscale
 
@@ -427,7 +414,8 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
 
     @info("Presolved model stats:",
         lp.pb0.ncon, lp.nrow,
-        lp.pb0.nvar, lp.ncol
+        lp.pb0.nvar, lp.ncol,
+        sum(lp.nzcol[lp.colflag]), sum(lp.nzrow[lp.rowflag])
     )
 
     # TODO: check problem dimensions and declare optimality if problem is empty

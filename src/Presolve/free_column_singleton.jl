@@ -15,6 +15,7 @@ function remove_free_column_singleton!(lp::PresolveData{Tv}, j::Int) where{Tv}
     col = lp.pb0.acols[j]
 
     # Find non-zero index
+    # TODO: put this in a function
     nz = 0
     i, aij = 0, zero(Tv)
     for (i_, a_) in zip(col.nzind, col.nzval)
@@ -43,8 +44,7 @@ function remove_free_column_singleton!(lp::PresolveData{Tv}, j::Int) where{Tv}
         if aij > zero(Tv)
             l_, u_ = lr, ur
             for (k, aik) in zip(row.nzind, row.nzval)
-                lp.colflag[k] || continue
-
+                (lp.colflag[k] && k != j) || continue
                 # Update bounds
                 if aik > 0
                     l_ -= aik * lp.ucol[k]
@@ -59,8 +59,7 @@ function remove_free_column_singleton!(lp::PresolveData{Tv}, j::Int) where{Tv}
         else
             l_, u_ = ur, lr
             for (k, aik) in zip(row.nzind, row.nzval)
-                lp.colflag[k] || continue
-
+                (lp.colflag[k] && k != j) || continue
                 # Update bounds
                 if aik > 0
                     l_ -= aik * lp.lcol[k]
@@ -73,12 +72,15 @@ function remove_free_column_singleton!(lp::PresolveData{Tv}, j::Int) where{Tv}
             l_ /= aij
             u_ /= aij
         end
-
+        @debug """Column singleton $j
+            Original bounds: [$l, $u]
+             Implied bounds: [$(l_), $(u_)]
+        """
         l <= l_ <= u_ <= u || return nothing  # Not implied free
     end
 
     # Remove (implied) free column
-    @debug "Remove free column singleton $j"
+    @debug "Removing (implied) free column singleton $j"
     y = lp.obj[j] / aij  # dual of row i
 
     # Update objective
