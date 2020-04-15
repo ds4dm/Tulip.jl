@@ -244,13 +244,16 @@ function extract_reduced_problem!(dat::PresolveData{Tv}) where{Tv<:Real}
     # Compute norm of each row and column
     # TODO: use a parameter p and do norm(.., p)
     for (i, row) in enumerate(pb.arows)
-        r = norm(row.nzval, 2)
+        r = norm(row.nzval, Inf)
         rscale[i] = r > zero(Tv) ? r : one(Tv)
     end
     for (j, col) in enumerate(pb.acols)
-        r = norm(col.nzval, 2)
+        r = norm(col.nzval, Inf)
         cscale[j] = r > zero(Tv) ? r : one(Tv)
     end
+
+    map!(sqrt, cscale, cscale)
+    map!(sqrt, rscale, rscale)
 
     # Rows
     for (i, row) in enumerate(pb.arows)
