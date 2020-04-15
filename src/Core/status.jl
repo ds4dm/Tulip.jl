@@ -13,6 +13,7 @@ but no result (e.g. certificate of infeasibility) is available.
     Cholesky decomposition.
 """
 @enum(TerminationStatus,
+    Trm_NotCalled,
     Trm_Unknown,
     # OK statuses
     Trm_Optimal,

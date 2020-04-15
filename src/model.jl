@@ -13,6 +13,7 @@ mutable struct Model{Tv}
                 * changing names
                 * changing objective constant
     =#
+    status::TerminationStatus
 
     # Problem data
     pbdata::ProblemData{Tv}
@@ -30,7 +31,7 @@ mutable struct Model{Tv}
     solution::Union{Nothing, Solution{Tv}}
 
     Model{Tv}() where{Tv} = new{Tv}(
-        Parameters{Tv}(), ProblemData{Tv}(),
+        Parameters{Tv}(), Trm_NotCalled, ProblemData{Tv}(),
         nothing, nothing, nothing
     )
 end
@@ -50,6 +51,7 @@ import Base.empty!
 
 function Base.empty!(m::Model{Tv}) where{Tv}
     m.pbdata = ProblemData{Tv}()
+    m.status = Trm_NotCalled
     m.presolve_data = nothing
     m.solver = nothing
     m.solution = nothing
@@ -69,9 +71,9 @@ function optimize!(model::Model{Tv}) where{Tv}
     # TODO: presolve flag
     model.presolve_data = PresolveData(model.pbdata)
     st = presolve!(model.presolve_data)
+    model.status = st
 
     # Check presolve status
-    st = model.presolve_data.status
     if st == Trm_Optimal || st == Trm_PrimalInfeasible || st == Trm_DualInfeasible || st == Trm_PrimalDualInfeasible
         @info "Presolve solved the problem"
         
@@ -109,6 +111,8 @@ function optimize!(model::Model{Tv}) where{Tv}
     sol_outer = Solution{Tv}(model.pbdata.ncon, model.pbdata.nvar)
     postsolve!(sol_outer, sol_inner, model.presolve_data)
     model.solution = sol_outer
+
+    model.status = model.solver.solver_status
 
     # Done.
     return nothing

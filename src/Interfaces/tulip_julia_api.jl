@@ -50,6 +50,15 @@ Set the `ModelName` attribute in `model`
 set_attribute(m::Model, ::ModelName, name::String) = (m.pbdata.name = name; return nothing)
 
 """
+    get_attribute(model::Model, ::Status)
+
+Query the `Status` attribute from `model`
+"""
+function get_attribute(m::Model, ::Status)
+    return m.status
+end
+
+"""
     set_attribute(m::Model{Tv}, ::VariableLowerBound, j::Int, lb::Tv)
 
 Set the lower bound of variable `j` in model `m` to `lb`.
