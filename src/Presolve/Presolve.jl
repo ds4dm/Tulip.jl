@@ -243,12 +243,13 @@ function extract_reduced_problem!(dat::PresolveData{Tv}) where{Tv<:Real}
 
     # Compute norm of each row and column
     # TODO: use a parameter p and do norm(.., p)
+    p = 2
     for (i, row) in enumerate(pb.arows)
-        r = norm(row.nzval, Inf)
+        r = norm(row.nzval, p)
         rscale[i] = r > zero(Tv) ? r : one(Tv)
     end
     for (j, col) in enumerate(pb.acols)
-        r = norm(col.nzval, Inf)
+        r = norm(col.nzval, p)
         cscale[j] = r > zero(Tv) ? r : one(Tv)
     end
 
@@ -278,7 +279,7 @@ function extract_reduced_problem!(dat::PresolveData{Tv}) where{Tv<:Real}
     end
 
     # Record scaling
-    @info "Scaling info" extrema(rscale) extrema(cscale)
+    @debug "Scaling info" extrema(rscale) extrema(cscale)
     dat.row_scaling = rscale
     dat.col_scaling = cscale
 
@@ -354,8 +355,13 @@ end
 
 Perform pre-solve.
 """
-function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
+function presolve!(
+    lp::PresolveData{Tv};
+    OutputLevel::Int=0
+) where{Tv<:Real}
     tstart = time()
+
+    nz0 = sum(lp.nzrow)
 
     # TODO: check bound consistency on all rows/columns
     st = bounds_consistency_checks!(lp)
@@ -379,7 +385,7 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
     while lp.updated && lp.status == Trm_Unknown
         npasses += 1
         lp.updated = false
-        @info "Presolve pass $npasses" lp.nrow lp.ncol
+        @debug "Presolve pass $npasses" lp.nrow lp.ncol
 
         bounds_consistency_checks!(lp)
         lp.status == Trm_Unknown || return lp.status
@@ -417,7 +423,7 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
 
     remove_empty_columns!(lp)
 
-    @info("Presolved model stats:",
+    @debug("Presolved problem info",
         lp.pb0.ncon, lp.nrow,
         lp.pb0.nvar, lp.ncol,
         sum(lp.nzcol[lp.colflag]), sum(lp.nzrow[lp.rowflag])
@@ -444,7 +450,14 @@ function presolve!(lp::PresolveData{Tv}) where{Tv<:Real}
     # TODO: extract reduced problem (?)
 
     # Done.
-    @info "Presolve time "*@sprintf("%.2fs", time() - tstart)
+    if OutputLevel > 0
+        nz = sum(lp.nzrow[lp.rowflag])
+        @printf "\nReduced problem info\n"
+        @printf "  Constraints : %d  (removed %d)\n" lp.nrow (lp.pb0.ncon - lp.nrow)
+        @printf "  Variables   : %d  (removed %d)\n" lp.ncol (lp.pb0.nvar - lp.ncol)
+        @printf "  Non-zeros   : %d  (removed %d)\n" nz (nz0 - nz)
+        @printf "Presolve time : %.3fs\n\n" (time() - tstart)
+    end
     return lp.status
 end
 
@@ -686,8 +699,7 @@ function remove_dominated_columns!(lp::PresolveData{Tv}) where{Tv}
             end
         end
 
-        # TODO: dual feasibility check
-        lp.ly[i] <= lp.uy[i] || @warn "Inconsistent dual bounds for row $j: [$(lp.ly[i]), $(lp.uy[i])]"
+        # TODO: dual feasibility check (?)
     end
 
     for (j, flag) in enumerate(lp.colflag)

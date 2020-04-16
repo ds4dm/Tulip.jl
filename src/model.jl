@@ -65,52 +65,67 @@ end
 Solve the optimization problem.
 """
 function optimize!(model::Model{Tv}) where{Tv}
-    # @info model.pbdata
     
+    # Print initial stats
+    if model.params.OutputLevel > 0
+        println("Problem info")
+        @printf "  Name        : %s\n" model.pbdata.name
+        @printf "  Constraints : %d\n" model.pbdata.ncon
+        @printf "  Variables   : %d\n" model.pbdata.nvar
+        @printf "  Non-zeros   : %d\n" sum(length.([col.nzind for col in model.pbdata.acols]))
+    end
+    
+    pb_ = model.pbdata
     # Presolve
-    # TODO: presolve flag
-    model.presolve_data = PresolveData(model.pbdata)
-    st = presolve!(model.presolve_data)
-    model.status = st
+    # TODO: improve the if-else
+    if model.params.Presolve > 0
+        model.presolve_data = PresolveData(model.pbdata)
+        st = presolve!(model.presolve_data,
+            OutputLevel=model.params.OutputLevel
+        )
+        model.status = st
 
-    # Check presolve status
-    if st == Trm_Optimal || st == Trm_PrimalInfeasible || st == Trm_DualInfeasible || st == Trm_PrimalDualInfeasible
-        @info "Presolve solved the problem"
-        
-        # Perform post-solve
-        sol0 = Solution{Tv}(model.pbdata.ncon, model.pbdata.nvar)
-        postsolve!(sol0, model.presolve_data.solution, model.presolve_data)
-        model.solution = sol0
+        # Check presolve status
+        if st == Trm_Optimal || st == Trm_PrimalInfeasible || st == Trm_DualInfeasible || st == Trm_PrimalDualInfeasible
+            @info "Presolve solved the problem"
+            
+            # Perform post-solve
+            sol0 = Solution{Tv}(model.pbdata.ncon, model.pbdata.nvar)
+            postsolve!(sol0, model.presolve_data.solution, model.presolve_data)
+            model.solution = sol0
 
-        # Book-keeping
-        # TODO: have a ModelStatus that indicates that model was solved by presolve
-        model.solver = nothing
+            # Book-keeping
+            # TODO: have a ModelStatus that indicates that model was solved by presolve
+            model.solver = nothing
 
-        # Done.
-        return
+            # Done.
+            return
+        end
+
+        # Presolve was not able to solve the problem
+        extract_reduced_problem!(model.presolve_data)
+        pb_ = model.presolve_data.pb_red
     end
 
-    # Presolve was not able to solve the problem
-    extract_reduced_problem!(model.presolve_data)
-    presolved_problem = model.presolve_data.pb_red
-
-    # Instantiate solver
-    model.solver = HSDSolver{Tv}(model.params, presolved_problem)
+    # Instantiate the IPM solver
+    model.solver = HSDSolver{Tv}(model.params, pb_)
 
     # Solve the problem
     # TODO: add a try-catch for error handling
     optimize!(model.solver, model.params)
 
-    # TODO: check solver's status
-
-    # Recover solution in presolve space
-    sol_inner = Solution{Tv}(presolved_problem.ncon, presolved_problem.nvar)
-    _extract_solution!(sol_inner, presolved_problem, model.solver)
+    # Recover solution in original space
+    sol_inner = Solution{Tv}(pb_.ncon, pb_.nvar)
+    _extract_solution!(sol_inner, pb_, model.solver)
 
     # Post-solve
-    sol_outer = Solution{Tv}(model.pbdata.ncon, model.pbdata.nvar)
-    postsolve!(sol_outer, sol_inner, model.presolve_data)
-    model.solution = sol_outer
+    if model.params.Presolve > 0
+        sol_outer = Solution{Tv}(model.pbdata.ncon, model.pbdata.nvar)
+        postsolve!(sol_outer, sol_inner, model.presolve_data)
+        model.solution = sol_outer
+    else
+        model.solution = sol_inner
+    end
 
     model.status = model.solver.solver_status
 
