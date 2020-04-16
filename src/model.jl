@@ -68,7 +68,7 @@ function optimize!(model::Model{Tv}) where{Tv}
     
     # Print initial stats
     if model.params.OutputLevel > 0
-        println("Problem info")
+        @printf "\nProblem info\n"
         @printf "  Name        : %s\n" model.pbdata.name
         @printf "  Constraints : %d\n" model.pbdata.ncon
         @printf "  Variables   : %d\n" model.pbdata.nvar
@@ -80,14 +80,23 @@ function optimize!(model::Model{Tv}) where{Tv}
     # TODO: improve the if-else
     if model.params.Presolve > 0
         model.presolve_data = PresolveData(model.pbdata)
-        st = presolve!(model.presolve_data,
-            OutputLevel=model.params.OutputLevel
-        )
+        t_ = @elapsed st = presolve!(model.presolve_data)
         model.status = st
+
+        if model.params.OutputLevel > 0
+            ps = model.presolve_data
+            nz0 = mapreduce(col -> length(col.nzind), +, model.pbdata.acols)
+            nz = sum(ps.nzrow[ps.rowflag])
+            @printf "\nReduced problem info\n"
+            @printf "  Constraints : %d  (removed %d)\n" ps.nrow (ps.pb0.ncon - ps.nrow)
+            @printf "  Variables   : %d  (removed %d)\n" ps.ncol (ps.pb0.nvar - ps.ncol)
+            @printf "  Non-zeros   : %d  (removed %d)\n" nz (nz0 - nz)
+            @printf "Presolve time : %.3fs\n" t_
+        end
 
         # Check presolve status
         if st == Trm_Optimal || st == Trm_PrimalInfeasible || st == Trm_DualInfeasible || st == Trm_PrimalDualInfeasible
-            @info "Presolve solved the problem"
+            model.params.OutputLevel > 0 && println("Presolve solved the problem.")
             
             # Perform post-solve
             sol0 = Solution{Tv}(model.pbdata.ncon, model.pbdata.nvar)

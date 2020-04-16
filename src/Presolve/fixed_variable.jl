@@ -5,48 +5,48 @@ struct FixedVariable{Tv} <: PresolveTransformation{Tv}
     col::Col{Tv}  # current column
 end
 
-function remove_fixed_variable!(lp::PresolveData, j::Int)
-    lp.colflag[j] || return nothing  # Column was already removed
+function remove_fixed_variable!(ps::PresolveData, j::Int)
+    ps.colflag[j] || return nothing  # Column was already removed
     
     # Check bounds
-    lb, ub = lp.lcol[j], lp.ucol[j]
+    lb, ub = ps.lcol[j], ps.ucol[j]
 
     # TODO: use tolerance
     if lb == ub
         @debug "Fix variable $j to $lb"
 
-        col = lp.pb0.acols[j]
-        cj = lp.obj[j]
+        col = ps.pb0.acols[j]
+        cj = ps.obj[j]
 
         # Remove column
-        lp.colflag[j] = false
-        lp.ncol -= 1
-        lp.updated = true
+        ps.colflag[j] = false
+        ps.ncol -= 1
+        ps.updated = true
 
         # TODO: make this more efficient
-        push!(lp.ops, FixedVariable(j, lb, cj, Col(
-            [i for i in col.nzind if lp.rowflag[i]],
-            [aij for (i, aij) in zip(col.nzind, col.nzval) if lp.rowflag[i]]
+        push!(ps.ops, FixedVariable(j, lb, cj, Col(
+            [i for i in col.nzind if ps.rowflag[i]],
+            [aij for (i, aij) in zip(col.nzind, col.nzval) if ps.rowflag[i]]
         )))
 
         # Update objective constant
-        lp.obj0 += cj * lb
+        ps.obj0 += cj * lb
 
         # Update rows
         for (i, aij) in zip(col.nzind, col.nzval)
-            lp.rowflag[i] || continue  # This row is no longer in the problem
+            ps.rowflag[i] || continue  # This row is no longer in the problem
 
             # Update row bounds
-            lp.lrow[i] -= aij * lb
-            lp.urow[i] -= aij * lb
+            ps.lrow[i] -= aij * lb
+            ps.urow[i] -= aij * lb
 
-            lp.nzrow[i] -= 1
+            ps.nzrow[i] -= 1
 
             # Check row
-            if lp.nzrow[i] == 0
-                remove_empty_row!(lp, i)
-            elseif lp.nzrow == 1
-                push!(lp.row_singletons, i)
+            if ps.nzrow[i] == 0
+                remove_empty_row!(ps, i)
+            elseif ps.nzrow == 1
+                push!(ps.row_singletons, i)
             end
         end  # row update
     end

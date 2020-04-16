@@ -8,18 +8,18 @@ struct FreeColumnSingleton{Tv} <: PresolveTransformation{Tv}
     row::Row{Tv}
 end
 
-function remove_free_column_singleton!(lp::PresolveData{Tv}, j::Int) where{Tv}
+function remove_free_column_singleton!(ps::PresolveData{Tv}, j::Int) where{Tv}
 
-    lp.colflag[j] && lp.nzcol[j] == 1 || return nothing  # only column singletons
+    ps.colflag[j] && ps.nzcol[j] == 1 || return nothing  # only column singletons
 
-    col = lp.pb0.acols[j]
+    col = ps.pb0.acols[j]
 
     # Find non-zero index
     # TODO: put this in a function
     nz = 0
     i, aij = 0, zero(Tv)
     for (i_, a_) in zip(col.nzind, col.nzval)
-        if lp.rowflag[i_]
+        if ps.rowflag[i_]
             nz += 1; nz <= 1 || break
 
             i = i_
@@ -34,24 +34,24 @@ function remove_free_column_singleton!(lp::PresolveData{Tv}, j::Int) where{Tv}
         return nothing  # column is actually empty
     end
 
-    row = lp.pb0.arows[i]
-    lr, ur = lp.lrow[i], lp.urow[i]
+    row = ps.pb0.arows[i]
+    lr, ur = ps.lrow[i], ps.urow[i]
 
     # Detect if xj is implied free
-    l, u = lp.lcol[j], lp.ucol[j]
+    l, u = ps.lcol[j], ps.ucol[j]
     if isfinite(l) || isfinite(u)
         # Not a free variable, compute implied bounds
         if aij > zero(Tv)
             l_, u_ = lr, ur
             for (k, aik) in zip(row.nzind, row.nzval)
-                (lp.colflag[k] && k != j) || continue
+                (ps.colflag[k] && k != j) || continue
                 # Update bounds
                 if aik > 0
-                    l_ -= aik * lp.ucol[k]
-                    u_ -= aik * lp.lcol[k]
+                    l_ -= aik * ps.ucol[k]
+                    u_ -= aik * ps.lcol[k]
                 else
-                    l_ -= aik * lp.lcol[k]
-                    u_ -= aik * lp.ucol[k]
+                    l_ -= aik * ps.lcol[k]
+                    u_ -= aik * ps.ucol[k]
                 end
             end
             l_ /= aij
@@ -59,14 +59,14 @@ function remove_free_column_singleton!(lp::PresolveData{Tv}, j::Int) where{Tv}
         else
             l_, u_ = ur, lr
             for (k, aik) in zip(row.nzind, row.nzval)
-                (lp.colflag[k] && k != j) || continue
+                (ps.colflag[k] && k != j) || continue
                 # Update bounds
                 if aik > 0
-                    l_ -= aik * lp.lcol[k]
-                    u_ -= aik * lp.ucol[k]
+                    l_ -= aik * ps.lcol[k]
+                    u_ -= aik * ps.ucol[k]
                 else
-                    l_ -= aik * lp.ucol[k]
-                    u_ -= aik * lp.lcol[k]
+                    l_ -= aik * ps.ucol[k]
+                    u_ -= aik * ps.lcol[k]
                 end
             end
             l_ /= aij
@@ -81,29 +81,29 @@ function remove_free_column_singleton!(lp::PresolveData{Tv}, j::Int) where{Tv}
 
     # Remove (implied) free column
     @debug "Removing (implied) free column singleton $j"
-    y = lp.obj[j] / aij  # dual of row i
+    y = ps.obj[j] / aij  # dual of row i
 
     # Update objective
-    lp.obj0 += (y >= zero(Tv)) ? y * lr : y * ur
+    ps.obj0 += (y >= zero(Tv)) ? y * lr : y * ur
     row_ = Row{Tv}(Int[], Tv[])
     for (j_, aij_) in zip(row.nzind, row.nzval)
-        lp.colflag[j_] && (j_ != j) || continue
+        ps.colflag[j_] && (j_ != j) || continue
 
         push!(row_.nzind, j_)
         push!(row_.nzval, aij_)
-        lp.obj[j_] -= y * aij_
+        ps.obj[j_] -= y * aij_
 
         # Update number of non-zeros in column
-        lp.nzcol[j_] -= 1
+        ps.nzcol[j_] -= 1
     end
 
     # Book-keeping
-    push!(lp.ops, FreeColumnSingleton(i, j, lr, ur, aij, y, row_))
-    lp.rowflag[i] = false  # remove row
-    lp.colflag[j] = false  # remove column
-    lp.nrow -= 1
-    lp.ncol -= 1
-    lp.updated = true
+    push!(ps.ops, FreeColumnSingleton(i, j, lr, ur, aij, y, row_))
+    ps.rowflag[i] = false  # remove row
+    ps.colflag[j] = false  # remove column
+    ps.nrow -= 1
+    ps.ncol -= 1
+    ps.updated = true
 
     return nothing
 end

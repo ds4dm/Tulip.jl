@@ -5,106 +5,106 @@ struct DominatedColumn{Tv} <: PresolveTransformation{Tv}
     col::Col{Tv}  # Column
 end
 
-function remove_dominated_column!(lp::PresolveData{Tv}, j::Int; tol::Tv=100*sqrt(eps(Tv))) where{Tv}
-    lp.colflag[j] || return nothing
+function remove_dominated_column!(ps::PresolveData{Tv}, j::Int; tol::Tv=100*sqrt(eps(Tv))) where{Tv}
+    ps.colflag[j] || return nothing
 
     # Compute implied bounds on reduced cost: `ls ≤ s ≤ us`
     ls = us = zero(Tv)
-    col = lp.pb0.acols[j]
+    col = ps.pb0.acols[j]
     for (i, aij) in zip(col.nzind, col.nzval)
-        (lp.rowflag[i] && !iszero(aij)) || continue
+        (ps.rowflag[i] && !iszero(aij)) || continue
 
-        ls += aij * ( (aij >= zero(Tv)) ? lp.ly[i] : lp.uy[i] )
-        us += aij * ( (aij >= zero(Tv)) ? lp.uy[i] : lp.ly[i] )
+        ls += aij * ( (aij >= zero(Tv)) ? ps.ly[i] : ps.uy[i] )
+        us += aij * ( (aij >= zero(Tv)) ? ps.uy[i] : ps.ly[i] )
     end
 
     # Check if column is dominated
-    cj = lp.obj[j]
+    cj = ps.obj[j]
     if cj - us > tol
         # Reduced cost is always positive => fix to lower bound (or problem is unbounded)
-        lb = lp.lcol[j]
+        lb = ps.lcol[j]
         @debug "Fixing dominated column $j to its lower bound $lb"
 
         if !isfinite(lb)
             # Problem is dual infeasible
             @debug "Column $j is (lower) unbounded"
-            lp.status = Trm_DualInfeasible
-            lp.updated = true
+            ps.status = Trm_DualInfeasible
+            ps.updated = true
 
             # Resize problem
-            compute_index_mapping!(lp)
-            resize!(lp.solution, lp.nrow, lp.ncol)
-            lp.solution.x .= zero(Tv)
-            lp.solution.y_lower .= zero(Tv)
-            lp.solution.y_upper .= zero(Tv)
-            lp.solution.s_lower .= zero(Tv)
-            lp.solution.s_upper .= zero(Tv)
+            compute_index_mapping!(ps)
+            resize!(ps.solution, ps.nrow, ps.ncol)
+            ps.solution.x .= zero(Tv)
+            ps.solution.y_lower .= zero(Tv)
+            ps.solution.y_upper .= zero(Tv)
+            ps.solution.s_lower .= zero(Tv)
+            ps.solution.s_upper .= zero(Tv)
 
             # Unbounded ray: xj = -1
-            lp.solution.primal_status = Sln_InfeasibilityCertificate
-            lp.solution.dual_status = Sln_Unknown
-            lp.solution.is_primal_ray = true
-            lp.solution.is_dual_ray = false
-            lp.solution.z_primal = lp.solution.z_dual = -Tv(Inf)
-            j_ = lp.new_var_idx[j]
-            lp.solution.x[j_] = -one(Tv)
+            ps.solution.primal_status = Sln_InfeasibilityCertificate
+            ps.solution.dual_status = Sln_Unknown
+            ps.solution.is_primal_ray = true
+            ps.solution.is_dual_ray = false
+            ps.solution.z_primal = ps.solution.z_dual = -Tv(Inf)
+            j_ = ps.new_var_idx[j]
+            ps.solution.x[j_] = -one(Tv)
 
             return nothing
         end
 
         # Update objective
-        lp.obj0 += cj * lb
+        ps.obj0 += cj * lb
 
         # Extract column and update rows
         col_ = Col{Tv}(Int[], Tv[])
         for (i, aij) in zip(col.nzind, col.nzval)
-            lp.rowflag[i] || continue
+            ps.rowflag[i] || continue
 
             push!(col_.nzind, i)
             push!(col_.nzval, aij)
 
             # Update bounds and non-zeros
-            lp.lrow[i] -= aij * lb
-            lp.urow[i] -= aij * lb
-            lp.nzrow[i] -= 1
+            ps.lrow[i] -= aij * lb
+            ps.urow[i] -= aij * lb
+            ps.nzrow[i] -= 1
 
-            lp.nzrow[i] == 1 && push!(lp.row_singletons, i)
+            ps.nzrow[i] == 1 && push!(ps.row_singletons, i)
         end
 
         # Remove variable from problem
-        push!(lp.ops, DominatedColumn(j, lb, cj, col_))
-        lp.colflag[j] = false
-        lp.ncol -= 1
-        lp.updated = true
+        push!(ps.ops, DominatedColumn(j, lb, cj, col_))
+        ps.colflag[j] = false
+        ps.ncol -= 1
+        ps.updated = true
 
     elseif cj - ls < -tol
         # Reduced cost is always negative => fix to upper bound (or problem is unbounded)
-        ub = lp.ucol[j]
+        ub = ps.ucol[j]
         
         if !isfinite(ub)
             # Problem is unbounded
             @debug "Column $j is (upper) unbounded"
 
-            lp.status = Trm_DualInfeasible
-            lp.updated = true
+            ps.status = Trm_DualInfeasible
+            ps.updated = true
 
             # Resize solution
-            compute_index_mapping!(lp)
-            resize!(lp.solution, lp.nrow, lp.ncol)
-            lp.solution.x .= zero(Tv)
-            lp.solution.y_lower .= zero(Tv)
-            lp.solution.y_upper .= zero(Tv)
-            lp.solution.s_lower .= zero(Tv)
-            lp.solution.s_upper .= zero(Tv)
+            compute_index_mapping!(ps)
+            resize!(ps.solution, ps.nrow, ps.ncol)
+            ps.solution.x .= zero(Tv)
+            ps.solution.y_lower .= zero(Tv)
+            ps.solution.y_upper .= zero(Tv)
+            ps.solution.s_lower .= zero(Tv)
+            ps.solution.s_upper .= zero(Tv)
 
             # Unbounded ray: xj = -1
-            lp.solution.primal_status = Sln_InfeasibilityCertificate
-            lp.solution.dual_status = Sln_Unknown
-            lp.solution.is_primal_ray = true
-            lp.solution.is_dual_ray = false
-            lp.solution.z_primal = lp.solution.z_dual = -Tv(Inf)
-            j_ = lp.new_var_idx[j]
-            lp.solution.x[j_] = one(Tv)
+            ps.solution.primal_status = Sln_InfeasibilityCertificate
+            ps.solution.dual_status = Sln_Unknown
+            ps.solution.is_primal_ray = true
+            ps.solution.is_dual_ray = false
+            ps.solution.z_primal = ps.solution.z_dual = -Tv(Inf)
+            j_ = ps.new_var_idx[j]
+            ps.solution.x[j_] = one(Tv)
 
             return nothing
         end
@@ -112,29 +112,29 @@ function remove_dominated_column!(lp::PresolveData{Tv}, j::Int; tol::Tv=100*sqrt
         @debug "Fixing dominated column $j to its upper bound $ub"
 
         # Update objective
-        lp.obj0 += cj * ub
+        ps.obj0 += cj * ub
 
         # Extract column and update rows
         col_ = Col{Tv}(Int[], Tv[])
         for (i, aij) in zip(col.nzind, col.nzval)
-            lp.rowflag[i] || continue
+            ps.rowflag[i] || continue
 
             push!(col_.nzind, i)
             push!(col_.nzval, aij)
 
             # Update bounds and non-zeros
-            lp.lrow[i] -= aij * ub
-            lp.urow[i] -= aij * ub
-            lp.nzrow[i] -= 1
+            ps.lrow[i] -= aij * ub
+            ps.urow[i] -= aij * ub
+            ps.nzrow[i] -= 1
 
-            lp.nzrow[i] == 1 && push!(lp.row_singletons, i)
+            ps.nzrow[i] == 1 && push!(ps.row_singletons, i)
         end
 
         # Remove variable from problem
-        push!(lp.ops, DominatedColumn(j, ub, cj, col_))
-        lp.colflag[j] = false
-        lp.ncol -= 1
-        lp.updated = true
+        push!(ps.ops, DominatedColumn(j, ub, cj, col_))
+        ps.colflag[j] = false
+        ps.ncol -= 1
+        ps.updated = true
     end
 
     return nothing

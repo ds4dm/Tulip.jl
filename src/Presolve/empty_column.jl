@@ -4,44 +4,44 @@ struct EmptyColumn{Tv} <: PresolveTransformation{Tv}
     s::Tv  # Reduced cost
 end
 
-function remove_empty_column!(lp::PresolveData{Tv}, j::Int) where{Tv}
+function remove_empty_column!(ps::PresolveData{Tv}, j::Int) where{Tv}
     # Sanity check
-    (lp.colflag[j] && (lp.nzcol[j] == 0)) || return nothing
+    (ps.colflag[j] && (ps.nzcol[j] == 0)) || return nothing
 
     # Remove column
-    lb, ub = lp.lcol[j], lp.ucol[j]
-    cj = lp.obj[j]
+    lb, ub = ps.lcol[j], ps.ucol[j]
+    cj = ps.obj[j]
     @debug "Removing empty column $j" cj lb ub
 
     if cj > zero(Tv)
         if isfinite(lb)
             # Set variable to lower bound
             # Update objective constant
-            lp.obj0 += lb * cj
-            push!(lp.ops, EmptyColumn(j, lb, cj))
+            ps.obj0 += lb * cj
+            push!(ps.ops, EmptyColumn(j, lb, cj))
         else
             # Problem is dual infeasible
             @debug "Column $j is (lower) unbounded"
-            lp.status = Trm_DualInfeasible
-            lp.updated = true
+            ps.status = Trm_DualInfeasible
+            ps.updated = true
 
             # Resize problem
-            compute_index_mapping!(lp)
-            resize!(lp.solution, lp.nrow, lp.ncol)
-            lp.solution.x .= zero(Tv)
-            lp.solution.y_lower .= zero(Tv)
-            lp.solution.y_upper .= zero(Tv)
-            lp.solution.s_lower .= zero(Tv)
-            lp.solution.s_upper .= zero(Tv)
+            compute_index_mapping!(ps)
+            resize!(ps.solution, ps.nrow, ps.ncol)
+            ps.solution.x .= zero(Tv)
+            ps.solution.y_lower .= zero(Tv)
+            ps.solution.y_upper .= zero(Tv)
+            ps.solution.s_lower .= zero(Tv)
+            ps.solution.s_upper .= zero(Tv)
 
             # Unbounded ray: xj = -1
-            lp.solution.primal_status = Sln_InfeasibilityCertificate
-            lp.solution.dual_status = Sln_Unknown
-            lp.solution.is_primal_ray = true
-            lp.solution.is_dual_ray = false
-            lp.solution.z_primal = lp.solution.z_dual = -Tv(Inf)
-            j_ = lp.new_var_idx[j]
-            lp.solution.x[j_] = -one(Tv)
+            ps.solution.primal_status = Sln_InfeasibilityCertificate
+            ps.solution.dual_status = Sln_Unknown
+            ps.solution.is_primal_ray = true
+            ps.solution.is_dual_ray = false
+            ps.solution.z_primal = ps.solution.z_dual = -Tv(Inf)
+            j_ = ps.new_var_idx[j]
+            ps.solution.x[j_] = -one(Tv)
 
             return nothing
         end
@@ -49,51 +49,51 @@ function remove_empty_column!(lp::PresolveData{Tv}, j::Int) where{Tv}
         if isfinite(ub)
             # Set variable to upper bound
             # Update objective constant
-            lp.obj0 += ub * cj
-            push!(lp.ops, EmptyColumn(j, ub, cj))
+            ps.obj0 += ub * cj
+            push!(ps.ops, EmptyColumn(j, ub, cj))
         else
             # Problem is dual infeasible
             @debug "Column $j is (upper) unbounded"
-            lp.status = Trm_DualInfeasible
-            lp.updated = true
+            ps.status = Trm_DualInfeasible
+            ps.updated = true
 
             # Resize problem
-            compute_index_mapping!(lp)
-            resize!(lp.solution, lp.nrow, lp.ncol)
-            lp.solution.x .= zero(Tv)
-            lp.solution.y_lower .= zero(Tv)
-            lp.solution.y_upper .= zero(Tv)
-            lp.solution.s_lower .= zero(Tv)
-            lp.solution.s_upper .= zero(Tv)
+            compute_index_mapping!(ps)
+            resize!(ps.solution, ps.nrow, ps.ncol)
+            ps.solution.x .= zero(Tv)
+            ps.solution.y_lower .= zero(Tv)
+            ps.solution.y_upper .= zero(Tv)
+            ps.solution.s_lower .= zero(Tv)
+            ps.solution.s_upper .= zero(Tv)
 
             # Unbounded ray: xj = 1
-            lp.solution.primal_status = Sln_InfeasibilityCertificate
-            lp.solution.dual_status = Sln_Unknown
-            lp.solution.is_primal_ray = true
-            lp.solution.is_dual_ray = false
-            lp.solution.z_primal = lp.solution.z_dual = -Tv(Inf)
-            j_ = lp.new_var_idx[j]
-            lp.solution.x[j_] = one(Tv)
+            ps.solution.primal_status = Sln_InfeasibilityCertificate
+            ps.solution.dual_status = Sln_Unknown
+            ps.solution.is_primal_ray = true
+            ps.solution.is_dual_ray = false
+            ps.solution.z_primal = ps.solution.z_dual = -Tv(Inf)
+            j_ = ps.new_var_idx[j]
+            ps.solution.x[j_] = one(Tv)
             
             return
         end
     else
         # Any feasible value works
         if isfinite(lb)
-            push!(lp.ops, EmptyColumn(j, lb, zero(Tv)))
+            push!(ps.ops, EmptyColumn(j, lb, zero(Tv)))
         elseif isfinite(ub)
-            push!(lp.ops, EmptyColumn(j, ub, zero(Tv)))
+            push!(ps.ops, EmptyColumn(j, ub, zero(Tv)))
         else
             # Free variable with zero coefficient and empty column
-            push!(lp.ops, EmptyColumn(j, zero(Tv), zero(Tv)))
+            push!(ps.ops, EmptyColumn(j, zero(Tv), zero(Tv)))
         end
 
     end
 
     # Book=keeping
-    lp.colflag[j] = false
-    lp.updated = true
-    lp.ncol -= 1
+    ps.colflag[j] = false
+    ps.updated = true
+    ps.ncol -= 1
     return nothing
 end
 

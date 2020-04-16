@@ -466,17 +466,16 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
 
     # Print information about the problem
     if params.OutputLevel > 0
-        @printf "Optimizer info\n"
+        @printf "\nOptimizer info\n"
         @printf "Linear solver options\n"
         @printf "  %-12s : %s\n" "Precision" "$Tv"
         @printf "  %-12s : %s\n" "Backend" TLA.backend(hsd.ls)
         @printf "  %-12s : %s\n" "System" TLA.linear_system(hsd.ls)
-        @printf "\n"
     end
 
     # IPM LOG
     if params.OutputLevel > 0
-        @printf "%4s  %14s  %14s  %8s %8s %8s  %7s  %4s\n" "Itn" "PObj" "DObj" "PFeas" "DFeas" "GFeas" "Mu" "Time"
+        @printf "\n%4s  %14s  %14s  %8s %8s %8s  %7s  %4s\n" "Itn" "PObj" "DObj" "PFeas" "DFeas" "GFeas" "Mu" "Time"
     end
 
     # TODO: set starting point

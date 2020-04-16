@@ -11,39 +11,39 @@ struct DominatedRow{Tv} <: PresolveTransformation{Tv}
     i::Int  # Row index
 end
 
-function remove_forcing_row!(lp::PresolveData{Tv}, i::Int) where{Tv}
-    lp.rowflag[i] || return
-    lp.nzrow[i] == 1 && return  # skip row singletons 
+function remove_forcing_row!(ps::PresolveData{Tv}, i::Int) where{Tv}
+    ps.rowflag[i] || return
+    ps.nzrow[i] == 1 && return  # skip row singletons 
 
     # Implied row bounds
-    row = lp.pb0.arows[i]
+    row = ps.pb0.arows[i]
     l_ = u_ = zero(Tv)
     for (j, aij) in zip(row.nzind, row.nzval)
-        lp.colflag[j] || continue
+        ps.colflag[j] || continue
         if aij < zero(Tv)
-            l_ += aij * lp.ucol[j]
-            u_ += aij * lp.lcol[j]
+            l_ += aij * ps.ucol[j]
+            u_ += aij * ps.lcol[j]
         else
-            l_ += aij * lp.lcol[j]
-            u_ += aij * lp.ucol[j]
+            l_ += aij * ps.lcol[j]
+            u_ += aij * ps.ucol[j]
         end
 
         isfinite(l_) || isfinite(u_) || break  # infinite bounds
     end
 
-    l, u = lp.lrow[i], lp.urow[i]
+    l, u = ps.lrow[i], ps.urow[i]
     if l <= l_ <= u_ <= u
         # Constraint is dominated
         @debug "Row $i is dominated"
-        lp.rowflag[i] = false
-        lp.updated = true
-        lp.nrow -= 1
+        ps.rowflag[i] = false
+        ps.updated = true
+        ps.nrow -= 1
 
-        push!(lp.ops, DominatedRow{Tv}(i))
+        push!(ps.ops, DominatedRow{Tv}(i))
         # Update column non-zeros
         for (j, aij) in zip(row.nzind, row.nzval)
-            lp.colflag[j] || continue
-            lp.nzcol[j] -= !iszero(aij)
+            ps.colflag[j] || continue
+            ps.nzcol[j] -= !iszero(aij)
         end
 
     elseif l_ == u
@@ -51,16 +51,16 @@ function remove_forcing_row!(lp::PresolveData{Tv}, i::Int) where{Tv}
         @debug "Row $i is forced to its upper bound"  (l, u) (l_, u_)
         # Record tranformation
         row_ = Row(
-            [  j for (j, aij) in zip(row.nzind, row.nzval) if lp.colflag[j]],
-            [aij for (j, aij) in zip(row.nzind, row.nzval) if lp.colflag[j]]
+            [  j for (j, aij) in zip(row.nzind, row.nzval) if ps.colflag[j]],
+            [aij for (j, aij) in zip(row.nzind, row.nzval) if ps.colflag[j]]
         )
         cols_ = Col{Tv}[]
         xs = Tv[]
         cs = Tv[]
         for (j, aij) in zip(row.nzind, row.nzval)
-            lp.colflag[j] || continue
+            ps.colflag[j] || continue
             # Extract column j
-            col = lp.pb0.acols[j]
+            col = ps.pb0.acols[j]
 
             col_ = Col{Tv}(Int[], Tv[])
 
@@ -68,61 +68,61 @@ function remove_forcing_row!(lp::PresolveData{Tv}, i::Int) where{Tv}
             # TODO: put this in a function and mutualize with fixed variables
             if aij > 0
                 # Set xj to its lower bound
-                xj_ = lp.lcol[j]
+                xj_ = ps.lcol[j]
             else
                 # Set xj to its upper bound
-                xj_ = lp.ucol[j]
+                xj_ = ps.ucol[j]
             end
 
             for (k, akj) in zip(col.nzind, col.nzval)
-                lp.rowflag[k] || continue
+                ps.rowflag[k] || continue
 
                 # Update column j
                 push!(col_.nzind, k)
                 push!(col_.nzval, akj)
 
                 # Update row k
-                lp.nzrow[k] -= 1
-                lp.lrow[k] -= akj * xj_
-                lp.urow[k] -= akj * xj_
+                ps.nzrow[k] -= 1
+                ps.lrow[k] -= akj * xj_
+                ps.urow[k] -= akj * xj_
 
-                # lp.nzrow[k] == 0 && remove_empty_row!(lp, k)
-                lp.nzrow[k] == 1 && push!(lp.row_singletons, k)
+                # ps.nzrow[k] == 0 && remove_empty_row!(ps, k)
+                ps.nzrow[k] == 1 && push!(ps.row_singletons, k)
             end
             
-            cj = lp.obj[j]
+            cj = ps.obj[j]
             push!(cols_, col_)
             push!(xs, xj_)
             push!(cs, cj)
 
             # Remove variable from problem
-            lp.colflag[j] = false
-            lp.ncol -= 1
+            ps.colflag[j] = false
+            ps.ncol -= 1
         end
 
         # Record transformation
-        push!(lp.ops, ForcingRow(i, true, row_, cols_, xs, cs))
+        push!(ps.ops, ForcingRow(i, true, row_, cols_, xs, cs))
 
         # Book-keeping
-        lp.rowflag[i] = false
-        lp.nrow -= 1
-        lp.updated = true
+        ps.rowflag[i] = false
+        ps.nrow -= 1
+        ps.updated = true
 
     elseif u_ == l
         # Row is forced to its lower bound
         @debug "Row $i is forced to its lower bound" (l, u) (l_, u_)
         # Record tranformation
         row_ = Row(
-            [  j for (j, aij) in zip(row.nzind, row.nzval) if lp.colflag[j]],
-            [aij for (j, aij) in zip(row.nzind, row.nzval) if lp.colflag[j]]
+            [  j for (j, aij) in zip(row.nzind, row.nzval) if ps.colflag[j]],
+            [aij for (j, aij) in zip(row.nzind, row.nzval) if ps.colflag[j]]
         )
         cols_ = Col{Tv}[]
         xs = Tv[]
         cs = Tv[]
         for (j, aij) in zip(row.nzind, row.nzval)
-            lp.colflag[j] || continue
+            ps.colflag[j] || continue
             # Extract column j
-            col = lp.pb0.acols[j]
+            col = ps.pb0.acols[j]
 
             col_ = Col{Tv}(Int[], Tv[])
 
@@ -130,45 +130,45 @@ function remove_forcing_row!(lp::PresolveData{Tv}, i::Int) where{Tv}
             # TODO: put this in a function and mutualize with fixed variables
             if aij > 0
                 # Set xj to its upper bound
-                xj_ = lp.ucol[j]
+                xj_ = ps.ucol[j]
             else
                 # Set xj to its lower bound
-                xj_ = lp.lcol[j]
+                xj_ = ps.lcol[j]
             end
 
             for (k, akj) in zip(col.nzind, col.nzval)
-                lp.rowflag[k] || continue
+                ps.rowflag[k] || continue
 
                 # Update column j
                 push!(col_.nzind, k)
                 push!(col_.nzval, akj)
 
                 # Update row k
-                lp.nzrow[k] -= 1
-                lp.lrow[k] -= akj * xj_
-                lp.urow[k] -= akj * xj_
+                ps.nzrow[k] -= 1
+                ps.lrow[k] -= akj * xj_
+                ps.urow[k] -= akj * xj_
 
-                # lp.nzrow[k] == 0 && remove_empty_row!(lp, k)
-                lp.nzrow[k] == 1 && push!(lp.row_singletons, k)
+                # ps.nzrow[k] == 0 && remove_empty_row!(ps, k)
+                ps.nzrow[k] == 1 && push!(ps.row_singletons, k)
             end
             
-            cj = lp.obj[j]
+            cj = ps.obj[j]
             push!(cols_, col_)
             push!(xs, xj_)
             push!(cs, cj)
 
             # Remove variable from problem
-            lp.colflag[j] = false
-            lp.ncol -= 1
+            ps.colflag[j] = false
+            ps.ncol -= 1
         end
 
         # Record transformation
-        push!(lp.ops, ForcingRow(i, false, row_, cols_, xs, cs))
+        push!(ps.ops, ForcingRow(i, false, row_, cols_, xs, cs))
 
         # Book-keeping
-        lp.rowflag[i] = false
-        lp.nrow -= 1
-        lp.updated = true
+        ps.rowflag[i] = false
+        ps.nrow -= 1
+        ps.updated = true
     end
     # TODO: handle infeasible row cases
 
