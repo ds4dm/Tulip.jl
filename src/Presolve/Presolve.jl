@@ -21,7 +21,7 @@ whose dual writes
                y⁺,     y⁻,     s⁺,     s⁻ ⩾ 0
 ```
 """
-mutable struct PresolveData{Tv<:Real}
+mutable struct PresolveData{Tv}
     updated::Bool
     status::TerminationStatus
 
