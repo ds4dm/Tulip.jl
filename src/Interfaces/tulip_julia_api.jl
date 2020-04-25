@@ -59,6 +59,19 @@ function get_attribute(m::Model, ::Status)
 end
 
 """
+    get_attribute(model::Model, ::BarrierIterations)
+
+Query the `BarrierIterations` attribute from `model`
+"""
+function get_attribute(m::Model, ::BarrierIterations)
+    if isnothing(m.solver)
+        return 0
+    else
+        return m.solver.niter
+    end
+end
+
+"""
     set_attribute(m::Model{Tv}, ::VariableLowerBound, j::Int, lb::Tv)
 
 Set the lower bound of variable `j` in model `m` to `lb`.
