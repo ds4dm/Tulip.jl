@@ -50,6 +50,28 @@ Set the `ModelName` attribute in `model`
 set_attribute(m::Model, ::ModelName, name::String) = (m.pbdata.name = name; return nothing)
 
 """
+    get_attribute(model::Model, ::Status)
+
+Query the `Status` attribute from `model`
+"""
+function get_attribute(m::Model, ::Status)
+    return m.status
+end
+
+"""
+    get_attribute(model::Model, ::BarrierIterations)
+
+Query the `BarrierIterations` attribute from `model`
+"""
+function get_attribute(m::Model, ::BarrierIterations)
+    if isnothing(m.solver)
+        return 0
+    else
+        return m.solver.niter
+    end
+end
+
+"""
     set_attribute(m::Model{Tv}, ::VariableLowerBound, j::Int, lb::Tv)
 
 Set the lower bound of variable `j` in model `m` to `lb`.
@@ -192,10 +214,10 @@ set_attribute(m::Model{Tv}, ::ObjectiveConstant, obj0::Tv) where{Tv} = (m.pbdata
 Query the `ObjectiveValue` attribute from `model`
 """
 function get_attribute(m::Model{Tv}, ::ObjectiveValue) where{Tv}
-    if isnothing(m.solver)
-        error("No solver is attached to the model")
+    if isnothing(m.solution)
+        error("Model has no solution")
     else
-        z = m.solver.primal_bound_scaled
+        z = m.solution.z_primal
         return m.pbdata.objsense ? z : -z
     end
 end
@@ -206,10 +228,10 @@ end
 Query the `DualObjectiveValue` attribute from `model`
 """
 function get_attribute(m::Model{Tv}, ::DualObjectiveValue) where{Tv}
-    if isnothing(m.solver)
-        error("No solver is attached to the model")
+    if isnothing(m.solution)
+        error("Model has no solution")
     else
-        z = m.solver.dual_bound_scaled
+        z = m.solution.z_dual
         return m.pbdata.objsense ? z : -z
     end
 end

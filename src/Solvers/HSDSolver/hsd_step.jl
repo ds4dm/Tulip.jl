@@ -51,13 +51,14 @@ function compute_step!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Rea
             update_linear_solver!(hsd.ls, θ, hsd.regP, hsd.regD)
             break
         catch err
-            isa(err, PosDefException) || rethrow(err)
+            isa(err, PosDefException) || isa(err, ZeroPivotException) || rethrow(err)
 
             # Increase regularization
             hsd.regD .*= 100
             hsd.regP .*= 100
             hsd.regG  *= 100
             nbump += 1
+            @warn "Increase regularizations to $(hsd.regG)"
         end
     end
     nbump < 3 || throw(PosDefException(0))  # factorization could not be saved

@@ -11,7 +11,9 @@ const MOI = MathOptInterface
 Convert a Tulip `TerminationStatus` into a `MOI.TerminationStatusCode`.
 """
 function MOITerminationStatus(st::TerminationStatus)::MOI.TerminationStatusCode
-    if st == Trm_Optimal
+    if st == Trm_NotCalled
+        return MOI.OPTIMIZE_NOT_CALLED
+    elseif st == Trm_Optimal
         return MOI.OPTIMAL
     elseif st == Trm_PrimalInfeasible
         return MOI.INFEASIBLE

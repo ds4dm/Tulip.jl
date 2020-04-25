@@ -57,4 +57,5 @@ Base.@kwdef mutable struct Parameters{Tv}
 
     # Others
     Threads::Int = 1
+    Presolve::Int = 1
 end

@@ -68,7 +68,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         hsd.uval = uval
 
         hsd.niter = 0
-        hsd.solver_status = TerminationStatus(0)
+        hsd.solver_status = Trm_Unknown
         hsd.primal_status = SolutionStatus(0)
         hsd.dual_status = SolutionStatus(0)
 
@@ -400,7 +400,7 @@ function update_solver_status!(
     A, b, c, c0, uind, uval,
     ϵp, ϵd, ϵg, ϵi
 ) where{Tv<:Real}
-    hsd.solver_status = TerminationStatus(0)
+    hsd.solver_status = Trm_Unknown
 
     ρp = max(
         res.rp_nrm / (pt.t * (oneunit(Tv) + norm(b, Inf))),
@@ -413,20 +413,20 @@ function update_solver_status!(
     if ρp <= ϵp
         hsd.primal_status = Sln_FeasiblePoint
     else
-        hsd.primal_status = Sln_InfeasiblePoint
+        hsd.primal_status = Sln_Unknown
     end
 
     if ρd <= ϵd
         hsd.dual_status = Sln_FeasiblePoint
     else
-        hsd.dual_status = Sln_InfeasiblePoint
+        hsd.dual_status = Sln_Unknown
     end
     
     # Check for optimal solution
     if ρp <= ϵp && ρd <= ϵd && ρg <= ϵg
         hsd.primal_status = Sln_Optimal
         hsd.dual_status   = Sln_Optimal
-        hsd.solver_status = TerminationStatus(1)
+        hsd.solver_status = Trm_Optimal
         return nothing
     end
     
@@ -434,7 +434,7 @@ function update_solver_status!(
     if max(norm(A*pt.x, Inf), norm(pt.x[uind] + pt.w, Inf)) * (norm(c, Inf) / max(1, norm(b, Inf))) < - ϵi * dot(c, pt.x)
         # Dual infeasible, i.e., primal unbounded
         hsd.primal_status = Sln_InfeasibilityCertificate
-        hsd.solver_status = TerminationStatus(3)
+        hsd.solver_status = Trm_DualInfeasible
         return nothing
     end
 
@@ -443,7 +443,7 @@ function update_solver_status!(
     if norm(δ, Inf) * norm(b, Inf) / (max(1, norm(c, Inf)))  < (dot(b, pt.y) - dot(uval, pt.z)) * ϵi
         # Primal infeasible
         hsd.dual_status = Sln_InfeasibilityCertificate
-        hsd.solver_status = TerminationStatus(2)
+        hsd.solver_status = Trm_PrimalInfeasible
         return nothing
     end
 
@@ -466,17 +466,16 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
 
     # Print information about the problem
     if params.OutputLevel > 0
-        @printf "Optimizer info\n"
+        @printf "\nOptimizer info\n"
         @printf "Linear solver options\n"
         @printf "  %-12s : %s\n" "Precision" "$Tv"
         @printf "  %-12s : %s\n" "Backend" TLA.backend(hsd.ls)
         @printf "  %-12s : %s\n" "System" TLA.linear_system(hsd.ls)
-        @printf "\n"
     end
 
     # IPM LOG
     if params.OutputLevel > 0
-        @printf "%4s  %14s  %14s  %8s %8s %8s  %7s  %4s\n" "Itn" "PObj" "DObj" "PFeas" "DFeas" "GFeas" "Mu" "Time"
+        @printf "\n%4s  %14s  %14s  %8s %8s %8s  %7s  %4s\n" "Itn" "PObj" "DObj" "PFeas" "DFeas" "GFeas" "Mu" "Time"
     end
 
     # TODO: set starting point
@@ -549,16 +548,16 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
         )
 
         if (
-            hsd.solver_status == TerminationStatus(1)     # Optimal
-            || hsd.solver_status == TerminationStatus(2)  # Primal infeasible
-            || hsd.solver_status == TerminationStatus(3)  # Dual infeasible
+            hsd.solver_status == Trm_Optimal
+            || hsd.solver_status == Trm_PrimalInfeasible
+            || hsd.solver_status == Trm_DualInfeasible
         )
             break
         elseif hsd.niter >= params.BarrierIterationsLimit 
-            hsd.solver_status = TerminationStatus(4)  # Iteration limit
+            hsd.solver_status = Trm_IterationLimit
             break
         elseif ttot >= params.TimeLimit
-            hsd.solver_status = TerminationStatus(5)  # Iteration limit
+            hsd.solver_status = Trm_TimeLimit
             break
         end
         

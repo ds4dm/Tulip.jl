@@ -198,11 +198,7 @@ MOI.get(m::Optimizer, ::MOI.BarrierIterations) = get_attribute(m.inner, BarrierI
 #
 # TODO: use inner query
 function MOI.get(m::Optimizer, ::MOI.TerminationStatus)
-    isa(m.inner.solver, Nothing) && return MOI.OPTIMIZE_NOT_CALLED
-
-    st = m.inner.solver.solver_status
-    
-    return MOITerminationStatus(st)
+    return MOITerminationStatus(get_attribute(m.inner, Status()))
 end
 
 #
@@ -212,7 +208,11 @@ end
 function MOI.get(m::Optimizer, attr::MOI.PrimalStatus)
     attr.N == 1 || return MOI.NO_SOLUTION
 
-    return MOISolutionStatus(m.inner.solver.primal_status)
+    if isnothing(m.inner.solution)
+        return MOI.NO_SOLUTION
+    else
+        MOISolutionStatus(m.inner.solution.primal_status)
+    end
 end
 
 #
@@ -222,5 +222,9 @@ end
 function MOI.get(m::Optimizer, attr::MOI.DualStatus)
     attr.N == 1 || return MOI.NO_SOLUTION
     
-    return MOISolutionStatus(m.inner.solver.dual_status)
+    if isnothing(m.inner.solution)
+        return MOI.NO_SOLUTION
+    else
+        MOISolutionStatus(m.inner.solution.dual_status)
+    end
 end

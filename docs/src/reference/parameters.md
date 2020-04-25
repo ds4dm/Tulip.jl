@@ -53,3 +53,4 @@ Numerical tolerances for the interior-point algorithm.
 |:----------|:------------|:--------|
 | `OutputLevel` | Controls the solver's output | `0` |
 | `Threads` | Maximum number of threads | `1` |
+| `Presolve` | Presolve (no presolve if set to ≤ 0) | `1` |
