@@ -25,8 +25,8 @@ Just install like any Julia package
 
 The recommended way of using Tulip is through [JuMP](https://github.com/JuliaOpt/JuMP.jl) and/or [MathOptInterface](https://github.com/JuliaOpt/MathOptInterface.jl) (MOI).
 
-The low-level interface is still under development and will change in the future.
-The user-exposed MOI interface is more stable.
+The low-level interface is still under development and is likely change in the future.
+The MOI interface is more stable.
 
 ### Using with JuMP
 Tulip follows the syntax convention `PackageName.Optimizer`:
@@ -35,12 +35,14 @@ Tulip follows the syntax convention `PackageName.Optimizer`:
 using JuMP
 import Tulip
 
-model = Model(with_optimizer(Tulip.Optimizer))
+model = Model(Tulip.Optimizer)
 ```
+
+Linear objectives, linear constraints and lower/upper bounds on variables are supported.
 
 ### Using with MOI
 
-The type `Tulip.Optimizer` is parametrized by the type of numerical data.
+The type `Tulip.Optimizer` is parametrized by the model's arithmetic, e.g., `Float64` or `BigFloat`.
 This allows to solve problem in higher numerical precision.
 See the documentation for more details.
 
@@ -53,6 +55,37 @@ model = Tulip.Optimizer{Float64}()   # Create a model in Float64 precision
 model = Tulip.Optimizer()            # Defaults to the above call
 model = Tulip.Optimizer{BigFloat}()  # Create a model in BigFloat precision
 ```
+
+## Solver parameters
+
+### Setting parameters
+
+When using Tulip through JuMP/MOI, parameters can be set either through MOI's generic `OptimizerAttribute`s, e.g., `MOI.TimeLimitSec` and `MOI.Silent`, or by name.
+
+* Through JuMP
+    ```julia
+    jump_model = JuMP.Model(Tulip.Optimizer)
+
+    JuMP.set_optimizer_attribute(jump_model, "BarrierIterationsLimit", 200)
+    ```
+
+* Through MOI
+    ```julia
+    moi_model = Tulip.Optimizer{Float64}()
+
+    MOI.set(moi_model, MOI.RawParameter("BarrierIterationsLimit"), 200)
+    ```
+
+* Through Tulip's API
+    ```julia
+    model = Tulip.Model{Float64}()
+
+    Tulip.set_parameter(model, "BarrierIterationsLimit", 200)
+    ```
+
+### Parameters description
+
+See the [documentation](https://ds4dm.github.io/Tulip.jl/dev/reference/parameters/).
 
 ## Citing `Tulip.jl`
 

@@ -1,7 +1,7 @@
 name = "Tulip"
 uuid = "6dd1b50a-3aae-11e9-10b5-ef983d2400fa"
 authors = ["Mathieu Tanneau <mathieu.tanneau@gmail.com>"]
-version = "0.3.0"
+version = "0.4.0"
 
 [deps]
 LDLFactorizations = "40e66cde-538c-5869-a4ad-c39174c6795b"
@@ -15,6 +15,7 @@ SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
+QPSReader = "≥ 0.1.1"
 LDLFactorizations = "^0.4"
 MathOptInterface = "~0.9.5"
 julia = "1.1"
