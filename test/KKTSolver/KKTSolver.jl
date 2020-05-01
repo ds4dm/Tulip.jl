@@ -1,4 +1,4 @@
-const TLA = TLP.TLPLinearAlgebra
+const KKT = Tulip.KKT
 
 @testset "LinearSolvers" begin
 

@@ -1,7 +1,6 @@
 module TLPLinearAlgebra
 
 using LinearAlgebra
-BlasReal = LinearAlgebra.BlasReal
 
 using SparseArrays
 
@@ -32,7 +31,5 @@ construct_matrix(
     ::Type{SparseMatrixCSC}, m::Int, n::Int,
     aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{Tv}
 ) where{Tv<:Real} = sparse(aI, aJ, aV, m, n)
-
-include("LinearSolvers/LinearSolvers.jl")
 
 end  # module

@@ -6,8 +6,8 @@
                 1 0 1 0;
                 0 1 0 1
             ])
-            ls = TLA.AbstractLinearSolver(TLA.LDLFact(), TLA.AugmentedSystem(), A)
-            TLA.run_ls_tests(A, ls)
+            ls = KKT.AbstractLinearSolver(KKT.LDLFact(), KKT.AugmentedSystem(), A)
+            KKT.run_ls_tests(A, ls)
         end
     end
 end

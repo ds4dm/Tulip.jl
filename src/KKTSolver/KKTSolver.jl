@@ -1,3 +1,11 @@
+module KKT
+
+using LinearAlgebra
+
+export AbstractLinearSolver
+
+const BlasReal = LinearAlgebra.BlasReal
+
 """
     AbstractLinearSolver{Tv}
 
@@ -119,3 +127,5 @@ AbstractLinearSolver(
     ::DefaultSystem,
     A::AbstractMatrix{Tv}
 ) where{Tv<:Real} = AbstractLinearSolver(LDLFact(), AugmentedSystem(), A)
+
+end  # module

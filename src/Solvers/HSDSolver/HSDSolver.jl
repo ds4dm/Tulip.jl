@@ -324,9 +324,6 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         A = construct_matrix(params.MatrixType, ncon, nvar, aI, aJ, aV)
 
         # TODO: setup linear solver
-
-        # TODO: log
-        # @info "Standard form problem has $ncon constraints and $nvar variables ($nupb upper-bounds)"
         
         return HSDSolver{Tv}(params, ncon, nvar, nupb, A, b, pb.objsense, c, c0, uind, uval)
     end
@@ -469,8 +466,8 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
         @printf "\nOptimizer info\n"
         @printf "Linear solver options\n"
         @printf "  %-12s : %s\n" "Precision" "$Tv"
-        @printf "  %-12s : %s\n" "Backend" TLA.backend(hsd.ls)
-        @printf "  %-12s : %s\n" "System" TLA.linear_system(hsd.ls)
+        @printf "  %-12s : %s\n" "Backend" KKT.backend(hsd.ls)
+        @printf "  %-12s : %s\n" "System" KKT.linear_system(hsd.ls)
     end
 
     # IPM LOG

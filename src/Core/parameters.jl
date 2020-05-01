@@ -46,8 +46,8 @@ Base.@kwdef mutable struct Parameters{Tv}
     =#
     KKTBackend::Int = -1
     KKTSystem::Int = -1
-    LinearSolverBackend::TLA.LSBackend = TLA.DefaultBackend()
-    LinearSolverSystem::TLA.LinearSystem = TLA.DefaultSystem()
+    LinearSolverBackend::KKT.LSBackend = KKT.DefaultBackend()
+    LinearSolverSystem::KKT.LinearSystem = KKT.DefaultSystem()
     # TODO: put regularizations here (?)
     # TODO: iterative refinement
 
