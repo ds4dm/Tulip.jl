@@ -16,8 +16,8 @@ function run_ls_tests(
     @testset "Required methods" begin
         Tls = typeof(ls)
         V = Vector{Tv}
-        @test hasmethod(update_linear_solver!, Tuple{Tls, V, V, V})
-        @test hasmethod(solve_augmented_system!, Tuple{V, V, Tls, V, V})
+        @test hasmethod(update!, Tuple{Tls, V, V, V})
+        @test hasmethod(solve!, Tuple{V, V, Tls, V, V})
     end
 
     m, n = size(A)
@@ -26,14 +26,14 @@ function run_ls_tests(
     θ = ones(Tv, n)
     regP = ones(Tv, n)
     regD = ones(Tv, m)
-    update_linear_solver!(ls, θ, regP, regD)
+    update!(ls, θ, regP, regD)
 
     # Solve linear system
     ξp = ones(Tv, m)
     ξd = ones(Tv, n)
     dx = zeros(Tv, n)
     dy = zeros(Tv, m)
-    solve_augmented_system!(dx, dy, ls, ξp, ξd)
+    solve!(dx, dy, ls, ξp, ξd)
 
     # Check residuals
     rp = A * dx + regD .* dy - ξp

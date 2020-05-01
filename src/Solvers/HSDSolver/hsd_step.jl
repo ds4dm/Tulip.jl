@@ -48,7 +48,7 @@ function compute_step!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Rea
     nbump = 0
     while nbump <= 3
         try
-            KKT.update_linear_solver!(hsd.ls, θ, hsd.regP, hsd.regD)
+            KKT.update!(hsd.ls, θ, hsd.regP, hsd.regD)
             break
         catch err
             isa(err, PosDefException) || isa(err, ZeroPivotException) || rethrow(err)
@@ -269,7 +269,7 @@ function solve_augsys_hsd!(
     ξd_ = copy(ξd)
     @views ξd_[uind] .-= (ξu .* θwz)
 
-    KKT.solve_augmented_system!(dx, dy, ls, ξp, ξd_)
+    KKT.solve!(dx, dy, ls, ξp, ξd_)
 
     # Recover dz
     dz .= zero(Tv)

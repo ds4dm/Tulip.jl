@@ -70,7 +70,7 @@ struct DefaultBackend <: LSBackend end
 # 
 
 """
-    update_linear_solver!(ls, θ, regP, regD)
+    update!(ls, θ, regP, regD)
 
 Update internal data, and re-compute factorization/pre-conditioner.
 
@@ -81,11 +81,11 @@ After this call, `ls` can be used to solve the augmented system
 ```
 for given right-hand sides `ξd` and `ξp`.
 """
-function update_linear_solver! end
+function update! end
 
 
 """
-    solve_augmented_system!(dx, dy, ls, ξp, ξd)
+    solve!(dx, dy, ls, ξp, ξd)
 
 Solve the symmetric quasi-definite augmented system
 ```
@@ -99,7 +99,7 @@ and over-write `dx`, `dy` with the result.
 - `ls`: Linear solver for the augmented system
 - `ξp, ξd`: Right-hand-side vectors
 """
-function solve_augmented_system! end
+function solve! end
 
 
 include("test.jl")

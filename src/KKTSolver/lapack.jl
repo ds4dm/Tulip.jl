@@ -66,13 +66,13 @@ backend(::KKTSolver_Dense) = "LAPACK"
 linear_system(::KKTSolver_Dense) = "Normal equations"
 
 """
-    update_linear_solver!(ls::KKTSolver_Dense{<:Real}, θ, regP, regD)
+    update!(ls::KKTSolver_Dense{<:Real}, θ, regP, regD)
 
 Compute normal equations system matrix and update Cholesky factorization.
 
 Uses Julia's generic linear algebra.
 """
-function update_linear_solver!(
+function update!(
     ls::KKTSolver_Dense{Tv},
     θ::AbstractVector{Tv},
     regP::AbstractVector{Tv},
@@ -111,13 +111,13 @@ function update_linear_solver!(
 end
 
 """
-    update_linear_solver!(ls::KKTSolver_Dense{<:BlasReal}, θ, regP, regD)
+    update!(ls::KKTSolver_Dense{<:BlasReal}, θ, regP, regD)
 
 Compute normal equations system matrix and update Cholesky factorization.
 
 Uses BLAS and LAPACK routines.
 """
-function update_linear_solver!(
+function update!(
     ls::KKTSolver_Dense{Tv},
     θ::AbstractVector{Tv},
     regP::AbstractVector{Tv},
@@ -160,13 +160,13 @@ end
 
 
 """
-    solve_augmented_system!(dx, dy, ls, ξp, ξd)
+    solve!(dx, dy, ls, ξp, ξd)
 
 Solve the augmented system, overwriting `dx, dy` with the result.
 
 Uses two generic triangular solves for solving the normal equations system.
 """
-function solve_augmented_system!(
+function solve!(
     dx::Vector{Tv}, dy::Vector{Tv},
     ls::KKTSolver_Dense{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
@@ -189,13 +189,13 @@ function solve_augmented_system!(
 end
 
 """
-    solve_augmented_system!(dx, dy, ls, ξp, ξd)
+    solve!(dx, dy, ls, ξp, ξd)
 
 Solve the augmented system, overwriting `dx, dy` with the result.
 
 Uses one LAPACK call for solving the normal equations system.
 """
-function solve_augmented_system!(
+function solve!(
     dx::Vector{Tv}, dy::Vector{Tv},
     ls::KKTSolver_Dense{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}

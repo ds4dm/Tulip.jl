@@ -14,11 +14,11 @@ Custom linear solvers should inherit from the `AbstractKKTSolver` class,
 and extend the following two functions:
 
 ```@docs
-update_linear_solver!
+update!
 ```
 
 ```@docs
-solve_augmented_system!
+solve!
 ```
 
 ### KKTSolver_Dense
@@ -28,13 +28,13 @@ KKTSolver_Dense
 ```
 
 ```@docs
-update_linear_solver!(::KKTSolver_Dense{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:Real}
-update_linear_solver!(::KKTSolver_Dense{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:BlasReal}
+update!(::KKTSolver_Dense{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:Real}
+update!(::KKTSolver_Dense{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:BlasReal}
 ```
 
 ```@docs
-solve_augmented_system!(::Vector{Tv},::Vector{Tv},::KKTSolver_Dense{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:Real}
-solve_augmented_system!(::Vector{Tv},::Vector{Tv},::KKTSolver_Dense{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:BlasReal}
+solve!(::Vector{Tv},::Vector{Tv},::KKTSolver_Dense{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:Real}
+solve!(::Vector{Tv},::Vector{Tv},::KKTSolver_Dense{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:BlasReal}
 ```
 
 ### KKTSolver_CholmodQD
@@ -44,11 +44,11 @@ KKTSolver_CholmodQD
 ```
 
 ```@docs
-update_linear_solver!(::KKTSolver_CholmodQD,::AbstractVector{Float64},::AbstractVector{Float64},::AbstractVector{Float64})
+update!(::KKTSolver_CholmodQD,::AbstractVector{Float64},::AbstractVector{Float64},::AbstractVector{Float64})
 ```
 
 ```@docs
-solve_augmented_system!(::Vector{Float64},::Vector{Float64},::KKTSolver_CholmodQD, ::Vector{Float64}, ::Vector{Float64})
+solve!(::Vector{Float64},::Vector{Float64},::KKTSolver_CholmodQD, ::Vector{Float64}, ::Vector{Float64})
 ```
 
 
@@ -60,11 +60,11 @@ KKTSolver_CholmodPD
 ```
 
 ```@docs
-update_linear_solver!(::KKTSolver_CholmodPD,::AbstractVector{Float64},::AbstractVector{Float64},::AbstractVector{Float64})
+update!(::KKTSolver_CholmodPD,::AbstractVector{Float64},::AbstractVector{Float64},::AbstractVector{Float64})
 ```
 
 ```@docs
-solve_augmented_system!(::Vector{Float64},::Vector{Float64},::KKTSolver_CholmodPD, ::Vector{Float64}, ::Vector{Float64})
+solve!(::Vector{Float64},::Vector{Float64},::KKTSolver_CholmodPD, ::Vector{Float64}, ::Vector{Float64})
 ```
 
 ### KKTSolver_LDLFact
@@ -74,9 +74,9 @@ KKTSolver_LDLFact
 ```
 
 ```@docs
-update_linear_solver!(::KKTSolver_LDLFact{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:Real}
+update!(::KKTSolver_LDLFact{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:Real}
 ```
 
 ```@docs
-solve_augmented_system!(::Vector{Tv},::Vector{Tv},::KKTSolver_LDLFact{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:Real}
+solve!(::Vector{Tv},::Vector{Tv},::KKTSolver_LDLFact{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:Real}
 ```

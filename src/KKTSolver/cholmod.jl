@@ -77,7 +77,7 @@ backend(::KKTSolver_CholmodQD) = "CHOLMOD"
 linear_system(::KKTSolver_CholmodQD) = "Augmented system"
 
 """
-    update_linear_solver!(ls, θ, regP, regD)
+    update!(ls, θ, regP, regD)
 
 Update LDLᵀ factorization of the augmented system.
 
@@ -85,7 +85,7 @@ Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
     the factorization.
 Throws a `PosDefException` if matrix is not quasi-definite.
 """
-function update_linear_solver!(
+function update!(
     ls::KKTSolver_CholmodQD,
     θ::AbstractVector{Float64},
     regP::AbstractVector{Float64},
@@ -126,11 +126,11 @@ function update_linear_solver!(
 end
 
 """
-    solve_augmented_system!(dx, dy, ls, ξp, ξd)
+    solve!(dx, dy, ls, ξp, ξd)
 
 Solve the augmented system, overwriting `dx, dy` with the result.
 """
-function solve_augmented_system!(
+function solve!(
     dx::Vector{Float64}, dy::Vector{Float64},
     ls::KKTSolver_CholmodQD,
     ξp::Vector{Float64}, ξd::Vector{Float64}
@@ -229,11 +229,11 @@ backend(::KKTSolver_CholmodPD) = "CHOLMOD - Cholesky"
 linear_system(::KKTSolver_CholmodPD) = "Normal equations"
 
 """
-    update_linear_solver!(ls, θ, regP, regD)
+    update!(ls, θ, regP, regD)
 
 Compute normal equation system matrix, and update the factorization.
 """
-function update_linear_solver!(
+function update!(
     ls::KKTSolver_CholmodPD,
     θ::AbstractVector{Float64},
     regP::AbstractVector{Float64},
@@ -269,11 +269,11 @@ function update_linear_solver!(
 end
 
 """
-    solve_augmented_system!(dx, dy, ls, ξp, ξd)
+    solve!(dx, dy, ls, ξp, ξd)
 
 Solve the augmented system, overwriting `dx, dy` with the result.
 """
-function solve_augmented_system!(
+function solve!(
     dx::Vector{Float64}, dy::Vector{Float64},
     ls::KKTSolver_CholmodPD,
     ξp::Vector{Float64}, ξd::Vector{Float64}

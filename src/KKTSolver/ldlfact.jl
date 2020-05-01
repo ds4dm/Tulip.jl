@@ -67,7 +67,7 @@ backend(::KKTSolver_LDLFact) = "LDLFactorizations.jl"
 linear_system(::KKTSolver_LDLFact) = "Augmented system"
 
 """
-    update_linear_solver!(ls, θ, regP, regD)
+    update!(ls, θ, regP, regD)
 
 Update LDLᵀ factorization of the augmented system.
 
@@ -75,7 +75,7 @@ Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
     the factorization.
 Throws a `PosDefException` if matrix is not quasi-definite.
 """
-function update_linear_solver!(
+function update!(
     ls::KKTSolver_LDLFact{Tv},
     θ::AbstractVector{Tv},
     regP::AbstractVector{Tv},
@@ -117,11 +117,11 @@ function update_linear_solver!(
 end
 
 """
-    solve_augmented_system!(dx, dy, ls, ξp, ξd)
+    solve!(dx, dy, ls, ξp, ξd)
 
 Solve the augmented system, overwriting `dx, dy` with the result.
 """
-function solve_augmented_system!(
+function solve!(
     dx::Vector{Tv}, dy::Vector{Tv},
     ls::KKTSolver_LDLFact{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
