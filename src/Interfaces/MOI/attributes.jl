@@ -100,6 +100,7 @@ end
 #   Name
 #
 MOI.get(m::Optimizer, ::MOI.Name) = m.inner.pbdata.name
+MOI.set(m::Optimizer, ::MOI.Name, name) = (m.inner.pbdata.name = name)
 
 #
 #   NumberOfVariables
