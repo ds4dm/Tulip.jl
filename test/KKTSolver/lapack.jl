@@ -5,7 +5,7 @@
                 1 0 1 0;
                 0 1 0 1
             ])
-            ls = KKT.AbstractLinearSolver(KKT.Lapack(), KKT.NormalEquations(), A)
+            ls = KKT.AbstractKKTSolver(KKT.Lapack(), KKT.NormalEquations(), A)
             KKT.run_ls_tests(A, ls)
         end
     end

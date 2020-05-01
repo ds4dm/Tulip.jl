@@ -24,7 +24,7 @@ Linear solver for the 2x2 augmented system with ``A`` sparse.
 
 Uses LDLFactorizations.jl to compute an LDLᵀ factorization of the quasi-definite augmented system.
 """
-mutable struct LDLFLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv}
+mutable struct LDLFLinearSolver{Tv<:Real} <: AbstractKKTSolver{Tv}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -57,7 +57,7 @@ mutable struct LDLFLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv}
 
 end
 
-AbstractLinearSolver(
+AbstractKKTSolver(
     ::LDLFact,
     ::AugmentedSystem,
     A::AbstractMatrix{Tv}

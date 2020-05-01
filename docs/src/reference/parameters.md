@@ -44,8 +44,8 @@ Numerical tolerances for the interior-point algorithm.
 
 | Parameter | Description | Default |
 |:----------|:------------|:--------|
-| `LinearSolverBackend` | Backend for solving linear systems | [`Tulip.TLPLinearAlgebra.DefaultBackend`](@ref) |
-| `LinearSolverSystem` | Linear system solved | [`Tulip.TLPLinearAlgebra.DefaultSystem`](@ref) |
+| `LinearSolverBackend` | Backend for solving linear systems | [`Tulip.KKT.DefaultBackend`](@ref) |
+| `LinearSolverSystem` | Linear system solved | [`Tulip.KKT.DefaultSystem`](@ref) |
 
 ## Others
 

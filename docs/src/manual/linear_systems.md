@@ -1,5 +1,5 @@
 ```@meta
-CurrentModule = Tulip.TLPLinearAlgebra
+CurrentModule = Tulip.KKT
 ```
 
 # Solving linear systems

@@ -38,7 +38,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     =====================#
     pt::Point{Tv}    # Current primal-dual iterate
     res::Residuals{Tv}  # Residuals at current iterate
-    ls::AbstractLinearSolver{Tv}
+    ls::AbstractKKTSolver{Tv}
     regP::Vector{Tv}  # primal regularization
     regD::Vector{Tv}  # dual regularization
     regG::Tv  # gap regularization
@@ -84,7 +84,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
             zero(Tv), zero(Tv), zero(Tv), zero(Tv)
         )
 
-        hsd.ls = AbstractLinearSolver(params.LinearSolverBackend, params.LinearSolverSystem, A)
+        hsd.ls = AbstractKKTSolver(params.LinearSolverBackend, params.LinearSolverSystem, A)
 
         # Initial regularizations
         hsd.regP = ones(Tv, nvar)

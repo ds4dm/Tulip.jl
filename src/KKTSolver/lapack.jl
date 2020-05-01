@@ -26,7 +26,7 @@ with ``A`` dense.
 The augmented system is automatically reduced to the normal equations system.
 BLAS/LAPACK functions are used whenever applicable.
 """
-mutable struct DenseLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv}
+mutable struct DenseLinearSolver{Tv<:Real} <: AbstractKKTSolver{Tv}
     m::Int  # Number of rows in A
     n::Int  # Number of columns in A
 
@@ -56,7 +56,7 @@ mutable struct DenseLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv}
     end
 end
 
-AbstractLinearSolver(
+AbstractKKTSolver(
     ::Lapack,
     ::NormalEquations,
     A::AbstractMatrix{Tv}

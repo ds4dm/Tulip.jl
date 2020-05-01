@@ -6,12 +6,12 @@
     ])
 
     @testset "LDL" begin
-        ls = KKT.AbstractLinearSolver(KKT.Cholmod(), KKT.AugmentedSystem(), A)
+        ls = KKT.AbstractKKTSolver(KKT.Cholmod(), KKT.AugmentedSystem(), A)
         KKT.run_ls_tests(A, ls)
     end
     
     @testset "Cholesky" begin
-        ls = KKT.AbstractLinearSolver(KKT.Cholmod(), KKT.NormalEquations(), A)
+        ls = KKT.AbstractKKTSolver(KKT.Cholmod(), KKT.NormalEquations(), A)
         KKT.run_ls_tests(A, ls)
     end
 

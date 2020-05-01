@@ -24,7 +24,7 @@ Linear solver for the 2x2 augmented system with ``A`` sparse.
 
 Uses an LDLᵀ factorization of the quasi-definite augmented system.
 """
-mutable struct SparseIndefLinearSolver <: AbstractLinearSolver{Float64}
+mutable struct SparseIndefLinearSolver <: AbstractKKTSolver{Float64}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -62,13 +62,13 @@ mutable struct SparseIndefLinearSolver <: AbstractLinearSolver{Float64}
 
 end
 
-AbstractLinearSolver(
+AbstractKKTSolver(
     ::Cholmod,
     ::AugmentedSystem,
     A::AbstractMatrix{Float64}
 ) = SparseIndefLinearSolver(sparse(A))
 
-AbstractLinearSolver(
+AbstractKKTSolver(
     ::Cholmod,
     ::DefaultSystem,
     A::AbstractMatrix{Float64}
@@ -187,7 +187,7 @@ Uses a Cholesky factorization of the positive definite normal equations system
                               dx = (Θ⁻¹ + Rp)⁻¹ * (Aᵀ * dy - xi_d)
 ```
 """
-mutable struct SparsePosDefLinearSolver <: AbstractLinearSolver{Float64}
+mutable struct SparsePosDefLinearSolver <: AbstractKKTSolver{Float64}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -220,7 +220,7 @@ mutable struct SparsePosDefLinearSolver <: AbstractLinearSolver{Float64}
 
 end
 
-AbstractLinearSolver(
+AbstractKKTSolver(
     ::Cholmod,
     ::NormalEquations,
     A::AbstractMatrix{Float64}

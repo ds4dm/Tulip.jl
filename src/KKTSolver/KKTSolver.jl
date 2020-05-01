@@ -2,12 +2,12 @@ module KKT
 
 using LinearAlgebra
 
-export AbstractLinearSolver
+export AbstractKKTSolver
 
 const BlasReal = LinearAlgebra.BlasReal
 
 """
-    AbstractLinearSolver{Tv}
+    AbstractKKTSolver{Tv}
 
 Abstract container for solving an augmented system
 ```
@@ -16,7 +16,7 @@ Abstract container for solving an augmented system
 ```
 where `ξd` and `ξp` are given right-hand side.
 """
-abstract type AbstractLinearSolver{Tv<:Real} end
+abstract type AbstractKKTSolver{Tv<:Real} end
 
 
 """
@@ -110,22 +110,22 @@ include("cholmod.jl")
 include("ldlfact.jl")
 
 # Default settings
-AbstractLinearSolver(
+AbstractKKTSolver(
     ::DefaultBackend,
     ::DefaultSystem,
     A::Matrix{Tv}
-) where{Tv<:Real} = AbstractLinearSolver(Lapack(), NormalEquations(), A)
+) where{Tv<:Real} = AbstractKKTSolver(Lapack(), NormalEquations(), A)
 
-AbstractLinearSolver(
+AbstractKKTSolver(
     ::DefaultBackend,
     ::DefaultSystem,
     A::AbstractMatrix{Float64}
-) = AbstractLinearSolver(Cholmod(), AugmentedSystem(), A)
+) = AbstractKKTSolver(Cholmod(), AugmentedSystem(), A)
 
-AbstractLinearSolver(
+AbstractKKTSolver(
     ::DefaultBackend,
     ::DefaultSystem,
     A::AbstractMatrix{Tv}
-) where{Tv<:Real} = AbstractLinearSolver(LDLFact(), AugmentedSystem(), A)
+) where{Tv<:Real} = AbstractKKTSolver(LDLFact(), AugmentedSystem(), A)
 
 end  # module

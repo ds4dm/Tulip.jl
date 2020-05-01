@@ -8,7 +8,7 @@ using LinearAlgebra
 """
 function run_ls_tests(
     A::AbstractMatrix{Tv},
-    ls::AbstractLinearSolver{Tv};
+    ls::AbstractKKTSolver{Tv};
     atol::Tv=sqrt(eps(Tv))
 ) where{Tv<:Real}
 

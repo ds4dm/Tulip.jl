@@ -260,7 +260,7 @@ Solve the augmented system for `dx, dy, dz`
 """
 function solve_augsys_hsd!(
     dx::Vector{Tv}, dy::Vector{Tv}, dz::Vector{Tv},
-    ls::AbstractLinearSolver{Tv},
+    ls::AbstractKKTSolver{Tv},
     θwz::Vector{Tv}, uind::Vector{Int},
     ξp::Vector{Tv}, ξd::Vector{Tv}, ξu::Vector{Tv}
 ) where{Tv<:Real}

@@ -1,16 +1,16 @@
 ```@meta
-CurrentModule = Tulip.TLPLinearAlgebra
+CurrentModule = Tulip.KKT
 ```
 
-### AbstractLinearSolver
+### AbstractKKTSolver
 
 This is the base type from which all implementations should derive.
 
 ```@docs
-AbstractLinearSolver
+AbstractKKTSolver
 ```
 
-Custom linear solvers should inherit from the `AbstractLinearSolver` class,
+Custom linear solvers should inherit from the `AbstractKKTSolver` class,
 and extend the following two functions:
 
 ```@docs
