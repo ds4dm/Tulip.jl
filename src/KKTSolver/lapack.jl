@@ -14,7 +14,7 @@ Options available:
 struct Lapack <: LSBackend end
 
 """
-    DenseLinearSolver{Tv}
+    KKTSolver_Dense{Tv}
 
 Linear solver for the 2x2 augmented system
 ```
@@ -26,7 +26,7 @@ with ``A`` dense.
 The augmented system is automatically reduced to the normal equations system.
 BLAS/LAPACK functions are used whenever applicable.
 """
-mutable struct DenseLinearSolver{Tv<:Real} <: AbstractKKTSolver{Tv}
+mutable struct KKTSolver_Dense{Tv<:Real} <: AbstractKKTSolver{Tv}
     m::Int  # Number of rows in A
     n::Int  # Number of columns in A
 
@@ -44,7 +44,7 @@ mutable struct DenseLinearSolver{Tv<:Real} <: AbstractKKTSolver{Tv}
     S::Matrix{Tv}  # Normal equations matrix, that also holds the factorization
 
     # Constructor
-    function DenseLinearSolver(A::Matrix{Tv}) where{Tv<:Real}
+    function KKTSolver_Dense(A::Matrix{Tv}) where{Tv<:Real}
         m, n = size(A)
         θ = ones(Tv, n)
 
@@ -60,20 +60,20 @@ AbstractKKTSolver(
     ::Lapack,
     ::NormalEquations,
     A::AbstractMatrix{Tv}
-) where{Tv<:Real} = DenseLinearSolver(Matrix(A))
+) where{Tv<:Real} = KKTSolver_Dense(Matrix(A))
 
-backend(::DenseLinearSolver) = "LAPACK"
-linear_system(::DenseLinearSolver) = "Normal equations"
+backend(::KKTSolver_Dense) = "LAPACK"
+linear_system(::KKTSolver_Dense) = "Normal equations"
 
 """
-    update_linear_solver!(ls::DenseLinearSolver{<:Real}, θ, regP, regD)
+    update_linear_solver!(ls::KKTSolver_Dense{<:Real}, θ, regP, regD)
 
 Compute normal equations system matrix and update Cholesky factorization.
 
 Uses Julia's generic linear algebra.
 """
 function update_linear_solver!(
-    ls::DenseLinearSolver{Tv},
+    ls::KKTSolver_Dense{Tv},
     θ::AbstractVector{Tv},
     regP::AbstractVector{Tv},
     regD::AbstractVector{Tv}
@@ -111,14 +111,14 @@ function update_linear_solver!(
 end
 
 """
-    update_linear_solver!(ls::DenseLinearSolver{<:BlasReal}, θ, regP, regD)
+    update_linear_solver!(ls::KKTSolver_Dense{<:BlasReal}, θ, regP, regD)
 
 Compute normal equations system matrix and update Cholesky factorization.
 
 Uses BLAS and LAPACK routines.
 """
 function update_linear_solver!(
-    ls::DenseLinearSolver{Tv},
+    ls::KKTSolver_Dense{Tv},
     θ::AbstractVector{Tv},
     regP::AbstractVector{Tv},
     regD::AbstractVector{Tv}
@@ -168,7 +168,7 @@ Uses two generic triangular solves for solving the normal equations system.
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
-    ls::DenseLinearSolver{Tv},
+    ls::KKTSolver_Dense{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:Real}
     m, n = ls.m, ls.n
@@ -197,7 +197,7 @@ Uses one LAPACK call for solving the normal equations system.
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
-    ls::DenseLinearSolver{Tv},
+    ls::KKTSolver_Dense{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:BlasReal}
     m, n = ls.m, ls.n

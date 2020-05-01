@@ -21,62 +21,62 @@ update_linear_solver!
 solve_augmented_system!
 ```
 
-### DenseLinearSolver
+### KKTSolver_Dense
 
 ```@docs
-DenseLinearSolver
+KKTSolver_Dense
 ```
 
 ```@docs
-update_linear_solver!(::DenseLinearSolver{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:Real}
-update_linear_solver!(::DenseLinearSolver{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:BlasReal}
+update_linear_solver!(::KKTSolver_Dense{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:Real}
+update_linear_solver!(::KKTSolver_Dense{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:BlasReal}
 ```
 
 ```@docs
-solve_augmented_system!(::Vector{Tv},::Vector{Tv},::DenseLinearSolver{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:Real}
-solve_augmented_system!(::Vector{Tv},::Vector{Tv},::DenseLinearSolver{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:BlasReal}
+solve_augmented_system!(::Vector{Tv},::Vector{Tv},::KKTSolver_Dense{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:Real}
+solve_augmented_system!(::Vector{Tv},::Vector{Tv},::KKTSolver_Dense{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:BlasReal}
 ```
 
-### SparseIndefLinearSolver
+### KKTSolver_CholmodQD
 
 ```@docs
-SparseIndefLinearSolver
-```
-
-```@docs
-update_linear_solver!(::SparseIndefLinearSolver,::AbstractVector{Float64},::AbstractVector{Float64},::AbstractVector{Float64})
+KKTSolver_CholmodQD
 ```
 
 ```@docs
-solve_augmented_system!(::Vector{Float64},::Vector{Float64},::SparseIndefLinearSolver, ::Vector{Float64}, ::Vector{Float64})
+update_linear_solver!(::KKTSolver_CholmodQD,::AbstractVector{Float64},::AbstractVector{Float64},::AbstractVector{Float64})
+```
+
+```@docs
+solve_augmented_system!(::Vector{Float64},::Vector{Float64},::KKTSolver_CholmodQD, ::Vector{Float64}, ::Vector{Float64})
 ```
 
 
 
-### SparsePosDefLinearSolver
+### KKTSolver_CholmodPD
 
 ```@docs
-SparsePosDefLinearSolver
+KKTSolver_CholmodPD
 ```
 
 ```@docs
-update_linear_solver!(::SparsePosDefLinearSolver,::AbstractVector{Float64},::AbstractVector{Float64},::AbstractVector{Float64})
+update_linear_solver!(::KKTSolver_CholmodPD,::AbstractVector{Float64},::AbstractVector{Float64},::AbstractVector{Float64})
 ```
 
 ```@docs
-solve_augmented_system!(::Vector{Float64},::Vector{Float64},::SparsePosDefLinearSolver, ::Vector{Float64}, ::Vector{Float64})
+solve_augmented_system!(::Vector{Float64},::Vector{Float64},::KKTSolver_CholmodPD, ::Vector{Float64}, ::Vector{Float64})
 ```
 
-### LDLFLinearSolver
+### KKTSolver_LDLFact
 
 ```@docs
-LDLFLinearSolver
-```
-
-```@docs
-update_linear_solver!(::LDLFLinearSolver{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:Real}
+KKTSolver_LDLFact
 ```
 
 ```@docs
-solve_augmented_system!(::Vector{Tv},::Vector{Tv},::LDLFLinearSolver{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:Real}
+update_linear_solver!(::KKTSolver_LDLFact{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:Real}
+```
+
+```@docs
+solve_augmented_system!(::Vector{Tv},::Vector{Tv},::KKTSolver_LDLFact{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:Real}
 ```

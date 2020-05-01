@@ -96,13 +96,13 @@ Here is a list of currently supported linear solvers:
 
 | Linear solver type | `Tv` | System | `LSBackend` | Method |
 |:-------------------|:----:|:------:|:-------:|:-------|
-| [`DenseLinearSolver`](@ref) | `Real` | `NormalEquations` | `Lapack` | Cholesky
-| [`SparseIndefLinearSolver`](@ref) | `Float64` | `AugmentedSystem` | `Cholmod` | LDLᵀ
-| [`SparsePosDefLinearSolver`](@ref) | `Float64` | `NormalEquations` | `Cholmod` | Cholesky
-| [`LDLFLinearSolver`](@ref) | `Real` | `AugmentedSystem` | `LDLFact` | LDLᵀ
+| [`KKTSolver_Dense`](@ref) | `Real` | `NormalEquations` | `Lapack` | Cholesky
+| [`KKTSolver_CholmodQD`](@ref) | `Float64` | `AugmentedSystem` | `Cholmod` | LDLᵀ
+| [`KKTSolver_CholmodPD`](@ref) | `Float64` | `NormalEquations` | `Cholmod` | Cholesky
+| [`KKTSolver_LDLFact`](@ref) | `Real` | `AugmentedSystem` | `LDLFact` | LDLᵀ
 
 ### Default options
 If no option is specified, then the linear solver is chosen as follows:
-* ``A`` is dense: `DenseLinearSolver`
-* If ``A`` sparse and `Tv` is `Float64`: `SparseIndefLinearSolver`
-* All other cases: `LDLFLinearSolver`
+* ``A`` is dense: `KKTSolver_Dense`
+* If ``A`` sparse and `Tv` is `Float64`: `KKTSolver_CholmodQD`
+* All other cases: `KKTSolver_LDLFact`

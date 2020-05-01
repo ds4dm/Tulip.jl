@@ -14,17 +14,17 @@ Options available:
 struct Cholmod <: LSBackend end
 
 # ==============================================================================
-#   SparseIndefLinearSolver
+#   KKTSolver_CholmodQD
 # ==============================================================================
 
 """
-    SparseIndefLinearSolver
+    KKTSolver_CholmodQD
 
 Linear solver for the 2x2 augmented system with ``A`` sparse.
 
 Uses an LDLᵀ factorization of the quasi-definite augmented system.
 """
-mutable struct SparseIndefLinearSolver <: AbstractKKTSolver{Float64}
+mutable struct KKTSolver_CholmodQD <: AbstractKKTSolver{Float64}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -44,7 +44,7 @@ mutable struct SparseIndefLinearSolver <: AbstractKKTSolver{Float64}
     F::CHOLMOD.Factor{Float64}
 
     # TODO: constructor with initial memory allocation
-    function SparseIndefLinearSolver(A::SparseMatrixCSC{Float64, Int})
+    function KKTSolver_CholmodQD(A::SparseMatrixCSC{Float64, Int})
         m, n = size(A)
         θ = ones(Float64, n)
 
@@ -53,8 +53,7 @@ mutable struct SparseIndefLinearSolver <: AbstractKKTSolver{Float64}
             spzeros(Float64, m, n) spdiagm(0 => ones(m))
         ]
 
-        # Symbolic factorization
-        # See code in src/cholmod.jl of SuiteSparse.jl for `ldlt` function
+        # TODO: Symbolic factorization only
         F = ldlt(Symmetric(S))
 
         return new(m, n, A, θ, ones(Float64, n), ones(Float64, m), S, F)
@@ -66,16 +65,16 @@ AbstractKKTSolver(
     ::Cholmod,
     ::AugmentedSystem,
     A::AbstractMatrix{Float64}
-) = SparseIndefLinearSolver(sparse(A))
+) = KKTSolver_CholmodQD(sparse(A))
 
 AbstractKKTSolver(
     ::Cholmod,
     ::DefaultSystem,
     A::AbstractMatrix{Float64}
-) = SparseIndefLinearSolver(sparse(A))
+) = KKTSolver_CholmodQD(sparse(A))
 
-backend(::SparseIndefLinearSolver) = "CHOLMOD"
-linear_system(::SparseIndefLinearSolver) = "Augmented system"
+backend(::KKTSolver_CholmodQD) = "CHOLMOD"
+linear_system(::KKTSolver_CholmodQD) = "Augmented system"
 
 """
     update_linear_solver!(ls, θ, regP, regD)
@@ -87,7 +86,7 @@ Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
 Throws a `PosDefException` if matrix is not quasi-definite.
 """
 function update_linear_solver!(
-    ls::SparseIndefLinearSolver,
+    ls::KKTSolver_CholmodQD,
     θ::AbstractVector{Float64},
     regP::AbstractVector{Float64},
     regD::AbstractVector{Float64}
@@ -133,7 +132,7 @@ Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve_augmented_system!(
     dx::Vector{Float64}, dy::Vector{Float64},
-    ls::SparseIndefLinearSolver,
+    ls::KKTSolver_CholmodQD,
     ξp::Vector{Float64}, ξd::Vector{Float64}
 )
     m, n = ls.m, ls.n
@@ -168,11 +167,11 @@ function solve_augmented_system!(
 end
 
 # ==============================================================================
-#   SparsePosDefLinearSolver
+#   KKTSolver_CholmodPD
 # ==============================================================================
 
 """
-    SparsePosDefLinearSolver
+    KKTSolver_CholmodPD
 
 Linear solver for the 2x2 augmented system
 ```
@@ -187,7 +186,7 @@ Uses a Cholesky factorization of the positive definite normal equations system
                               dx = (Θ⁻¹ + Rp)⁻¹ * (Aᵀ * dy - xi_d)
 ```
 """
-mutable struct SparsePosDefLinearSolver <: AbstractKKTSolver{Float64}
+mutable struct KKTSolver_CholmodPD <: AbstractKKTSolver{Float64}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -206,7 +205,7 @@ mutable struct SparsePosDefLinearSolver <: AbstractKKTSolver{Float64}
 
     # Constructor and initial memory allocation
     # TODO: symbolic only + allocation
-    function SparsePosDefLinearSolver(A::SparseMatrixCSC{Float64, Int})
+    function KKTSolver_CholmodPD(A::SparseMatrixCSC{Float64, Int})
         m, n = size(A)
         θ = ones(Float64, n)
 
@@ -224,10 +223,10 @@ AbstractKKTSolver(
     ::Cholmod,
     ::NormalEquations,
     A::AbstractMatrix{Float64}
-) = SparsePosDefLinearSolver(sparse(A))
+) = KKTSolver_CholmodPD(sparse(A))
 
-backend(::SparsePosDefLinearSolver) = "CHOLMOD - Cholesky"
-linear_system(::SparsePosDefLinearSolver) = "Normal equations"
+backend(::KKTSolver_CholmodPD) = "CHOLMOD - Cholesky"
+linear_system(::KKTSolver_CholmodPD) = "Normal equations"
 
 """
     update_linear_solver!(ls, θ, regP, regD)
@@ -235,7 +234,7 @@ linear_system(::SparsePosDefLinearSolver) = "Normal equations"
 Compute normal equation system matrix, and update the factorization.
 """
 function update_linear_solver!(
-    ls::SparsePosDefLinearSolver,
+    ls::KKTSolver_CholmodPD,
     θ::AbstractVector{Float64},
     regP::AbstractVector{Float64},
     regD::AbstractVector{Float64}
@@ -276,7 +275,7 @@ Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve_augmented_system!(
     dx::Vector{Float64}, dy::Vector{Float64},
-    ls::SparsePosDefLinearSolver,
+    ls::KKTSolver_CholmodPD,
     ξp::Vector{Float64}, ξd::Vector{Float64}
 )
     m, n = ls.m, ls.n

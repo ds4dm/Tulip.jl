@@ -14,17 +14,17 @@ Options available:
 struct LDLFact <: LSBackend end
 
 # ==============================================================================
-#   LDLFLinearSolver
+#   KKTSolver_LDLFact
 # ==============================================================================
 
 """
-    LDLFLinearSolver{Tv}
+    KKTSolver_LDLFact{Tv}
 
 Linear solver for the 2x2 augmented system with ``A`` sparse.
 
 Uses LDLFactorizations.jl to compute an LDLᵀ factorization of the quasi-definite augmented system.
 """
-mutable struct LDLFLinearSolver{Tv<:Real} <: AbstractKKTSolver{Tv}
+mutable struct KKTSolver_LDLFact{Tv<:Real} <: AbstractKKTSolver{Tv}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -41,7 +41,7 @@ mutable struct LDLFLinearSolver{Tv<:Real} <: AbstractKKTSolver{Tv}
     F::LDLF.LDLFactorization{Tv}
 
     # TODO: constructor with initial memory allocation
-    function LDLFLinearSolver(A::SparseMatrixCSC{Tv, Int}) where{Tv<:Real}
+    function KKTSolver_LDLFact(A::SparseMatrixCSC{Tv, Int}) where{Tv<:Real}
         m, n = size(A)
         θ = ones(Tv, n)
 
@@ -61,10 +61,10 @@ AbstractKKTSolver(
     ::LDLFact,
     ::AugmentedSystem,
     A::AbstractMatrix{Tv}
-) where{Tv<:Real} = LDLFLinearSolver(sparse(A))
+) where{Tv<:Real} = KKTSolver_LDLFact(sparse(A))
 
-backend(::LDLFLinearSolver) = "LDLFactorizations.jl"
-linear_system(::LDLFLinearSolver) = "Augmented system"
+backend(::KKTSolver_LDLFact) = "LDLFactorizations.jl"
+linear_system(::KKTSolver_LDLFact) = "Augmented system"
 
 """
     update_linear_solver!(ls, θ, regP, regD)
@@ -76,7 +76,7 @@ Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
 Throws a `PosDefException` if matrix is not quasi-definite.
 """
 function update_linear_solver!(
-    ls::LDLFLinearSolver{Tv},
+    ls::KKTSolver_LDLFact{Tv},
     θ::AbstractVector{Tv},
     regP::AbstractVector{Tv},
     regD::AbstractVector{Tv}
@@ -123,7 +123,7 @@ Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve_augmented_system!(
     dx::Vector{Tv}, dy::Vector{Tv},
-    ls::LDLFLinearSolver{Tv},
+    ls::KKTSolver_LDLFact{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:Real}
     m, n = ls.m, ls.n
