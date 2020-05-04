@@ -1,20 +1,9 @@
 using LinearAlgebra.LAPACK
 
-"""
-    Lapack <: LSBackend
-
-Use LAPACK backend.
-
-Options available:
-* Numerical precision: `Tv<:Real`
-    * `Float32` and `Float64` will use LAPACK.
-    * Other numerical types will use Julia's generic cholesky factorization.
-* [`NormalEquations`](@ref) only, with Cholesky factorization
-"""
-struct Lapack <: LSBackend end
+const BlasReal = LinearAlgebra.BlasReal
 
 """
-    KKTSolver_Dense{Tv}
+    Dense_SymPosDef{Tv}
 
 Linear solver for the 2x2 augmented system
 ```
@@ -26,7 +15,7 @@ with ``A`` dense.
 The augmented system is automatically reduced to the normal equations system.
 BLAS/LAPACK functions are used whenever applicable.
 """
-mutable struct KKTSolver_Dense{Tv<:Real} <: AbstractKKTSolver{Tv}
+mutable struct Dense_SymPosDef{Tv<:Real} <: AbstractKKTSolver{Tv}
     m::Int  # Number of rows in A
     n::Int  # Number of columns in A
 
@@ -44,7 +33,7 @@ mutable struct KKTSolver_Dense{Tv<:Real} <: AbstractKKTSolver{Tv}
     S::Matrix{Tv}  # Normal equations matrix, that also holds the factorization
 
     # Constructor
-    function KKTSolver_Dense(A::Matrix{Tv}) where{Tv<:Real}
+    function Dense_SymPosDef(A::AbstractMatrix{Tv}) where{Tv<:Real}
         m, n = size(A)
         θ = ones(Tv, n)
 
@@ -52,28 +41,22 @@ mutable struct KKTSolver_Dense{Tv<:Real} <: AbstractKKTSolver{Tv}
         # so no factorization yet
         S = zeros(Tv, m, m)
 
-        return new{Tv}(m, n, A, θ, zeros(Tv, n), zeros(Tv, m), copy(A), S)
+        return new{Tv}(m, n, Matrix(A), θ, zeros(Tv, n), zeros(Tv, m), Matrix(A), S)
     end
 end
 
-AbstractKKTSolver(
-    ::Lapack,
-    ::NormalEquations,
-    A::AbstractMatrix{Tv}
-) where{Tv<:Real} = KKTSolver_Dense(Matrix(A))
-
-backend(::KKTSolver_Dense) = "LAPACK"
-linear_system(::KKTSolver_Dense) = "Normal equations"
+backend(::Dense_SymPosDef) = "LAPACK"
+linear_system(::Dense_SymPosDef) = "Normal equations"
 
 """
-    update!(ls::KKTSolver_Dense{<:Real}, θ, regP, regD)
+    update!(ls::Dense_SymPosDef{<:Real}, θ, regP, regD)
 
 Compute normal equations system matrix and update Cholesky factorization.
 
 Uses Julia's generic linear algebra.
 """
 function update!(
-    ls::KKTSolver_Dense{Tv},
+    ls::Dense_SymPosDef{Tv},
     θ::AbstractVector{Tv},
     regP::AbstractVector{Tv},
     regD::AbstractVector{Tv}
@@ -111,14 +94,14 @@ function update!(
 end
 
 """
-    update!(ls::KKTSolver_Dense{<:BlasReal}, θ, regP, regD)
+    update!(ls::Dense_SymPosDef{<:BlasReal}, θ, regP, regD)
 
 Compute normal equations system matrix and update Cholesky factorization.
 
 Uses BLAS and LAPACK routines.
 """
 function update!(
-    ls::KKTSolver_Dense{Tv},
+    ls::Dense_SymPosDef{Tv},
     θ::AbstractVector{Tv},
     regP::AbstractVector{Tv},
     regD::AbstractVector{Tv}
@@ -168,7 +151,7 @@ Uses two generic triangular solves for solving the normal equations system.
 """
 function solve!(
     dx::Vector{Tv}, dy::Vector{Tv},
-    ls::KKTSolver_Dense{Tv},
+    ls::Dense_SymPosDef{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:Real}
     m, n = ls.m, ls.n
@@ -197,7 +180,7 @@ Uses one LAPACK call for solving the normal equations system.
 """
 function solve!(
     dx::Vector{Tv}, dy::Vector{Tv},
-    ls::KKTSolver_Dense{Tv},
+    ls::Dense_SymPosDef{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:BlasReal}
     m, n = ls.m, ls.n

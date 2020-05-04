@@ -84,7 +84,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
             zero(Tv), zero(Tv), zero(Tv), zero(Tv)
         )
 
-        hsd.ls = AbstractKKTSolver(params.LinearSolverBackend, params.LinearSolverSystem, A)
+        hsd.ls = KKT.setup(params.KKTOptions.Ts, A; params.KKTOptions.options...)
 
         # Initial regularizations
         hsd.regP = ones(Tv, nvar)
@@ -321,9 +321,9 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         nupb = nvarupb + nslackupb
 
         # Build matrix
-        A = construct_matrix(params.MatrixType, ncon, nvar, aI, aJ, aV)
+        A = construct_matrix(params.MatrixOptions.Ta, ncon, nvar, aI, aJ, aV; params.MatrixOptions.options...)
 
-        # TODO: setup linear solver
+        # TODO: setup linear solver here
         
         return HSDSolver{Tv}(params, ncon, nvar, nupb, A, b, pb.objsense, c, c0, uind, uval)
     end
@@ -465,7 +465,7 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
     if params.OutputLevel > 0
         @printf "\nOptimizer info\n"
         @printf "Linear solver options\n"
-        @printf "  %-12s : %s\n" "Precision" "$Tv"
+        @printf "  %-12s : %s\n" "Arithmetic" KKT.arithmetic(hsd.ls)
         @printf "  %-12s : %s\n" "Backend" KKT.backend(hsd.ls)
         @printf "  %-12s : %s\n" "System" KKT.linear_system(hsd.ls)
     end

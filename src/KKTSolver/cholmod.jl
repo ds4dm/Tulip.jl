@@ -2,29 +2,37 @@ using SparseArrays
 using SuiteSparse.CHOLMOD
 
 """
-    Cholmod <: LSBackend
+    CholmodSolver{Tv}
 
-Use CHOLMOD backend.
-
-Options available:
-* `Float64` only
-* Augmented system with LDLᵀ factorization
-* Normal equations with Cholesky factorization
-"""
-struct Cholmod <: LSBackend end
-
-# ==============================================================================
-#   KKTSolver_CholmodQD
-# ==============================================================================
 
 """
-    KKTSolver_CholmodQD
+abstract type CholmodSolver <: AbstractKKTSolver{Float64} end
+
+function CholmodSolver(
+    A::AbstractMatrix{Float64};
+    normal_equations::Bool=false,
+    kwargs...
+)
+    if normal_equations
+        return Cholmod_SymPosDef(A; kwargs...)
+    else
+        return Cholmod_SymQuasDef(A; kwargs...)
+    end
+end
+
+
+# ==============================================================================
+#   Cholmod_SymQuasDef
+# ==============================================================================
+
+"""
+    Cholmod_SymQuasDef
 
 Linear solver for the 2x2 augmented system with ``A`` sparse.
 
 Uses an LDLᵀ factorization of the quasi-definite augmented system.
 """
-mutable struct KKTSolver_CholmodQD <: AbstractKKTSolver{Float64}
+mutable struct Cholmod_SymQuasDef <: CholmodSolver
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -44,7 +52,7 @@ mutable struct KKTSolver_CholmodQD <: AbstractKKTSolver{Float64}
     F::CHOLMOD.Factor{Float64}
 
     # TODO: constructor with initial memory allocation
-    function KKTSolver_CholmodQD(A::SparseMatrixCSC{Float64, Int})
+    function Cholmod_SymQuasDef(A::AbstractMatrix{Float64})
         m, n = size(A)
         θ = ones(Float64, n)
 
@@ -61,20 +69,8 @@ mutable struct KKTSolver_CholmodQD <: AbstractKKTSolver{Float64}
 
 end
 
-AbstractKKTSolver(
-    ::Cholmod,
-    ::AugmentedSystem,
-    A::AbstractMatrix{Float64}
-) = KKTSolver_CholmodQD(sparse(A))
-
-AbstractKKTSolver(
-    ::Cholmod,
-    ::DefaultSystem,
-    A::AbstractMatrix{Float64}
-) = KKTSolver_CholmodQD(sparse(A))
-
-backend(::KKTSolver_CholmodQD) = "CHOLMOD"
-linear_system(::KKTSolver_CholmodQD) = "Augmented system"
+backend(::Cholmod_SymQuasDef) = "CHOLMOD"
+linear_system(::Cholmod_SymQuasDef) = "Augmented system"
 
 """
     update!(ls, θ, regP, regD)
@@ -86,7 +82,7 @@ Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
 Throws a `PosDefException` if matrix is not quasi-definite.
 """
 function update!(
-    ls::KKTSolver_CholmodQD,
+    ls::Cholmod_SymQuasDef,
     θ::AbstractVector{Float64},
     regP::AbstractVector{Float64},
     regD::AbstractVector{Float64}
@@ -132,7 +128,7 @@ Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve!(
     dx::Vector{Float64}, dy::Vector{Float64},
-    ls::KKTSolver_CholmodQD,
+    ls::Cholmod_SymQuasDef,
     ξp::Vector{Float64}, ξd::Vector{Float64}
 )
     m, n = ls.m, ls.n
@@ -167,11 +163,11 @@ function solve!(
 end
 
 # ==============================================================================
-#   KKTSolver_CholmodPD
+#   Cholmod_SymPosDef
 # ==============================================================================
 
 """
-    KKTSolver_CholmodPD
+    Cholmod_SymPosDef
 
 Linear solver for the 2x2 augmented system
 ```
@@ -186,7 +182,7 @@ Uses a Cholesky factorization of the positive definite normal equations system
                               dx = (Θ⁻¹ + Rp)⁻¹ * (Aᵀ * dy - xi_d)
 ```
 """
-mutable struct KKTSolver_CholmodPD <: AbstractKKTSolver{Float64}
+mutable struct Cholmod_SymPosDef <: CholmodSolver
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -205,11 +201,11 @@ mutable struct KKTSolver_CholmodPD <: AbstractKKTSolver{Float64}
 
     # Constructor and initial memory allocation
     # TODO: symbolic only + allocation
-    function KKTSolver_CholmodPD(A::SparseMatrixCSC{Float64, Int})
+    function Cholmod_SymPosDef(A::AbstractMatrix{Float64})
         m, n = size(A)
         θ = ones(Float64, n)
 
-        S = A * A' + spdiagm(0 => ones(m))
+        S = sparse(A * A') + spdiagm(0 => ones(m))
 
         # TODO: PSD-ness checks
         F = cholesky(Symmetric(S))
@@ -219,14 +215,8 @@ mutable struct KKTSolver_CholmodPD <: AbstractKKTSolver{Float64}
 
 end
 
-AbstractKKTSolver(
-    ::Cholmod,
-    ::NormalEquations,
-    A::AbstractMatrix{Float64}
-) = KKTSolver_CholmodPD(sparse(A))
-
-backend(::KKTSolver_CholmodPD) = "CHOLMOD - Cholesky"
-linear_system(::KKTSolver_CholmodPD) = "Normal equations"
+backend(::Cholmod_SymPosDef) = "CHOLMOD - Cholesky"
+linear_system(::Cholmod_SymPosDef) = "Normal equations"
 
 """
     update!(ls, θ, regP, regD)
@@ -234,7 +224,7 @@ linear_system(::KKTSolver_CholmodPD) = "Normal equations"
 Compute normal equation system matrix, and update the factorization.
 """
 function update!(
-    ls::KKTSolver_CholmodPD,
+    ls::Cholmod_SymPosDef,
     θ::AbstractVector{Float64},
     regP::AbstractVector{Float64},
     regD::AbstractVector{Float64}
@@ -275,7 +265,7 @@ Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve!(
     dx::Vector{Float64}, dy::Vector{Float64},
-    ls::KKTSolver_CholmodPD,
+    ls::Cholmod_SymPosDef,
     ξp::Vector{Float64}, ξd::Vector{Float64}
 )
     m, n = ls.m, ls.n

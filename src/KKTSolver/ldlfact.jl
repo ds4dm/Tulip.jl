@@ -1,30 +1,18 @@
 import LDLFactorizations
 const LDLF = LDLFactorizations
 
-
-"""
-    LDLFact <: LSBackend
-
-Use LDLFactorizations backend.
-
-Options available:
-* Any numerical type `T`
-* Augmented system with LDLᵀ factorization
-"""
-struct LDLFact <: LSBackend end
-
 # ==============================================================================
-#   KKTSolver_LDLFact
+#   LDLFact_SymQuasDef
 # ==============================================================================
 
 """
-    KKTSolver_LDLFact{Tv}
+    LDLFact_SymQuasDef{Tv}
 
 Linear solver for the 2x2 augmented system with ``A`` sparse.
 
 Uses LDLFactorizations.jl to compute an LDLᵀ factorization of the quasi-definite augmented system.
 """
-mutable struct KKTSolver_LDLFact{Tv<:Real} <: AbstractKKTSolver{Tv}
+mutable struct LDLFact_SymQuasDef{Tv<:Real} <: AbstractKKTSolver{Tv}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -41,7 +29,7 @@ mutable struct KKTSolver_LDLFact{Tv<:Real} <: AbstractKKTSolver{Tv}
     F::LDLF.LDLFactorization{Tv}
 
     # TODO: constructor with initial memory allocation
-    function KKTSolver_LDLFact(A::SparseMatrixCSC{Tv, Int}) where{Tv<:Real}
+    function LDLFact_SymQuasDef(A::AbstractMatrix{Tv}) where{Tv<:Real}
         m, n = size(A)
         θ = ones(Tv, n)
 
@@ -57,14 +45,10 @@ mutable struct KKTSolver_LDLFact{Tv<:Real} <: AbstractKKTSolver{Tv}
 
 end
 
-AbstractKKTSolver(
-    ::LDLFact,
-    ::AugmentedSystem,
-    A::AbstractMatrix{Tv}
-) where{Tv<:Real} = KKTSolver_LDLFact(sparse(A))
+setup(::Type{LDLFact_SymQuasDef}, A) = LDLFact_SymQuasDef(A)
 
-backend(::KKTSolver_LDLFact) = "LDLFactorizations.jl"
-linear_system(::KKTSolver_LDLFact) = "Augmented system"
+backend(::LDLFact_SymQuasDef) = "LDLFactorizations.jl"
+linear_system(::LDLFact_SymQuasDef) = "Augmented system"
 
 """
     update!(ls, θ, regP, regD)
@@ -76,7 +60,7 @@ Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
 Throws a `PosDefException` if matrix is not quasi-definite.
 """
 function update!(
-    ls::KKTSolver_LDLFact{Tv},
+    ls::LDLFact_SymQuasDef{Tv},
     θ::AbstractVector{Tv},
     regP::AbstractVector{Tv},
     regD::AbstractVector{Tv}
@@ -123,7 +107,7 @@ Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve!(
     dx::Vector{Tv}, dy::Vector{Tv},
-    ls::KKTSolver_LDLFact{Tv},
+    ls::LDLFact_SymQuasDef{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:Real}
     m, n = ls.m, ls.n

@@ -4,8 +4,6 @@ using LinearAlgebra
 
 export AbstractKKTSolver
 
-const BlasReal = LinearAlgebra.BlasReal
-
 """
     AbstractKKTSolver{Tv}
 
@@ -16,54 +14,28 @@ Abstract container for solving an augmented system
 ```
 where `ξd` and `ξp` are given right-hand side.
 """
-abstract type AbstractKKTSolver{Tv<:Real} end
-
-
-"""
-    LinearSystem
-
-Indicates which linear system is solved.
-"""
-abstract type LinearSystem end
+abstract type AbstractKKTSolver{Tv} end
 
 """
-    DefaultSystem
+    SolverOptions
 
-Choose linear system to be solved using default option.
+Used to pass options and instantiate KKT solvers.
 """
-struct DefaultSystem <: LinearSystem end
+struct SolverOptions
+    Ts::Type{<:AbstractKKTSolver}
+    options::Base.Iterators.Pairs
 
-"""
-    AugmentedSystem
-
-Solve the augmented system, i.e., without reducing to normal equations.
-"""
-struct AugmentedSystem <: LinearSystem end
+    SolverOptions(::Type{Ts}; kwargs...) where{Ts<:AbstractKKTSolver} = new(Ts, kwargs)
+end
 
 """
-    NormalEquations
+    setup(T::Type{<:AbstractKKTSolver}, args...; kwargs...)
 
-Solve the normal equations system.
+Instantiate a KKT solver object.
 """
-struct NormalEquations <: LinearSystem end
-
-"""
-    LSBackend
-
-Backend used for solving linear systems.
-"""
-abstract type LSBackend end
-
-"""
-    DefaultBackend
-
-Chose linear solver backend automatically.
-
-* For `A::Matrix{Tv}`, defaults to [`Lapack`](@ref) (i.e., dense solver).
-* For `A::AbstractMatrix{Float64}`, defaults to [`Cholmod`](@ref)
-* Otherwise, defaults to [`LDLFact`](@ref)
-"""
-struct DefaultBackend <: LSBackend end
+function setup(Ts::Type{<:AbstractKKTSolver}, args...; kwargs...)
+    return Ts(args...; kwargs...)
+end
 
 # 
 # Specialized implementations should extend the functions below
@@ -101,31 +73,46 @@ and over-write `dx`, `dy` with the result.
 """
 function solve! end
 
+"""
+    arithmetic(kkt::AbstractKKTSolver)
 
+Return the arithmetic used by the solver.
+"""
+arithmetic(kkt::AbstractKKTSolver{Tv}) where Tv = Tv
+
+"""
+    backend(kkt)
+
+Return the name of the solver's backend.
+"""
+backend(::AbstractKKTSolver) = "Unkown"
+
+"""
+    linear_system(kkt)
+
+Return which system is solved by the kkt solver.
+"""
+linear_system(::AbstractKKTSolver) = "Unkown"
+
+# Generic tests
 include("test.jl")
 
-# 
+# Custom linear solvers
 include("lapack.jl")
 include("cholmod.jl")
 include("ldlfact.jl")
 
-# Default settings
-AbstractKKTSolver(
-    ::DefaultBackend,
-    ::DefaultSystem,
-    A::Matrix{Tv}
-) where{Tv<:Real} = AbstractKKTSolver(Lapack(), NormalEquations(), A)
+"""
+    default_options(Tv)
 
-AbstractKKTSolver(
-    ::DefaultBackend,
-    ::DefaultSystem,
-    A::AbstractMatrix{Float64}
-) = AbstractKKTSolver(Cholmod(), AugmentedSystem(), A)
-
-AbstractKKTSolver(
-    ::DefaultBackend,
-    ::DefaultSystem,
-    A::AbstractMatrix{Tv}
-) where{Tv<:Real} = AbstractKKTSolver(LDLFact(), AugmentedSystem(), A)
+Use CHOLMOD for `Float64` and LDLFactorizations otherwise.
+"""
+function default_options(::Type{Tv}) where{Tv}
+    if Tv == Float64
+        return SolverOptions(CholmodSolver; normal_equations=false)
+    else
+        return SolverOptions(LDLFact_SymQuasDef)
+    end
+end
 
 end  # module

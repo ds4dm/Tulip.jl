@@ -6,6 +6,18 @@ using SparseArrays
 
 export construct_matrix
 
+"""
+    MatrixOptions
+
+Used to pass options 
+"""
+struct MatrixOptions
+    Ta::Type{<:AbstractMatrix}
+    options::Base.Iterators.Pairs
+
+    MatrixOptions(::Type{Ts}; kwargs...) where{Ts<:AbstractMatrix} = new(Ts, kwargs)
+end
+
 
 """
     construct_matrix(Ta, m, n, aI, aJ, aV)

@@ -15,10 +15,6 @@ Base.@kwdef mutable struct Parameters{Tv}
     BarrierToleranceDFeas::Tv = sqrt(eps(Tv))  # dual feasibility
     BarrierToleranceRGap::Tv = sqrt(eps(Tv))  # optimality
     BarrierToleranceIFeas::Tv = sqrt(eps(Tv))  # infeasibility
-
-    # Regularizations
-    BarrierPRegMin::Tv = sqrt(eps(Tv))  # primal
-    BarrierDregMin::Tv = sqrt(eps(Tv))  # dual
     
     # Algorithmic parameters
     BarrierAlgorithm::Int = 1  # TODO: docs
@@ -28,27 +24,10 @@ Base.@kwdef mutable struct Parameters{Tv}
     BarrierCentralityOutlierThreshold::Tv = Tv(1 // 10)  # Relative threshold for centrality outliers
 
     # Linear algebra
-    MatrixType::Type{<:AbstractMatrix} = SparseMatrixCSC  # TODO: make this more flexible
-    #=
-        TODO: make it possible to use custom linear solver,
-            without having to change the source code.
-        KKTBackend:
-        * -1: Default
-        *  0: LAPACK (dense)
-        *  1: Julia's generic dense Cholesky
-        *  2: CHOLMOD (sparse)
-        *  3: LDLFact (sparse)
-    
-        KKTSystem:
-        * -1: Default
-        *  0: Augmented system
-        *  1: Normal equations
-    =#
-    KKTBackend::Int = -1
-    KKTSystem::Int = -1
-    LinearSolverBackend::KKT.LSBackend = KKT.DefaultBackend()
-    LinearSolverSystem::KKT.LinearSystem = KKT.DefaultSystem()
-    # TODO: put regularizations here (?)
+    MatrixOptions::TLA.MatrixOptions = TLA.MatrixOptions(SparseMatrixCSC)
+    KKTOptions::KKT.SolverOptions = KKT.default_options(Tv)
+    BarrierPRegMin::Tv = sqrt(eps(Tv))  # primal
+    BarrierDRegMin::Tv = sqrt(eps(Tv))  # dual
     # TODO: iterative refinement
 
     # I/O
