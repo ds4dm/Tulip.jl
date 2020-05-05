@@ -2,6 +2,8 @@
 CurrentModule = Tulip.KKT
 ```
 
+## Overview
+
 ### AbstractKKTSolver
 
 This is the base type from which all implementations should derive.
@@ -21,62 +23,46 @@ update!
 solve!
 ```
 
-### KKTSolver_Dense
+### Choosing between linear solvers
 
 ```@docs
-KKTSolver_Dense
+SolverOptions
+```
+
+```@meta
+CurrentModule = Tulip
 ```
 
 ```@docs
-update!(::KKTSolver_Dense{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:Real}
-update!(::KKTSolver_Dense{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:BlasReal}
+TLA.MatrixOptions
+```
+
+```@meta
+CurrentModule = Tulip.KKT
+```
+
+## Dense/LAPACK
+
+```@docs
+Dense_SymPosDef
+```
+
+## CHOLMOD
+
+```@docs
+CholmodSolver
 ```
 
 ```@docs
-solve!(::Vector{Tv},::Vector{Tv},::KKTSolver_Dense{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:Real}
-solve!(::Vector{Tv},::Vector{Tv},::KKTSolver_Dense{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:BlasReal}
-```
-
-### KKTSolver_CholmodQD
-
-```@docs
-KKTSolver_CholmodQD
+Cholmod_SymQuasDef
 ```
 
 ```@docs
-update!(::KKTSolver_CholmodQD,::AbstractVector{Float64},::AbstractVector{Float64},::AbstractVector{Float64})
+Cholmod_SymPosDef
 ```
 
-```@docs
-solve!(::Vector{Float64},::Vector{Float64},::KKTSolver_CholmodQD, ::Vector{Float64}, ::Vector{Float64})
-```
-
-
-
-### KKTSolver_CholmodPD
+## LDLFactorizations
 
 ```@docs
-KKTSolver_CholmodPD
-```
-
-```@docs
-update!(::KKTSolver_CholmodPD,::AbstractVector{Float64},::AbstractVector{Float64},::AbstractVector{Float64})
-```
-
-```@docs
-solve!(::Vector{Float64},::Vector{Float64},::KKTSolver_CholmodPD, ::Vector{Float64}, ::Vector{Float64})
-```
-
-### KKTSolver_LDLFact
-
-```@docs
-KKTSolver_LDLFact
-```
-
-```@docs
-update!(::KKTSolver_LDLFact{Tv},::AbstractVector{Tv},::AbstractVector{Tv},::AbstractVector{Tv}) where{Tv<:Real}
-```
-
-```@docs
-solve!(::Vector{Tv},::Vector{Tv},::KKTSolver_LDLFact{Tv}, ::Vector{Tv}, ::Vector{Tv}) where{Tv<:Real}
+LDLFact_SymQuasDef
 ```

@@ -2,9 +2,24 @@ using SparseArrays
 using SuiteSparse.CHOLMOD
 
 """
-    CholmodSolver{Tv}
+    CholmodSolver
 
+Uses CHOLMOD's factorization routines to solve the augmented system.
 
+To use an LDLᵀ factorization of the augmented system
+(see [`Cholmod_SymQuasDef`](@ref))
+```julia
+model.params.KKTOptions = Tulip.KKT.SolverOptions(CholmodSolver, normal_equations=false)
+```
+
+To use a Cholesky factorization of the normal equations system
+(see [`Cholmod_SymPosDef`](@ref))
+```julia
+model.params.KKTOptions = Tulip.KKT.SolverOptions(CholmodSolver, normal_equations=true)
+```
+
+!!! warning
+    CHOLMOD can only be used with `Float64` arithmetic.
 """
 abstract type CholmodSolver <: AbstractKKTSolver{Float64} end
 

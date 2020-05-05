@@ -9,7 +9,12 @@ export construct_matrix
 """
     MatrixOptions
 
-Used to pass options 
+Used to pass options for setting-up the matrix.
+
+```julia
+julia> model = Tulip.Model{Float64}()
+julia> model.params.MatrixOptions = Tulip.TLA.MatrixOptions(SparseMatrixCSC)
+```
 """
 struct MatrixOptions
     Ta::Type{<:AbstractMatrix}

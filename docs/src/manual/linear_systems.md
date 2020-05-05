@@ -40,69 +40,16 @@ The augmented system above can be reduced to the positive-definite _normal equat
 ```
 When selected, this reduction is transparent to the interior-point algorithm.
 
-
-To enable the use of fast external libraries and/or specialized routines, the resolution of linear systems is performed by a _linear solver_ object.
-Linear solvers can be customized with the options below.
-
-## Linear solver options
-
-### System
-
-```@docs
-LinearSystem
-```
-
-```@docs
-DefaultSystem
-```
-
-```@docs
-AugmentedSystem
-```
-
-```@docs
-NormalEquations
-```
-
-
-### Backend
-
-```@docs
-LSBackend
-```
-
-```@docs
-DefaultBackend
-```
-
-```@docs
-Lapack
-```
-
-```@docs
-Cholmod
-```
-
-```@docs
-LDLFact
-```
-
-### 
+To enable the use of fast external libraries and/or specialized routines, the resolution of linear systems is performed by an [`AbstractKKTSolver`] object.
 
 
 ## Supported linear solvers
 
 Here is a list of currently supported linear solvers:
 
-| Linear solver type | `Tv` | System | `LSBackend` | Method |
-|:-------------------|:----:|:------:|:-------:|:-------|
-| [`KKTSolver_Dense`](@ref) | `Real` | `NormalEquations` | `Lapack` | Cholesky
-| [`KKTSolver_CholmodQD`](@ref) | `Float64` | `AugmentedSystem` | `Cholmod` | LDLᵀ
-| [`KKTSolver_CholmodPD`](@ref) | `Float64` | `NormalEquations` | `Cholmod` | Cholesky
-| [`KKTSolver_LDLFact`](@ref) | `Real` | `AugmentedSystem` | `LDLFact` | LDLᵀ
-
-### Default options
-If no option is specified, then the linear solver is chosen as follows:
-* ``A`` is dense: `KKTSolver_Dense`
-* If ``A`` sparse and `Tv` is `Float64`: `KKTSolver_CholmodQD`
-* All other cases: `KKTSolver_LDLFact`
+| Linear solver type | `Tv` | System | Backend | Method |
+|:-------------------|:-----|:-------|:--------|:-------|
+| [`Dense_SymPosDef`](@ref) | `Real` | Normal equations | Dense / LAPACK | Cholesky
+| [`Cholmod_SymQuasDef`](@ref) | `Float64` | Augmented system | CHOLMOD | LDLᵀ
+| [`Cholmod_SymPosDef`](@ref) | `Float64` | Normal equations | CHOLMOD | Cholesky
+| [`LDLFact_SymQuasDef`](@ref) | `Real` | Augmented system | [LDLFactorizations.jl](https://github.com/JuliaSmoothOptimizers/LDLFactorizations.jl) | LDLᵀ

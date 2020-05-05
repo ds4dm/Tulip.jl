@@ -42,9 +42,9 @@ end
 # 
 
 """
-    update!(ls, θ, regP, regD)
+    update!(ls, θinv, regP, regD)
 
-Update internal data, and re-compute factorization/pre-conditioner.
+Update internal data and factorization/pre-conditioner.
 
 After this call, `ls` can be used to solve the augmented system
 ```
@@ -52,6 +52,12 @@ After this call, `ls` can be used to solve the augmented system
     [   A          Rd] [dy]   [ξp]
 ```
 for given right-hand sides `ξd` and `ξp`.
+
+# Arguments
+* `ls::AbstractKKTSolver{Tv}`: the KKT solver object
+* `θinv::AbstractVector{Tv}`: ``θ⁻¹``
+* `regP::AbstractVector{Tv}`: primal regularizations
+* `regD::AbstractVector{Tv}`: dual regularizations
 """
 function update! end
 

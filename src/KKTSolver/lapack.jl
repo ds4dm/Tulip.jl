@@ -5,15 +5,18 @@ const BlasReal = LinearAlgebra.BlasReal
 """
     Dense_SymPosDef{Tv}
 
-Linear solver for the 2x2 augmented system
-```
-    [-(Θ⁻¹ + Rp)   Aᵀ] [dx] = [xi_d]
-    [   A          Rd] [dy]   [xi_p]
-```
-with ``A`` dense.
+KKT solver for dense linear systems.
 
-The augmented system is automatically reduced to the normal equations system.
-BLAS/LAPACK functions are used whenever applicable.
+Uses a Cholesky factorization of the normal equations system. Not recommended
+    for systems of size larger than a few thousands.
+
+```julia
+model = Tulip.Model{Float64}()
+model.params.KKTOptions = Tulip.KKT.SolverOptions(Tulip.KKT.Dense_SymPosDef)
+```
+
+!!! info
+    Dispatches to BLAS/LAPACK in `Float32` and `Float64` arithmetic.
 """
 mutable struct Dense_SymPosDef{Tv<:Real} <: AbstractKKTSolver{Tv}
     m::Int  # Number of rows in A
@@ -27,7 +30,7 @@ mutable struct Dense_SymPosDef{Tv<:Real} <: AbstractKKTSolver{Tv}
     regP::Vector{Tv}  # primal
     regD::Vector{Tv}  # dual
 
-    B::Matrix{Tv}  # place-holder to avoid allocating memory afterwards
+    _A::Matrix{Tv}  # place-holder to avoid allocating memory afterwards
 
     # Factorization
     S::Matrix{Tv}  # Normal equations matrix, that also holds the factorization
@@ -41,7 +44,7 @@ mutable struct Dense_SymPosDef{Tv<:Real} <: AbstractKKTSolver{Tv}
         # so no factorization yet
         S = zeros(Tv, m, m)
 
-        return new{Tv}(m, n, Matrix(A), θ, zeros(Tv, n), zeros(Tv, m), Matrix(A), S)
+        return new{Tv}(m, n, A, θ, zeros(Tv, n), zeros(Tv, m), Matrix(A), S)
     end
 end
 
@@ -78,10 +81,10 @@ function update!(
 
     # Re-compute normal equations matrix
     # There's no function that does S = A*D*A', so we cache a copy of A
-    copyto!(ls.B, ls.A)
+    copyto!(ls._A, ls.A)
     D = Diagonal(one(Tv) ./ (ls.θ .+ ls.regP))
-    rmul!(ls.B, D)  # B = A * D
-    mul!(ls.S, ls.B, transpose(ls.A))  # Now S = A*D*A'
+    rmul!(ls._A, D)  # B = A * D
+    mul!(ls.S, ls._A, transpose(ls.A))  # Now S = A*D*A'
     # TODO: do not re-compute S if only dual regularization changes
     @inbounds for i in 1:ls.m
         ls.S[i, i] += ls.regD[i]
@@ -123,10 +126,10 @@ function update!(
 
     # Re-compute normal equations matrix
     # There's no function that does S = A*D*A', so we cache a copy of A
-    copyto!(ls.B, ls.A)
+    copyto!(ls._A, ls.A)
     D = Diagonal(sqrt.(one(Tv) ./ (ls.θ .+ ls.regP)))
-    rmul!(ls.B, D)  # B = A * √D
-    BLAS.syrk!('U', 'N', one(Tv), ls.B, zero(Tv), ls.S)
+    rmul!(ls._A, D)  # B = A * √D
+    BLAS.syrk!('U', 'N', one(Tv), ls._A, zero(Tv), ls.S)
 
     # Regularization
     # TODO: only update diagonal of S if only dual regularization changes
@@ -140,7 +143,6 @@ function update!(
     
     return nothing
 end
-
 
 """
     solve!(dx, dy, ls, ξp, ξd)
