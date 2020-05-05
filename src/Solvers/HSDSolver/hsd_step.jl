@@ -48,7 +48,7 @@ function compute_step!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Rea
     nbump = 0
     while nbump <= 3
         try
-            KKT.update!(hsd.ls, θ, hsd.regP, hsd.regD)
+            KKT.update!(hsd.kkt, θ, hsd.regP, hsd.regD)
             break
         catch err
             isa(err, PosDefException) || isa(err, ZeroPivotException) || rethrow(err)
@@ -74,7 +74,7 @@ function compute_step!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Rea
     hz = zeros(Tv, nupb)
     solve_augsys_hsd!(
         hx, hy, hz,
-        hsd.ls, θwz, uind,
+        hsd.kkt, θwz, uind,
         b, c, uval
     )
     # Recover h0 = ρg + κ / τ - c'hx + b'hy - u'hz
@@ -88,7 +88,7 @@ function compute_step!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Rea
     # Affine-scaling direction
     solve_newton_hsd!(
         Δ,
-        hsd.ls, θwz, b, c, uind, uval,
+        hsd.kkt, θwz, b, c, uind, uval,
         hx, hy, hz, h0, pt,
         # Right-hand side of Newton system
         res.rp, res.ru, res.rd, res.rg,
@@ -105,7 +105,7 @@ function compute_step!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Rea
     # Mehrotra corrector
     solve_newton_hsd!(
         Δ,
-        hsd.ls, θwz, b, c, uind, uval,
+        hsd.kkt, θwz, b, c, uind, uval,
         hx, hy, hz, h0, pt,
         # Right-hand side of Newton system
         η .* res.rp, η .* res.ru, η .* res.rd, η * res.rg,
@@ -124,7 +124,7 @@ function compute_step!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Rea
         # TODO: Compute extra-corrector
         αc = compute_higher_corrector_hsd!(
             Δc, γ,
-            hsd.ls, θwz, b, c, uind, uval,
+            hsd.kkt, θwz, b, c, uind, uval,
             hx, hy, hz, h0, pt,
             Δ, α_,
             params.BarrierCentralityOutlierThreshold,
@@ -182,7 +182,7 @@ Solve the Newton system for `dx, dw, dy, ds, dz, dτ, dκ`
 
 # Arguments
 - `Δ`: Search direction, modified
-- `ls`: Linear solver for the augmented system
+- `kkt`: Linear solver for the augmented system
 - `θwz`: Diagonal scaling term
 - `b`: Right-hand side of primal constraints
 - `c`: Primal objective term
@@ -194,7 +194,7 @@ Solve the Newton system for `dx, dw, dy, ds, dz, dτ, dκ`
 """
 function solve_newton_hsd!(
     Δ::Point{Tv},
-    ls, θwz, b, c, uind::Vector{Int}, uval,
+    kkt, θwz, b, c, uind::Vector{Int}, uval,
     hx::Vector{Tv}, hy::Vector{Tv}, hz::Vector{Tv}, h0::Tv, pt::Point{Tv},
     ξp::Vector{Tv}, ξu::Vector{Tv}, ξd::Vector{Tv}, ξg::Tv,
     ξxs::Vector{Tv}, ξwz::Vector{Tv}, ξtk::Tv
@@ -203,7 +203,7 @@ function solve_newton_hsd!(
     # Solve reduced newton system
     solve_augsys_hsd!(
         Δ.x, Δ.y, Δ.z,
-        ls, θwz, uind,
+        kkt, θwz, uind,
         ξp, ξd .- (ξxs ./ pt.x), ξu .- (ξwz ./ pt.z)
     )
 
@@ -253,14 +253,14 @@ Solve the augmented system for `dx, dy, dz`
 
 # Arguments
 - `dx, dy, dz`: Vectors of unknowns, modified in-place
-- `ls`: Linear solver for the augmented system
+- `kkt`: Linear solver for the augmented system
 - `θwz`: Diagonal scaling `z ./ w`
 - `uind`: Vector of indices of upper-bounded variables
 - `ξp, ξd, ξu`: Right-hand-side vectors
 """
 function solve_augsys_hsd!(
     dx::Vector{Tv}, dy::Vector{Tv}, dz::Vector{Tv},
-    ls::AbstractKKTSolver{Tv},
+    kkt::AbstractKKTSolver{Tv},
     θwz::Vector{Tv}, uind::Vector{Int},
     ξp::Vector{Tv}, ξd::Vector{Tv}, ξu::Vector{Tv}
 ) where{Tv<:Real}
@@ -269,7 +269,7 @@ function solve_augsys_hsd!(
     ξd_ = copy(ξd)
     @views ξd_[uind] .-= (ξu .* θwz)
 
-    KKT.solve!(dx, dy, ls, ξp, ξd_)
+    KKT.solve!(dx, dy, kkt, ξp, ξd_)
 
     # Recover dz
     dz .= zero(Tv)
@@ -331,7 +331,7 @@ Requires the solution of one Newton system.
 # Arguments
 - `Δc`: Corrected search direction, modified in-place
 - `γ`
-- `ls`: Linear solver for the augmented system
+- `kkt`: Linear solver for the augmented system
 - `θwz`: Diagonal scaling term
 - `b`: Right-hand side of primal constraints
 - `c`: Primal objective term
@@ -348,7 +348,7 @@ Requires the solution of one Newton system.
 function compute_higher_corrector_hsd!(
     Δc::Point{Tv},
     γ::Tv,
-    ls, θwz, b, c, uind::Vector{Int}, uval,
+    kkt, θwz, b, c, uind::Vector{Int}, uval,
     hx, hy, hz, h0, pt::Point{Tv},
     Δ::Point{Tv}, α::Tv,
     β::Tv,
@@ -401,7 +401,7 @@ function compute_higher_corrector_hsd!(
     # Compute corrector
     solve_newton_hsd!(
         Δc,
-        ls, θwz, b, c, uind, uval,
+        kkt, θwz, b, c, uind, uval,
         hx, hy, hz, h0, pt,
         # Right-hand sides
         zeros(Tv, pt.m), zeros(Tv, pt.p), zeros(Tv, pt.n), zero(Tv),

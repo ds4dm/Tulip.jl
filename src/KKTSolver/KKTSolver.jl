@@ -42,11 +42,11 @@ end
 # 
 
 """
-    update!(ls, θinv, regP, regD)
+    update!(kkt, θinv, regP, regD)
 
 Update internal data and factorization/pre-conditioner.
 
-After this call, `ls` can be used to solve the augmented system
+After this call, `kkt` can be used to solve the augmented system
 ```
     [-(Θ⁻¹ + Rp)   Aᵀ] [dx] = [ξd]
     [   A          Rd] [dy]   [ξp]
@@ -54,7 +54,7 @@ After this call, `ls` can be used to solve the augmented system
 for given right-hand sides `ξd` and `ξp`.
 
 # Arguments
-* `ls::AbstractKKTSolver{Tv}`: the KKT solver object
+* `kkt::AbstractKKTSolver{Tv}`: the KKT solver object
 * `θinv::AbstractVector{Tv}`: ``θ⁻¹``
 * `regP::AbstractVector{Tv}`: primal regularizations
 * `regD::AbstractVector{Tv}`: dual regularizations
@@ -63,7 +63,7 @@ function update! end
 
 
 """
-    solve!(dx, dy, ls, ξp, ξd)
+    solve!(dx, dy, kkt, ξp, ξd)
 
 Solve the symmetric quasi-definite augmented system
 ```
@@ -74,7 +74,7 @@ and over-write `dx`, `dy` with the result.
 
 # Arguments
 - `dx, dy`: Vectors of unknowns, modified in-place
-- `ls`: Linear solver for the augmented system
+- `kkt`: Linear solver for the augmented system
 - `ξp, ξd`: Right-hand-side vectors
 """
 function solve! end

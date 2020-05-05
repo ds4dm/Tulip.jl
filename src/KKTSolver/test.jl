@@ -2,19 +2,19 @@ using Test
 using LinearAlgebra
 
 """
-    run_ls_tests(A, ls; atol)
+    run_ls_tests(A, kkt; atol)
 
 
 """
 function run_ls_tests(
     A::AbstractMatrix{Tv},
-    ls::AbstractKKTSolver{Tv};
+    kkt::AbstractKKTSolver{Tv};
     atol::Tv=sqrt(eps(Tv))
 ) where{Tv<:Real}
 
     # Check that required methods are implemented
     @testset "Required methods" begin
-        Tls = typeof(ls)
+        Tls = typeof(kkt)
         V = Vector{Tv}
         @test hasmethod(update!, Tuple{Tls, V, V, V})
         @test hasmethod(solve!, Tuple{V, V, Tls, V, V})
@@ -26,14 +26,14 @@ function run_ls_tests(
     θ = ones(Tv, n)
     regP = ones(Tv, n)
     regD = ones(Tv, m)
-    update!(ls, θ, regP, regD)
+    update!(kkt, θ, regP, regD)
 
     # Solve linear system
     ξp = ones(Tv, m)
     ξd = ones(Tv, n)
     dx = zeros(Tv, n)
     dy = zeros(Tv, m)
-    solve!(dx, dy, ls, ξp, ξd)
+    solve!(dx, dy, kkt, ξp, ξd)
 
     # Check residuals
     rp = A * dx + regD .* dy - ξp

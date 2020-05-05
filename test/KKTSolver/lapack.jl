@@ -5,8 +5,8 @@
                 1 0 1 0;
                 0 1 0 1
             ])
-            ls = KKT.Dense_SymPosDef(A)
-            KKT.run_ls_tests(A, ls)
+            kkt = KKT.Dense_SymPosDef(A)
+            KKT.run_ls_tests(A, kkt)
         end
     end
 end

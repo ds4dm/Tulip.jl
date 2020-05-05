@@ -38,7 +38,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     =====================#
     pt::Point{Tv}    # Current primal-dual iterate
     res::Residuals{Tv}  # Residuals at current iterate
-    ls::AbstractKKTSolver{Tv}
+    kkt::AbstractKKTSolver{Tv}
     regP::Vector{Tv}  # primal regularization
     regD::Vector{Tv}  # dual regularization
     regG::Tv  # gap regularization
@@ -84,7 +84,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
             zero(Tv), zero(Tv), zero(Tv), zero(Tv)
         )
 
-        hsd.ls = KKT.setup(params.KKTOptions.Ts, A; params.KKTOptions.options...)
+        hsd.kkt = KKT.setup(params.KKTOptions.Ts, A; params.KKTOptions.options...)
 
         # Initial regularizations
         hsd.regP = ones(Tv, nvar)
@@ -465,9 +465,9 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
     if params.OutputLevel > 0
         @printf "\nOptimizer info\n"
         @printf "Linear solver options\n"
-        @printf "  %-12s : %s\n" "Arithmetic" KKT.arithmetic(hsd.ls)
-        @printf "  %-12s : %s\n" "Backend" KKT.backend(hsd.ls)
-        @printf "  %-12s : %s\n" "System" KKT.linear_system(hsd.ls)
+        @printf "  %-12s : %s\n" "Arithmetic" KKT.arithmetic(hsd.kkt)
+        @printf "  %-12s : %s\n" "Backend" KKT.backend(hsd.kkt)
+        @printf "  %-12s : %s\n" "System" KKT.linear_system(hsd.kkt)
     end
 
     # IPM LOG

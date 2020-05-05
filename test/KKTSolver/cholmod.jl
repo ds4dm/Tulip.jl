@@ -6,13 +6,13 @@
     ])
 
     @testset "LDL" begin
-        ls = KKT.CholmodSolver(A, normal_equations=false)
-        KKT.run_ls_tests(A, ls)
+        kkt = KKT.CholmodSolver(A, normal_equations=false)
+        KKT.run_ls_tests(A, kkt)
     end
     
     @testset "Cholesky" begin
-        ls = KKT.CholmodSolver(A, normal_equations=true)
-        KKT.run_ls_tests(A, ls)
+        kkt = KKT.CholmodSolver(A, normal_equations=true)
+        KKT.run_ls_tests(A, kkt)
     end
 
 end

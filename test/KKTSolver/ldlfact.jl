@@ -5,8 +5,8 @@
                 1 0 1 0;
                 0 1 0 1
             ])
-            ls = KKT.LDLFact_SymQuasDef(A)
-            KKT.run_ls_tests(A, ls)
+            kkt = KKT.LDLFact_SymQuasDef(A)
+            KKT.run_ls_tests(A, kkt)
         end
     end
 end
