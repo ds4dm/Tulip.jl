@@ -7,10 +7,12 @@ using SparseArrays
 
 # Linear algebra
 include("LinearAlgebra/LinearAlgebra.jl")
-import .TLPLinearAlgebra:
-    construct_matrix,
-    AbstractLinearSolver, update_linear_solver!, solve_augmented_system!
+import .TLPLinearAlgebra.construct_matrix
 const TLA = TLPLinearAlgebra
+
+# KKT solvers
+include("./KKTSolver/KKTSolver.jl")
+using .KKT
 
 # Core data structures
 # TODO: put this in a module

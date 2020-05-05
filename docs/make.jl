@@ -14,7 +14,7 @@ makedocs(
             "Julia API" => "reference/API.md",
             "Attributes" => "reference/attributes.md",
             "Parameters" => "reference/parameters.md",
-            "Linear solvers" => "reference/linear_solvers.md"
+            "KKT solvers" => "reference/kkt_solvers.md"
         ],
     ]
 )

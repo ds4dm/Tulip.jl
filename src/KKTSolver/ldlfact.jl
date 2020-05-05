@@ -1,30 +1,22 @@
 import LDLFactorizations
 const LDLF = LDLFactorizations
 
-
-"""
-    LDLFact <: LSBackend
-
-Use LDLFactorizations backend.
-
-Options available:
-* Any numerical type `T`
-* Augmented system with LDLᵀ factorization
-"""
-struct LDLFact <: LSBackend end
-
 # ==============================================================================
-#   LDLFLinearSolver
+#   LDLFact_SymQuasDef
 # ==============================================================================
 
 """
-    LDLFLinearSolver{Tv}
+    LDLFact_SymQuasDef{Tv}
 
 Linear solver for the 2x2 augmented system with ``A`` sparse.
 
 Uses LDLFactorizations.jl to compute an LDLᵀ factorization of the quasi-definite augmented system.
+
+```julia
+model.params.KKTOptions = Tulip.KKT.SolverOptions(LDLFact_SymQuasDef)
+```
 """
-mutable struct LDLFLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv}
+mutable struct LDLFact_SymQuasDef{Tv<:Real} <: AbstractKKTSolver{Tv}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -41,7 +33,7 @@ mutable struct LDLFLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv}
     F::LDLF.LDLFactorization{Tv}
 
     # TODO: constructor with initial memory allocation
-    function LDLFLinearSolver(A::SparseMatrixCSC{Tv, Int}) where{Tv<:Real}
+    function LDLFact_SymQuasDef(A::AbstractMatrix{Tv}) where{Tv<:Real}
         m, n = size(A)
         θ = ones(Tv, n)
 
@@ -57,17 +49,13 @@ mutable struct LDLFLinearSolver{Tv<:Real} <: AbstractLinearSolver{Tv}
 
 end
 
-AbstractLinearSolver(
-    ::LDLFact,
-    ::AugmentedSystem,
-    A::AbstractMatrix{Tv}
-) where{Tv<:Real} = LDLFLinearSolver(sparse(A))
+setup(::Type{LDLFact_SymQuasDef}, A) = LDLFact_SymQuasDef(A)
 
-backend(::LDLFLinearSolver) = "LDLFactorizations.jl"
-linear_system(::LDLFLinearSolver) = "Augmented system"
+backend(::LDLFact_SymQuasDef) = "LDLFactorizations.jl"
+linear_system(::LDLFact_SymQuasDef) = "Augmented system"
 
 """
-    update_linear_solver!(ls, θ, regP, regD)
+    update!(kkt, θ, regP, regD)
 
 Update LDLᵀ factorization of the augmented system.
 
@@ -75,39 +63,39 @@ Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
     the factorization.
 Throws a `PosDefException` if matrix is not quasi-definite.
 """
-function update_linear_solver!(
-    ls::LDLFLinearSolver{Tv},
+function update!(
+    kkt::LDLFact_SymQuasDef{Tv},
     θ::AbstractVector{Tv},
     regP::AbstractVector{Tv},
     regD::AbstractVector{Tv}
 ) where{Tv<:Real}
     # Sanity checks
-    length(θ)  == ls.n || throw(DimensionMismatch(
-        "θ has length $(length(θ)) but linear solver is for n=$(ls.n)."
+    length(θ)  == kkt.n || throw(DimensionMismatch(
+        "θ has length $(length(θ)) but linear solver is for n=$(kkt.n)."
     ))
-    length(regP) == ls.n || throw(DimensionMismatch(
-        "regP has length $(length(regP)) but linear solver has n=$(ls.n)"
+    length(regP) == kkt.n || throw(DimensionMismatch(
+        "regP has length $(length(regP)) but linear solver has n=$(kkt.n)"
     ))
-    length(regD) == ls.m || throw(DimensionMismatch(
-        "regD has length $(length(regD)) but linear solver has m=$(ls.m)"
+    length(regD) == kkt.m || throw(DimensionMismatch(
+        "regD has length $(length(regD)) but linear solver has m=$(kkt.m)"
     ))
 
     # Update diagonal scaling
-    ls.θ .= θ
+    kkt.θ .= θ
     # Update regularizers
-    ls.regP .= regP
-    ls.regD .= regD
+    kkt.regP .= regP
+    kkt.regD .= regD
 
     # Re-compute factorization
     # TODO: Keep S in memory, only change diagonal
     S = [
-        spdiagm(0 => -ls.θ .- regP)  ls.A';
-        ls.A spdiagm(0 => regD)
+        spdiagm(0 => -kkt.θ .- regP)  kkt.A';
+        kkt.A spdiagm(0 => regD)
     ]
 
     # TODO: PSD-ness checks
     try
-        ls.F = LDLF.ldl(S)
+        kkt.F = LDLF.ldl(S)
     catch err
         isa(err, LDLF.SQDException) && throw(PosDefException(-1))
         rethrow(err)
@@ -117,22 +105,22 @@ function update_linear_solver!(
 end
 
 """
-    solve_augmented_system!(dx, dy, ls, ξp, ξd)
+    solve!(dx, dy, kkt, ξp, ξd)
 
 Solve the augmented system, overwriting `dx, dy` with the result.
 """
-function solve_augmented_system!(
+function solve!(
     dx::Vector{Tv}, dy::Vector{Tv},
-    ls::LDLFLinearSolver{Tv},
+    kkt::LDLFact_SymQuasDef{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:Real}
-    m, n = ls.m, ls.n
+    m, n = kkt.m, kkt.n
     
     # Set-up right-hand side
     ξ = [ξd; ξp]
 
     # Solve augmented system
-    d = ls.F \ ξ
+    d = kkt.F \ ξ
 
     # Recover dx, dy
     @views dx .= d[1:n]

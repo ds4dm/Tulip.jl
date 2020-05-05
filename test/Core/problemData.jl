@@ -71,7 +71,7 @@ function run_tests_pbdata(Tv::Type)
             params = TLP.Parameters{Tv}()
             hsd = TLP.HSDSolver{Tv}(params, pb)
 
-            A = hsd.ls.A
+            A = hsd.kkt.A
             @test Matrix(A) == Tv.([
                 [-1 1 1 0];
                 [2 -2 0 -1]

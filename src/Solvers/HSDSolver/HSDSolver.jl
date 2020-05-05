@@ -38,7 +38,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     =====================#
     pt::Point{Tv}    # Current primal-dual iterate
     res::Residuals{Tv}  # Residuals at current iterate
-    ls::AbstractLinearSolver{Tv}
+    kkt::AbstractKKTSolver{Tv}
     regP::Vector{Tv}  # primal regularization
     regD::Vector{Tv}  # dual regularization
     regG::Tv  # gap regularization
@@ -84,7 +84,7 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
             zero(Tv), zero(Tv), zero(Tv), zero(Tv)
         )
 
-        hsd.ls = AbstractLinearSolver(params.LinearSolverBackend, params.LinearSolverSystem, A)
+        hsd.kkt = KKT.setup(params.KKTOptions.Ts, A; params.KKTOptions.options...)
 
         # Initial regularizations
         hsd.regP = ones(Tv, nvar)
@@ -321,12 +321,9 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         nupb = nvarupb + nslackupb
 
         # Build matrix
-        A = construct_matrix(params.MatrixType, ncon, nvar, aI, aJ, aV)
+        A = construct_matrix(params.MatrixOptions.Ta, ncon, nvar, aI, aJ, aV; params.MatrixOptions.options...)
 
-        # TODO: setup linear solver
-
-        # TODO: log
-        # @info "Standard form problem has $ncon constraints and $nvar variables ($nupb upper-bounds)"
+        # TODO: setup linear solver here
         
         return HSDSolver{Tv}(params, ncon, nvar, nupb, A, b, pb.objsense, c, c0, uind, uval)
     end
@@ -468,9 +465,9 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
     if params.OutputLevel > 0
         @printf "\nOptimizer info\n"
         @printf "Linear solver options\n"
-        @printf "  %-12s : %s\n" "Precision" "$Tv"
-        @printf "  %-12s : %s\n" "Backend" TLA.backend(hsd.ls)
-        @printf "  %-12s : %s\n" "System" TLA.linear_system(hsd.ls)
+        @printf "  %-12s : %s\n" "Arithmetic" KKT.arithmetic(hsd.kkt)
+        @printf "  %-12s : %s\n" "Backend" KKT.backend(hsd.kkt)
+        @printf "  %-12s : %s\n" "System" KKT.linear_system(hsd.kkt)
     end
 
     # IPM LOG

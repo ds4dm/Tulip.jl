@@ -19,8 +19,8 @@ const testdir = dirname(@__FILE__)
         include("Solvers/HSD.jl")
     end
 
-    @testset "Linear Algebra" begin
-        include("LinearAlgebra/linearAlgebra.jl")
+    @testset "KKT" begin
+        include("KKTSolver/KKTSolver.jl")
     end
 
     @testset "Presolve" begin

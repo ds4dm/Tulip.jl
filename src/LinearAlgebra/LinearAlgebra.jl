@@ -1,11 +1,27 @@
 module TLPLinearAlgebra
 
 using LinearAlgebra
-BlasReal = LinearAlgebra.BlasReal
 
 using SparseArrays
 
 export construct_matrix
+
+"""
+    MatrixOptions
+
+Used to pass options for setting-up the matrix.
+
+```julia
+julia> model = Tulip.Model{Float64}()
+julia> model.params.MatrixOptions = Tulip.TLA.MatrixOptions(SparseMatrixCSC)
+```
+"""
+struct MatrixOptions
+    Ta::Type{<:AbstractMatrix}
+    options::Base.Iterators.Pairs
+
+    MatrixOptions(::Type{Ts}; kwargs...) where{Ts<:AbstractMatrix} = new(Ts, kwargs)
+end
 
 
 """
@@ -32,7 +48,5 @@ construct_matrix(
     ::Type{SparseMatrixCSC}, m::Int, n::Int,
     aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{Tv}
 ) where{Tv<:Real} = sparse(aI, aJ, aV, m, n)
-
-include("LinearSolvers/LinearSolvers.jl")
 
 end  # module
