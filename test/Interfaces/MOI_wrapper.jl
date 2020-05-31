@@ -14,10 +14,11 @@ const MOI_EXCLUDE = [
     "delete_nonnegative_variables",         # Requires Vector-Of-Variables
     "update_dimension_nonnegative_variables",
     "delete_soc_variables",
+    "solve_func_vectoraffine_nonneg",       # Requires `VectorAffineFunction` and `Nonnegatives`
     # Require SingleVariable objective function
     "get_objective_function",
     "solve_result_index",
-    "solve_singlevariable_obj",             
+    "solve_singlevariable_obj",
     "solve_single_variable_dual_max",
     "solve_single_variable_dual_min",
     "solve_integer_edge_cases",             # Requires integer variables
