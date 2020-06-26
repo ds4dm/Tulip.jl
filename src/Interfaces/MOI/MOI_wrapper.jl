@@ -98,7 +98,7 @@ mutable struct Optimizer{Tv} <: MOI.AbstractOptimizer
     name2con::Dict{String, MOI.ConstraintIndex}
     # MOIIndex -> name mapping for SingleVariable constraints
     # Will be dropped with MOI 0.10
-    #   => (https://github.com/JuliaOpt/MathOptInterface.jl/issues/832)
+    #   => (https://github.com/jump-dev/MathOptInterface.jl/issues/832)
     bnd2name::Dict{MOI.ConstraintIndex, String}
 
     # Keep track of bound constraints
