@@ -23,7 +23,7 @@ Just install like any Julia package
 
 ## Usage
 
-The recommended way of using Tulip is through [JuMP](https://github.com/JuliaOpt/JuMP.jl) and/or [MathOptInterface](https://github.com/JuliaOpt/MathOptInterface.jl) (MOI).
+The recommended way of using Tulip is through [JuMP](https://github.com/jump-dev/JuMP.jl) and/or [MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl) (MOI).
 
 The low-level interface is still under development and is likely change in the future.
 The MOI interface is more stable.
