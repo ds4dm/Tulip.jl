@@ -1,5 +1,18 @@
 # Tulip release notes
 
+# v0.5.1 (August 15, 2020)
+* Fix URLs following migration to jump.dev (#51)
+* Fix bug in constraint/variable deletion (#52,#53)
+
+# v0.5.0
+* Support the MOI attribute `Name` (#47)
+* Simplify the user interface for choosing between different linear solvers (#48)
+
+# v0.4.0 (April 25, 2020)
+* Re-write data structure and interface (#44)
+* Add presolve module (#45)
+* Move `UnitBlockAngular` code to a separate package (#46)
+
 # v0.3.0 (February 29, 2020)
 
 * Improved documentation for parameter management (#43)
