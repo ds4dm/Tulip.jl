@@ -324,15 +324,23 @@ function delete_constraint!(pb::ProblemData{Tv}, rind::Int) where{Tv}
     deleteat!(pb.ucon, rind)
     
     # Update columns
-    for j in pb.arows[rind].nzind
-        col = pb.acols[j]
-        k = searchsortedfirst(col.nzind, rind)
-        # Delete coefficient from column
-        deleteat!(col.nzind, k)
-        deleteat!(col.nzval, k)
-        # Update remaining indices
-        col.nzind[k:end] .-= 1
-    end
+    for (j, col) in enumerate(pb.acols)
+        # Search for row in that column
+        rg = searchsorted(col.nzind, rind)
+        if rg.start > length(col.nzind)
+            # Nothing to do
+            continue
+        else
+            if col.nzind[rg.start] == rind
+                # Delete row from column
+                deleteat!(col.nzind, rg.start)
+                deleteat!(col.nzval, rg.start)
+            end
+
+            # Decrement subsequent row indices
+            col.nzind[rg.start:end] .-= 1
+        end
+    end 
 
     # Delete row
     deleteat!(pb.arows, rind)
@@ -375,14 +383,22 @@ function delete_variable!(pb::ProblemData{Tv}, cind::Int) where{Tv}
     deleteat!(pb.uvar, cind)
     
     # Update rows
-    for i in pb.acols[cind].nzind
-        row = pb.arows[i]
-        k = searchsortedfirst(row.nzind, cind)
-        # Delete coeff from row
-        deleteat!(row.nzind, k)
-        deleteat!(row.nzval, k)
-        # Update remaining coefficients
-        row.nzind[k:end] .-= 1
+    for (i, row) in enumerate(pb.arows)
+        # Search for column in that row
+        rg = searchsorted(row.nzind, cind)
+        if rg.start > length(row.nzind)
+            # Nothing to do
+            continue
+        else
+            if row.nzind[rg.start] == cind
+                # Column appears in row
+                deleteat!(row.nzind, rg.start)
+                deleteat!(row.nzval, rg.start)
+            end
+
+            # Decrement subsequent column indices
+            row.nzind[rg.start:end] .-= 1
+        end
     end
 
     # Delete column
