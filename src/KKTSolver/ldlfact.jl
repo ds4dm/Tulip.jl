@@ -29,6 +29,9 @@ mutable struct LDLFact_SymQuasDef{Tv<:Real} <: AbstractKKTSolver{Tv}
     regP::Vector{Tv}  # primal regularization
     regD::Vector{Tv}  # dual regularization
 
+    # Left-hand side matrix
+    S::SparseMatrixCSC{Tv, Int}
+
     # Factorization
     F::LDLF.LDLFactorization{Tv}
 
@@ -39,12 +42,14 @@ mutable struct LDLFact_SymQuasDef{Tv<:Real} <: AbstractKKTSolver{Tv}
 
         S = [
             spdiagm(0 => -θ)  A';
-            A spdiagm(0 => ones(m))
+            spzeros(Tv, m, n) spdiagm(0 => ones(m))
         ]
 
         # TODO: PSD-ness checks
-        F = LDLF.ldl(S)
-        return new{Tv}(m, n, A, θ, ones(Tv, n), ones(Tv, m), F)
+        # TODO: symbolic factorization only
+        F = LDLF.ldl(S, upper=true)
+
+        return new{Tv}(m, n, A, θ, ones(Tv, n), ones(Tv, m), S, F)
     end
 
 end
@@ -86,16 +91,20 @@ function update!(
     kkt.regP .= regP
     kkt.regD .= regD
 
-    # Re-compute factorization
-    # TODO: Keep S in memory, only change diagonal
-    S = [
-        spdiagm(0 => -kkt.θ .- regP)  kkt.A';
-        kkt.A spdiagm(0 => regD)
-    ]
+    # Update S.
+    # S is stored as upper-triangular and only its diagonal changes.
+    @inbounds for j in 1:kkt.n
+        k = kkt.S.colptr[1+j] - 1
+        kkt.S.nzval[k] = -kkt.θ[j] - regP[j]
+    end
+    @inbounds for i in 1:kkt.m
+        k = kkt.S.colptr[1+kkt.n+i] - 1
+        kkt.S.nzval[k] = regD[i]
+    end
 
     # TODO: PSD-ness checks
     try
-        kkt.F = LDLF.ldl(S)
+        kkt.F = LDLF.ldl(kkt.S, upper=true)
     catch err
         isa(err, LDLF.SQDException) && throw(PosDefException(-1))
         rethrow(err)
