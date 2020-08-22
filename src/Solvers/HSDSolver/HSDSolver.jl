@@ -346,24 +346,18 @@ function compute_residuals!(
     uind::Vector{Int}, uval::Vector{Tv}
 ) where{Tv<:Real}
 
-    # Primal residual
-    # ``rp = t*b - A*x``
-    mul!(res.rp, A, pt.x)
-    rmul!(res.rp, -oneunit(Tv))
-    axpy!(pt.t, b, res.rp)
+    # Primal residual: `rp = t*b - A*x`
+    axpby!(pt.t, b, zero(Tv), res.rp)
+    mul!(res.rp, A, pt.x, -one(Tv), one(Tv))
 
-    # Upper-bound residual
-    # ``ru = t*u - w - x``
-    rmul!(res.ru, zero(Tv))
-    axpy!(-oneunit(Tv), pt.w, res.ru)
-    @views axpy!(-oneunit(Tv), pt.x[uind], res.ru)
-    axpy!(pt.t, uval, res.ru)
+    # Upper-bound residual: `ru = t*u - w - x`
+    axpby!(oneunit(Tv), pt.w, zero(Tv), res.ru)
+    @views axpy!(oneunit(Tv), pt.x[uind], res.ru)
+    axpby!(pt.t, uval, -one(Tv), res.ru)
 
-    # Dual residual
-    # ``rd = t*c - A'*y - s + z``
-    mul!(res.rd, transpose(A), pt.y)
-    rmul!(res.rd, -oneunit(Tv))
-    axpy!(pt.t, c, res.rd)
+    # Dual residual: `rd = t*c - A'*y - s + z`
+    axpby!(pt.t, c, zero(Tv), res.rd)
+    mul!(res.rd, transpose(A), pt.y, -one(Tv), one(Tv))
     axpy!(-oneunit(Tv), pt.s, res.rd)
     @views axpy!(oneunit(Tv), pt.z, res.rd[uind])
 
