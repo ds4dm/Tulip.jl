@@ -658,7 +658,6 @@ function remove_dominated_columns!(ps::PresolveData{Tv}) where{Tv}
         if !isfinite(l) && !isfinite(u)
             # Free variable. Should not happen but handle anyway
             # TODO
-            @warn "TODO: dual bounds strengthening for free column singletons"
         elseif isfinite(l) && !isfinite(u)
             # Lower-bounded variable: `aij * yi ≤ cj`
             if aij > zero(Tv)
