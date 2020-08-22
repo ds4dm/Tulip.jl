@@ -65,6 +65,12 @@ end
 Solve the optimization problem.
 """
 function optimize!(model::Model{Tv}) where{Tv}
+
+    # Set number of threads
+    model.params.Threads >= 1 || error(
+        "Number of threads must be > 0 (is $(model.params.Threads))"
+    )
+    BLAS.set_num_threads(model.params.Threads)
     
     # Print initial stats
     if model.params.OutputLevel > 0
