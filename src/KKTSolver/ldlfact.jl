@@ -47,7 +47,7 @@ mutable struct LDLFact_SymQuasDef{Tv<:Real} <: AbstractKKTSolver{Tv}
 
         # TODO: PSD-ness checks
         # TODO: symbolic factorization only
-        @time F = LDLF.ldl(S, upper=true)
+        F = LDLF.ldl(S, upper=true)
 
         return new{Tv}(m, n, A, θ, ones(Tv, n), ones(Tv, m), S, F)
     end
