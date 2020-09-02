@@ -34,6 +34,7 @@ mutable struct KrylovPDSolver{T, F, Tv, Ta} <: KrylovSolver{T}
         F = typeof(f)
         m, n = size(A)
         T = eltype(A)
+
         return new{T, F, Vector{T}, Ta}(
             m, n,
             f,
@@ -98,13 +99,23 @@ function solve!(
     # Set-up right-hand side
     ξ_ = ξp .+ kkt.A * (D * ξd)
 
-    # Solve normal equations
-    opA = LO.LinearOperator(kkt.A)
-    opS = opA * D * opA' + Diagonal(kkt.regD)
-    y, stats = kkt.f(opS, ξ_)
+    # Form linear operator S = A * D *A' + Rd
+    # Here we pre-allocate the intermediary and final vectors
+    v1 = zeros(Tv, n)
+    v2 = zeros(Tv, m)
+    opS = LO.LinearOperator(Tv, m, m, true, true,
+        w -> begin
+            mul!(v1, kkt.A', w)
+            v1 .*= d
+            mul!(v2, kkt.A, v1)
+            v2 .+= kkt.regD .* w
+            v2
+        end
+    )
 
-    # @info stats.residuals
-    dy .= y
+    # Solve normal equations
+    _dy, stats = kkt.f(opS, ξ_)
+    dy .= _dy
 
     # Recover dx
     dx .= D * (kkt.A' * dy - ξd)
