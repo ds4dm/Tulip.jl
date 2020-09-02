@@ -93,14 +93,14 @@ function solve!(
 
     # Setup
     d = one(Float64) ./ (kkt.θ .+ kkt.regP)
-    D = LO.opDiagonal(d)
+    D = Diagonal(d)
     
     # Set-up right-hand side
     ξ_ = ξp .+ kkt.A * (D * ξd)
 
     # Solve normal equations
     opA = LO.LinearOperator(kkt.A)
-    opS = opA * D * opA' + LO.opDiagonal(kkt.regD)
+    opS = opA * D * opA' + Diagonal(kkt.regD)
     y, stats = kkt.f(opS, ξ_)
 
     # @info stats.residuals
@@ -203,7 +203,7 @@ function solve!(
 
     # Setup
     d = one(Float64) ./ (kkt.θ .+ kkt.regP)
-    D = LO.opDiagonal(d)
+    D = Diagonal(d)
 
     # Solve augmented system
     # Currently assumes that Rd is a multiple of the identity matrix
