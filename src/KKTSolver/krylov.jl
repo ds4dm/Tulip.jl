@@ -93,7 +93,7 @@ function solve!(
     m, n = kkt.m, kkt.n
 
     # Setup
-    d = one(Float64) ./ (kkt.θ .+ kkt.regP)
+    d = one(Tv) ./ (kkt.θ .+ kkt.regP)
     D = Diagonal(d)
     
     # Set-up right-hand side
@@ -213,7 +213,7 @@ function solve!(
     m, n = kkt.m, kkt.n
 
     # Setup
-    d = one(Float64) ./ (kkt.θ .+ kkt.regP)
+    d = one(Tv) ./ (kkt.θ .+ kkt.regP)
     D = Diagonal(d)
 
     # Solve augmented system
