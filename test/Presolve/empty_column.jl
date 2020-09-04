@@ -29,7 +29,7 @@ function emtpy_column_tests(Tv::Type)
     L = Tv.([-Inf,  -1])
     U = Tv.([   1, Inf])
     C = Tv.([-1, 0, 1])
-    for l in L for u in U for c in C
+    for l in L, u in U, c in C
         @testset "$((l, u, c))" begin
             pb = build_problem(l, u, c)
 
@@ -69,7 +69,7 @@ function emtpy_column_tests(Tv::Type)
                 @test op.j == 1
             end 
         end  # testset
-    end end end  # loop
+    end  # loop
 
     return
 end
