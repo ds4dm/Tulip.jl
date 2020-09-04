@@ -20,7 +20,7 @@ function remove_free_column_singleton!(ps::PresolveData{Tv}, j::Int) where{Tv}
     i, aij = 0, zero(Tv)
     for (i_, a_) in zip(col.nzind, col.nzval)
         if ps.rowflag[i_]
-            nz += 1; nz <= 1 || break
+            nz += !iszero(a_); nz <= 1 || break
 
             i = i_
             aij = a_
@@ -28,7 +28,7 @@ function remove_free_column_singleton!(ps::PresolveData{Tv}, j::Int) where{Tv}
     end
 
     # Not a singleton
-    nz == 1 || (@error "Expected singletons but column $j has $nz non-zeros"; return nothing)
+    nz == 1 || error("Expected singletons but column $j has $nz non-zeros")
 
     if iszero(aij) || iszero(i)
         return nothing  # column is actually empty

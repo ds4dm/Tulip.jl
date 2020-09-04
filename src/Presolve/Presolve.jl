@@ -198,6 +198,8 @@ function extract_reduced_problem!(ps::PresolveData{Tv}) where{Tv<:Real}
         k = 0
         for (jold, aij) in zip(row.nzind, row.nzval)
             ps.colflag[jold] || continue
+            iszero(aij) && continue
+
             # Set new coefficient
             k += 1
             rind[k] = ps.new_var_idx[jold]
@@ -222,6 +224,8 @@ function extract_reduced_problem!(ps::PresolveData{Tv}) where{Tv<:Real}
         k = 0
         for (iold, aij) in zip(col.nzind, col.nzval)
             ps.rowflag[iold] || continue
+            iszero(aij) && continue
+
             # Set new coefficient
             k += 1
             cind[k] = ps.new_con_idx[iold]

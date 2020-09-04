@@ -35,6 +35,7 @@ function remove_fixed_variable!(ps::PresolveData, j::Int)
         # Update rows
         for (i, aij) in zip(col.nzind, col.nzval)
             ps.rowflag[i] || continue  # This row is no longer in the problem
+            iszero(aij) && continue  # Skip if coefficient is zero
 
             # Update row bounds
             ps.lrow[i] -= aij * lb
