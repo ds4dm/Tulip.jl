@@ -22,7 +22,9 @@ mutable struct KrylovPDSolver{T, F, Tv, Ta} <: KrylovSolver{T}
     m::Int
     n::Int
 
-    f::F
+    f::F     # Krylov function
+    atol::T  # absolute tolerance
+    rtol::T  # relative tolerance
 
     # Problem data
     A::Ta     # Constraint matrix
@@ -30,20 +32,22 @@ mutable struct KrylovPDSolver{T, F, Tv, Ta} <: KrylovSolver{T}
     regP::Tv  # primal regularization
     regD::Tv  # dual regularization
 
-    function KrylovPDSolver(f::Function, A::Ta) where{Ta <: AbstractMatrix}
+    function KrylovPDSolver(f::Function, A::Ta;
+        atol::T=sqrt(eps(T)),
+        rtol::T=sqrt(eps(T))
+    ) where{T, Ta <: AbstractMatrix{T}}
         F = typeof(f)
         m, n = size(A)
-        T = eltype(A)
 
         return new{T, F, Vector{T}, Ta}(
             m, n,
-            f,
+            f, atol, rtol,
             A, ones(T, n), ones(T, n), ones(T, m)
         )
     end
 end
 
-setup(::Type{KrylovPDSolver}, A; method) = KrylovPDSolver(method, A)
+setup(::Type{KrylovPDSolver}, A; method, kwargs...) = KrylovPDSolver(method, A; kwargs...)
 
 backend(kkt::KrylovPDSolver) = "Krylov ($(kkt.f))"
 linear_system(::KrylovPDSolver) = "Normal equations"
@@ -99,7 +103,7 @@ function solve!(
     # Set-up right-hand side
     ξ_ = ξp .+ kkt.A * (D * ξd)
 
-    # Form linear operator S = A * D *A' + Rd
+    # Form linear operator S = A * D * A' + Rd
     # Here we pre-allocate the intermediary and final vectors
     v1 = zeros(Tv, n)
     v2 = zeros(Tv, m)
@@ -114,7 +118,7 @@ function solve!(
     )
 
     # Solve normal equations
-    _dy, stats = kkt.f(opS, ξ_)
+    _dy, stats = kkt.f(opS, ξ_, atol=kkt.atol, rtol=kkt.rtol)
     dy .= _dy
 
     # Recover dx
@@ -142,8 +146,10 @@ model.params.KKTOptions = Tulip.KKT.SolverOptions(
 mutable struct KrylovSQDSolver{T, F, Tv, Ta} <: KrylovSolver{T}
     m::Int
     n::Int
-
-    f::F
+    
+    f::F     # Krylov function
+    atol::T  # absolute tolerance
+    rtol::T  # relative tolerance
 
     # Problem data
     A::Ta     # Constraint matrix
@@ -151,19 +157,22 @@ mutable struct KrylovSQDSolver{T, F, Tv, Ta} <: KrylovSolver{T}
     regP::Tv  # primal regularization
     regD::Tv  # dual regularization
 
-    function KrylovSQDSolver(f::Function, A::Ta) where{Ta <: AbstractMatrix}
+    function KrylovSQDSolver(f::Function, A::Ta;
+        atol::T=sqrt(eps(T)),
+        rtol::T=sqrt(eps(T))
+    ) where{T, Ta <: AbstractMatrix{T}}
         F = typeof(f)
         m, n = size(A)
-        T = eltype(A)
+
         return new{T, F, Vector{T}, Ta}(
             m, n,
-            f,
+            f, atol, rtol,
             A, ones(T, n), ones(T, n), ones(T, m)
         )
     end
 end
 
-setup(::Type{KrylovSQDSolver}, A; method=Krylov.trimr) = KrylovSQDSolver(method, A)
+setup(::Type{KrylovSQDSolver}, A; method, kwargs...) = KrylovSQDSolver(method, A; kwargs...)
 
 backend(kkt::KrylovSQDSolver) = "Krylov ($(kkt.f))"
 linear_system(::KrylovSQDSolver) = "Augmented system"
@@ -218,9 +227,11 @@ function solve!(
 
     # Solve augmented system
     # Currently assumes that Rd is a multiple of the identity matrix
-    _dy, _dx, stats = kkt.f(kkt.A, ξp, ξd, N=D, τ = kkt.regD[1])
+    _dy, _dx, stats = kkt.f(kkt.A, ξp, ξd,
+        N=D, τ = kkt.regD[1],
+        atol=kkt.atol, rtol=kkt.rtol
+    )
 
-    # @info stats.residuals
     dx .= _dx
     dy .= _dy
 
