@@ -10,7 +10,7 @@ import Krylov
                         1 0 1 0;
                         0 1 0 1
                     ])
-                    kkt = KKT.KrylovPDSolver(f, A)
+                    kkt = KKT.KrylovSPDSolver(f, A)
                     KKT.run_ls_tests(A, kkt)
                 end
             end

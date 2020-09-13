@@ -9,21 +9,36 @@ Abstract type for Kyrlov-based linear solvers.
 abstract type AbstractKrylovSolver{T} <: AbstractKKTSolver{T} end
 
 # ==============================================================================
-#   KrylovPDSolver:
+#   KrylovSPDSolver:
 # ==============================================================================
 
 """
-    KrylovPDSolver{T, F, Tv, Ta}
+    KrylovSPDSolver{T, F, Tv, Ta}
 
-Solves normal equations system with an iterative method `f::F`.
+Krylov-based **S**ymmetric **P**ositive-**D**efinite (SPD) linear solver.
 
+Applies a Krylov method to the normal equations systems, then recovers a solution
+to the augmented system.
+The selected Krylov method must therefore handle symmetric positive-definite systems.
+Suitable methods are CG or CR.
+
+A `KrylovSPDSolver` is selected as follows
 ```julia
 model.params.KKTOptions = Tulip.KKT.SolverOptions(
-    KrylovPDSolver, method=Krylov.cg
+    KrylovSPDSolver, method=Krylov.cg,
+    atol=1e-12, rtol=1e-12
 )
 ```
+
+The `method` argument is a function `f::F` whose signature must match
+```julia
+dy, _ = f(S, ξ; atol, rtol)
+```
+where `S`, `ξ` and `dy` are the normal equations system's
+left- and right-hand side, and solution vector, respectively.
+`S` may take the form of a matrix, or of a suitable linear operator.
 """
-mutable struct KrylovPDSolver{T, F, Tv, Ta} <: AbstractKrylovSolver{T}
+mutable struct KrylovSPDSolver{T, F, Tv, Ta} <: AbstractKrylovSolver{T}
     m::Int
     n::Int
 
@@ -37,7 +52,7 @@ mutable struct KrylovPDSolver{T, F, Tv, Ta} <: AbstractKrylovSolver{T}
     regP::Tv  # primal regularization
     regD::Tv  # dual regularization
 
-    function KrylovPDSolver(f::Function, A::Ta;
+    function KrylovSPDSolver(f::Function, A::Ta;
         atol::T=sqrt(eps(T)),
         rtol::T=sqrt(eps(T))
     ) where{T, Ta <: AbstractMatrix{T}}
@@ -52,19 +67,19 @@ mutable struct KrylovPDSolver{T, F, Tv, Ta} <: AbstractKrylovSolver{T}
     end
 end
 
-setup(::Type{KrylovPDSolver}, A; method, kwargs...) = KrylovPDSolver(method, A; kwargs...)
+setup(::Type{KrylovSPDSolver}, A; method, kwargs...) = KrylovSPDSolver(method, A; kwargs...)
 
-backend(kkt::KrylovPDSolver) = "Krylov ($(kkt.f))"
-linear_system(::KrylovPDSolver) = "Normal equations"
+backend(kkt::KrylovSPDSolver) = "Krylov ($(kkt.f))"
+linear_system(::KrylovSPDSolver) = "Normal equations"
 
 
 """
-    update!(kkt::KrylovPDSolver, θ, regP, regD)
+    update!(kkt::KrylovSPDSolver, θ, regP, regD)
 
 Update diagonal scaling ``θ`` and primal-dual regularizations.
 """
 function update!(
-    kkt::KrylovPDSolver{Tv},
+    kkt::KrylovSPDSolver{Tv},
     θ::AbstractVector{Tv},
     regP::AbstractVector{Tv},
     regD::AbstractVector{Tv}
@@ -90,13 +105,13 @@ function update!(
 end
 
 """
-    solve!(dx, dy, kkt::KrylovPDSolver, ξp, ξd)
+    solve!(dx, dy, kkt::KrylovSPDSolver, ξp, ξd)
 
-Solve the normal equations system using an iterative method.
+Solve the normal equations system using the selected Krylov method.
 """
 function solve!(
     dx::Vector{Tv}, dy::Vector{Tv},
-    kkt::KrylovPDSolver{Tv},
+    kkt::KrylovSPDSolver{Tv},
     ξp::Vector{Tv}, ξd::Vector{Tv}
 ) where{Tv<:Real}
     m, n = kkt.m, kkt.n
@@ -140,23 +155,28 @@ end
 """
     KrylovSIDSolver{T, F, Tv, Ta}
 
-Solves the augmented system with an iterative method `f::F`.
+Krylov-based **S**ymmetric **I**n**D**efinite (SID) linear solver.
 
-The Krylov method should not exploit the system's SQD structure explicitly,
-and the function `f` will be called as:
+Applies a Krylov method to solve the augmented system,
+without exploiting its quasi-definiteness properties.
+The selected Krylov method must therefore handle symmetric indefinite systems.
+Suitable methods are MINRES or MINRES-QLP.
+
+A `KrylovSIDSolver` is selected as follows
+```julia
+model.params.KKTOptions = Tulip.KKT.SolverOptions(
+    KrylovSIDSolver, method=Krylov.minres,
+    atol=1e-12, rtol=1e-12
+)
+```
+
+The `method` argument is a function `f::F` whose signature must match
 ```julia
 Δ, _ = f(K, ξ; atol, rtol)
 ```
-where `K` and `ξ` are the is the 2x2 system's
-left-hand side matrix (or a suitable linear operator)
-and right-hand side, respectively, and
-`Δ` is the solution vector.
-
-```julia
-model.params.KKTOptions = Tulip.KKT.SolverOptions(
-    KrylovSIDSolver, method=Krylov.minres
-)
-```
+where `K`, `ξ` and `Δ` are the augmented system's
+left- and right-hand side, and solution vector, respectively.
+`K` may take the form of a matrix, or of a suitable linear operator.
 """
 mutable struct KrylovSIDSolver{T, F, Tv, Ta} <: AbstractKrylovSolver{T}
     m::Int
@@ -227,7 +247,7 @@ end
 """
     solve!(dx, dy, kkt::KrylovSIDSolver, ξp, ξd)
 
-Solve the normal equations system using an iterative method.
+Solve the augmented system using the selected Krylov method.
 """
 function solve!(
     dx::Vector{Tv}, dy::Vector{Tv},
@@ -284,13 +304,31 @@ end
 """
     KrylovSQDSolver{T, F, Tv, Ta}
 
-Solves the augmented system with an iterative method `f::F`.
+Krylov-based **S**ymmetric **Q**uasi-**D**efinite (SQD) linear solver.
 
+Applies a Krylov method to solve the augmented system, taking advantage of
+its 2x2 block structure and quasi-definiteness.
+The selected Krylov method must therefore handle 2x2 symmetric quasi-definite systems.
+Suitable methods are TriCG and TriMR.
+
+A `KrylovSIDSolver` is selected as follows
 ```julia
 model.params.KKTOptions = Tulip.KKT.SolverOptions(
-    KrylovSQDSolver, method=Krylov.trimr
+    KrylovSQDSolver, method=Krylov.trimr,
+    atol=1e-12, rtol=1e-12
 )
 ```
+
+The `method` argument is a function `f::F` whose signature must match
+```
+dy, dx, _ = f(A, ξp, ξd; M, N, atol, rtol)
+```
+where the augmented system is of the form
+```
+[ -N⁻¹ Aᵀ ] [dx] = [ξd]
+[  A   M⁻¹] [dy] = [ξp]
+```
+i.e., ``N = (Θ^{-1} + R_{p})^{-1}`` and ``M = R_{d}^{-1}``.
 """
 mutable struct KrylovSQDSolver{T, F, Tv, Ta} <: AbstractKrylovSolver{T}
     m::Int
@@ -361,7 +399,7 @@ end
 """
     solve!(dx, dy, kkt::KrylovSQDSolver, ξp, ξd)
 
-Solve the normal equations system using an iterative method.
+Solve the augmented system using the selected Kyrlov method.
 """
 function solve!(
     dx::Vector{Tv}, dy::Vector{Tv},

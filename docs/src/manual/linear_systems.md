@@ -53,5 +53,10 @@ Here is a list of currently supported linear solvers:
 | [`Cholmod_SymQuasDef`](@ref) | `Float64` | Augmented system | CHOLMOD | LDLᵀ
 | [`Cholmod_SymPosDef`](@ref) | `Float64` | Normal equations | CHOLMOD | Cholesky
 | [`LDLFact_SymQuasDef`](@ref) | `Real` | Augmented system | [LDLFactorizations.jl](https://github.com/JuliaSmoothOptimizers/LDLFactorizations.jl) | LDLᵀ
-| [`KrylovPDSolver`](@ref) | `Real` | Normal equations | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
-| [`KrylovSQDSolver`](@ref) | `Real` | Augmented system | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
+| [`KrylovSPDSolver`](@ref) | `Real` | Normal equations | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
+| [`KrylovSIDSolver`](@ref) | `Real` | Augmented system[^1] | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
+| [`KrylovSQDSolver`](@ref) | `Real` | Augmented system[^1] | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
+
+[^1]: [`KrylovSIDSolver`](@ref)s view the augmented system as a symmetric indefinite system,
+    while [`KrylovSQDSolver`](@ref)s exploit its 2x2 structure and quasi-definite property.
+    See the reference documentation for more details.

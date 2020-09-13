@@ -75,7 +75,11 @@ LDLFact_SymQuasDef
 
 
 ```@docs
-KrylovPDSolver
+KrylovSPDSolver
+```
+
+```@docs
+KrylovSIDSolver
 ```
 
 ```@docs
