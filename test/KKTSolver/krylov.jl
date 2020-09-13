@@ -3,8 +3,9 @@ import Krylov
 @testset "Krylov" begin
     for T in TvTYPES
         @testset "$T" begin
+            # Kyrlov solvers for symmetric positive-definite systems
             for f in [Krylov.cg, Krylov.minres, Krylov.minres_qlp]
-                @testset "$f" begin
+                @testset "PD:  $f" begin
                     A = SparseMatrixCSC{T, Int}([
                         1 0 1 0;
                         0 1 0 1
@@ -13,8 +14,20 @@ import Krylov
                     KKT.run_ls_tests(A, kkt)
                 end
             end
+            # Kyrlov solvers for symmetric indefinite systems
+            for f in [Krylov.minres, Krylov.minres_qlp]
+                @testset "SID: $f" begin
+                    A = SparseMatrixCSC{T, Int}([
+                        1 0 1 0;
+                        0 1 0 1
+                    ])
+                    kkt = KKT.KrylovSIDSolver(f, A)
+                    KKT.run_ls_tests(A, kkt)
+                end
+            end
+            # Kyrlov solvers for symmetric quasi-definite systems
             for f in [Krylov.tricg, Krylov.trimr]
-                @testset "$f" begin
+                @testset "SQD: $f" begin
                     A = SparseMatrixCSC{T, Int}([
                         1 0 1 0;
                         0 1 0 1
