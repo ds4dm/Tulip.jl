@@ -410,12 +410,13 @@ function solve!(
 
     # Setup
     d = one(Tv) ./ (kkt.θ .+ kkt.regP)
-    D = Diagonal(d)
+    N = Diagonal(d)
+
+    M = Diagonal(one(Tv) ./ kkt.regD)
 
     # Solve augmented system
-    # Currently assumes that Rd is a multiple of the identity matrix
     _dy, _dx, stats = kkt.f(kkt.A, ξp, ξd,
-        N=D, τ = kkt.regD[1],
+        M=M, N=N,
         atol=kkt.atol, rtol=kkt.rtol
     )
 
