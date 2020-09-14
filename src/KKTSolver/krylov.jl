@@ -53,8 +53,8 @@ mutable struct KrylovSPDSolver{T, F, Tv, Ta} <: AbstractKrylovSolver{T}
     regD::Tv  # dual regularization
 
     function KrylovSPDSolver(f::Function, A::Ta;
-        atol::T=sqrt(eps(T)),
-        rtol::T=sqrt(eps(T))
+        atol::T=eps(T)^(3 // 4),
+        rtol::T=eps(T)^(3 // 4)
     ) where{T, Ta <: AbstractMatrix{T}}
         F = typeof(f)
         m, n = size(A)
@@ -193,8 +193,8 @@ mutable struct KrylovSIDSolver{T, F, Tv, Ta} <: AbstractKrylovSolver{T}
     regD::Tv  # dual regularization
 
     function KrylovSIDSolver(f::Function, A::Ta;
-        atol::T=sqrt(eps(T)),
-        rtol::T=sqrt(eps(T))
+        atol::T=eps(T)^(3 // 4),
+        rtol::T=eps(T)^(3 // 4)
     ) where{T, Ta <: AbstractMatrix{T}}
         F = typeof(f)
         m, n = size(A)
@@ -345,8 +345,8 @@ mutable struct KrylovSQDSolver{T, F, Tv, Ta} <: AbstractKrylovSolver{T}
     regD::Tv  # dual regularization
 
     function KrylovSQDSolver(f::Function, A::Ta;
-        atol::T=sqrt(eps(T)),
-        rtol::T=sqrt(eps(T))
+        atol::T=eps(T)^(3 // 4),
+        rtol::T=eps(T)^(3 // 4)
     ) where{T, Ta <: AbstractMatrix{T}}
         F = typeof(f)
         m, n = size(A)
