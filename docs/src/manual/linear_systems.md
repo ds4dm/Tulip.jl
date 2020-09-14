@@ -38,7 +38,7 @@ The augmented system above can be reduced to the positive-definite _normal equat
 \Delta x &= (Θ^{-1} + R_{p})^{-1} (A^{T} \Delta y - \xi_{d})
 \end{array}
 ```
-When selected, this reduction is transparent to the interior-point algorithm.
+If available and when selected, this reduction is transparent to the interior-point algorithm.
 
 To enable the use of fast external libraries and/or specialized routines, the resolution of linear systems is performed by an [`AbstractKKTSolver`] object.
 
@@ -53,3 +53,10 @@ Here is a list of currently supported linear solvers:
 | [`Cholmod_SymQuasDef`](@ref) | `Float64` | Augmented system | CHOLMOD | LDLᵀ
 | [`Cholmod_SymPosDef`](@ref) | `Float64` | Normal equations | CHOLMOD | Cholesky
 | [`LDLFact_SymQuasDef`](@ref) | `Real` | Augmented system | [LDLFactorizations.jl](https://github.com/JuliaSmoothOptimizers/LDLFactorizations.jl) | LDLᵀ
+| [`KrylovSPDSolver`](@ref) | `Real` | Normal equations | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
+| [`KrylovSIDSolver`](@ref) | `Real` | Augmented system[^1] | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
+| [`KrylovSQDSolver`](@ref) | `Real` | Augmented system[^1] | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
+
+[^1]: [`KrylovSIDSolver`](@ref)s view the augmented system as a symmetric indefinite system,
+    while [`KrylovSQDSolver`](@ref)s exploit its 2x2 structure and quasi-definite property.
+    See the reference documentation for more details.

@@ -66,3 +66,22 @@ Cholmod_SymPosDef
 ```@docs
 LDLFact_SymQuasDef
 ```
+
+## Krylov
+
+!!! warning
+    Iterative methods are still an experimental feature.
+    Some numerical and performance issues should be expected.
+
+
+```@docs
+KrylovSPDSolver
+```
+
+```@docs
+KrylovSIDSolver
+```
+
+```@docs
+KrylovSQDSolver
+```
