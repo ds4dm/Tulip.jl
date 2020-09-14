@@ -1,7 +1,7 @@
 name = "Tulip"
 uuid = "6dd1b50a-3aae-11e9-10b5-ef983d2400fa"
 authors = ["Mathieu Tanneau <mathieu.tanneau@gmail.com>"]
-version = "0.5.1"
+version = "0.6.0"
 
 [deps]
 Krylov = "ba0b0d4f-ebba-5204-a429-3ac8c609bfb7"
