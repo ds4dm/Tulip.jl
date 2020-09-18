@@ -38,13 +38,16 @@ where `S`, `ξ` and `dy` are the normal equations system's
 left- and right-hand side, and solution vector, respectively.
 `S` may take the form of a matrix, or of a suitable linear operator.
 """
-mutable struct KrylovSPD{T, F, Tv, Ta} <: AbstractKrylovSolver{T}
+mutable struct KrylovSPD{T, F, Tv, Ta, Tp} <: AbstractKrylovSolver{T}
     m::Int
     n::Int
 
     f::F     # Krylov function
     atol::T  # absolute tolerance
     rtol::T  # relative tolerance
+
+    P::Tp  # Preconditioner
+    nitertot::Int  # Total number of Krylov iterations
 
     # Problem data
     A::Ta     # Constraint matrix
@@ -54,14 +57,26 @@ mutable struct KrylovSPD{T, F, Tv, Ta} <: AbstractKrylovSolver{T}
 
     function KrylovSPD(f::Function, A::Ta;
         atol::T=eps(T)^(3 // 4),
-        rtol::T=eps(T)^(3 // 4)
+        rtol::T=eps(T)^(3 // 4),
+        preconditioner::Symbol=:Identity
     ) where{T, Ta <: AbstractMatrix{T}}
         F = typeof(f)
         m, n = size(A)
 
-        return new{T, F, Vector{T}, Ta}(
+        if preconditioner == :Jacobi
+            P = JacobiPreconditioner(ones(T, m))
+        elseif preconditioner == :Identity
+            P = IdentityPreconditioner()
+        else
+            @error "Unknown preconditioner: $preconditioner, using identity instead"
+            P = IdentityPreconditioner()
+        end
+
+        return new{T, F, Vector{T}, Ta, typeof(P)}(
             m, n,
             f, atol, rtol,
+            P,
+            0,
             A, ones(T, n), ones(T, n), ones(T, m)
         )
     end
@@ -101,6 +116,9 @@ function update!(
     kkt.regP .= regP
     kkt.regD .= regD
 
+    # Update Jacobi preconditioner
+    update_preconditioner(kkt)
+
     return nothing
 end
 
@@ -137,16 +155,21 @@ function solve!(
         end
     )
 
-    # Solve normal equations
-    _dy, stats = kkt.f(opS, ξ_, atol=kkt.atol, rtol=kkt.rtol)
-    dy .= _dy
+    opM = op(kkt.P)
+    # @info typeof(opM) extrema(kkt.P.d)
 
-    # Recover dx
+    # Solve normal equations
+    _dy, stats = kkt.f(opS, ξ_, M = opM, atol=kkt.atol, rtol=kkt.rtol)
+
+    # Book-keeping
+    kkt.nitertot += length(stats.residuals) - 1
+    
+    # Recover dy, dx
+    dy .= _dy   
     dx .= D * (kkt.A' * dy - ξd)
 
     return nothing
 end
-
 
 # ==============================================================================
 #   KrylovSID:
@@ -425,3 +448,6 @@ function solve!(
 
     return nothing
 end
+
+# Code for pre-conditioners
+include("preconditioners.jl")
