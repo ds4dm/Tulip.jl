@@ -47,7 +47,7 @@ mutable struct LDLFact_SymQuasDef{Tv<:Real} <: AbstractKKTSolver{Tv}
 
         # TODO: PSD-ness checks
         # TODO: symbolic factorization only
-        F = LDLF.ldl(S, upper=true)
+        F = LDLF.ldl_analyze(Symmetric(S))
 
         return new{Tv}(m, n, A, θ, ones(Tv, n), ones(Tv, m), S, F)
     end
@@ -104,7 +104,7 @@ function update!(
 
     # TODO: PSD-ness checks
     try
-        kkt.F = LDLF.ldl(kkt.S, upper=true)
+        LDLF.ldl_factorize!(Symmetric(kkt.S), kkt.F)
     catch err
         isa(err, LDLF.SQDException) && throw(PosDefException(-1))
         rethrow(err)
