@@ -16,11 +16,11 @@ const testdir = dirname(@__FILE__)
 
 @testset "Unit tests" begin
     include("Core/problemData.jl")
-    include("Solvers/HSD.jl")
+    include("IPM/HSD.jl")
 end
 
 @testset "KKT" begin
-    include("KKTSolver/KKTSolver.jl")
+    include("KKT/KKT.jl")
 end
 
 @testset "Presolve" begin

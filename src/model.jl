@@ -25,7 +25,7 @@ mutable struct Model{Tv}
     # IPM solver
     # If required, the problem is transformed to standard form
     # when instantiating the IPMSolver object.
-    solver::Union{Nothing, AbstractIPMSolver{Tv}}
+    solver::Union{Nothing, AbstractIPMOptimizer{Tv}}
 
     # Problem solution (in original space)
     solution::Union{Nothing, Solution{Tv}}
@@ -123,7 +123,7 @@ function optimize!(model::Model{Tv}) where{Tv}
     end
 
     # Instantiate the IPM solver
-    model.solver = HSDSolver{Tv}(model.params, pb_)
+    model.solver = HSD{Tv}(model.params, pb_)
 
     # Solve the problem
     # TODO: add a try-catch for error handling
@@ -148,7 +148,7 @@ function optimize!(model::Model{Tv}) where{Tv}
     return nothing
 end
 
-function _extract_solution!(sol::Solution{Tv}, pb::ProblemData{Tv}, hsd::HSDSolver{Tv}) where{Tv}
+function _extract_solution!(sol::Solution{Tv}, pb::ProblemData{Tv}, hsd::HSD{Tv}) where{Tv}
 
     # Extract column information
     # TODO: check for ray vs vertex

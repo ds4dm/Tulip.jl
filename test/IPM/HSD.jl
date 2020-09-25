@@ -1,5 +1,3 @@
-import Tulip: HSDSolver, optimize!
-
 function run_tests_hsd(T::Type)
 
     Tv = Vector{T}
@@ -63,7 +61,7 @@ function run_tests_hsd(T::Type)
     u = Vector{T}([2, 2])
     dat = Tulip.IPMData(A, b, true, c, c0, l, u)
 
-    hsd = TLP.HSDSolver(dat, params)
+    hsd = TLP.HSD(dat, params)
 
     # Primal-dual optimal solution
     # x1 = x2 = 0.5; xl = 0.5; xu = 1.5; τ = 1

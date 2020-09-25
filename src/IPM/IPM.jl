@@ -72,7 +72,7 @@ end
 
 
 """
-    AbstractIPMSolver
+    AbstractIPMOptimizer
 
 Abstraction layer for IPM solvers.
 
@@ -80,7 +80,7 @@ An IPM solver implements an interior-point algorithm.
 Currently supported:
     * Homogeneous self-dual (HSD)
 """
-abstract type AbstractIPMSolver{T} end
+abstract type AbstractIPMOptimizer{T} end
 
 """
     ipm_optimize!(ipm, dat)
@@ -89,5 +89,5 @@ Run the interior-point optimizer of `ipm` on LP data `dat`.
 """
 function ipm_optimize! end
 
-include("HSDSolver/HSDSolver.jl")
+include("HSD/HSD.jl")
 # TODO: MPC solver

@@ -15,7 +15,7 @@ Compute next IP iterate for the HSD formulation.
 - `rp, ru, rd, rg`: Primal, dual and optimality residuals
 - `x, w, y, s, z, t, k`: Primal-dual iterate
 """
-function compute_step!(hsd::HSDSolver{T, Tv, Tk},
+function compute_step!(hsd::HSD{T, Tv, Tk},
     dat::IPMData{T, Tv, Tb, Ta}, params::Parameters{T}
 ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tk<:AbstractKKTSolver{T}}
 
@@ -162,7 +162,7 @@ end
 
 
 """
-    solve_newton_system!(Δ, hsd::HSDSolver, dat::IPMData)
+    solve_newton_system!(Δ, hsd::HSD, dat::IPMData)
 
 Solve the Newton system
 ```math
@@ -212,7 +212,7 @@ Solve the Newton system
 - `ξp, ξd, ξu, ξg, ξxs, ξwz, ξtk`: Right-hand side vectors
 """
 function solve_newton_system!(Δ::Point{T, Tv},
-    hsd::HSDSolver{T, Tv, Tk},
+    hsd::HSD{T, Tv, Tk},
     dat::IPMData{T, Tv, Tb, Ta},
     # Information from initial augmented system solve
     hx::Tv, hy::Tv, h0::T,
@@ -417,7 +417,7 @@ Requires the solution of one Newton system.
 - `β`: Relative threshold for centrality outliers
 """
 function compute_higher_corrector_hsd!(Δc::Point{T, Tv},
-    hsd::HSDSolver{T, Tv, Tk}, dat::IPMData{T, Tv, Tb, Ta}, γ::T,
+    hsd::HSD{T, Tv, Tk}, dat::IPMData{T, Tv, Tb, Ta}, γ::T,
     hx::Tv, hy::Tv, h0::T,
     Δ::Point{T, Tv}, α::T, β::T,
 ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tk<:AbstractKKTSolver{T}}

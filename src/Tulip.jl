@@ -13,7 +13,7 @@ import .TLPLinearAlgebra.construct_matrix
 const TLA = TLPLinearAlgebra
 
 # KKT solvers
-include("./KKTSolver/KKTSolver.jl")
+include("KKT/KKT.jl")
 using .KKT
 
 # Commons data structures
@@ -29,10 +29,10 @@ include("attributes.jl")
 include("Presolve/Presolve.jl")
 
 # IPM solvers
-include("./Solvers/Solvers.jl")
+include("./IPM/IPM.jl")
 
 # Model
-include("./model.jl")
+include("model.jl")
 
 # Interfaces
 include("Interfaces/tulip_julia_api.jl")

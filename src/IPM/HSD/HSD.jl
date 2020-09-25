@@ -1,9 +1,9 @@
 """
-    HSDSolver
+    HSD
 
 Solver for the homogeneous self-dual algorithm.
 """
-mutable struct HSDSolver{T, Tv, Tk} <: AbstractIPMSolver{T}
+mutable struct HSD{T, Tv, Tk} <: AbstractIPMOptimizer{T}
 
     # =================
     #   Book-keeping
@@ -30,7 +30,7 @@ mutable struct HSDSolver{T, Tv, Tk} <: AbstractIPMSolver{T}
     regD::Tv  # dual regularization
     regG::T   # gap regularization
 
-    function HSDSolver(
+    function HSD(
         dat::IPMData{T, Tv, Tb, Ta}, params::Parameters{T}
     ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
         
@@ -62,7 +62,7 @@ mutable struct HSDSolver{T, Tv, Tk} <: AbstractIPMSolver{T}
     end
 
     # TODO: remove and convert ProblemData --> IPMData
-    function HSDSolver{Tv}(params::Parameters{Tv}, pb::ProblemData{Tv}) where{Tv}
+    function HSD{Tv}(params::Parameters{Tv}, pb::ProblemData{Tv}) where{Tv}
         nvar = pb.nvar
         ncon = pb.ncon
 
@@ -293,22 +293,22 @@ mutable struct HSDSolver{T, Tv, Tk} <: AbstractIPMSolver{T}
 
         # TODO: setup linear solver here
         
-        return HSDSolver{Tv}(params, ncon, nvar, nupb, A, b, pb.objsense, c, c0, uind, uval)
+        return HSD{Tv}(params, ncon, nvar, nupb, A, b, pb.objsense, c, c0, uind, uval)
     end
 
 end
 
-include("./hsd_step.jl")
+include("step.jl")
 
 
 """
-    compute_residuals!(::HSDSolver, res, pt, A, b, c, uind, uval)
+    compute_residuals!(::HSD, res, pt, A, b, c, uind, uval)
 
 In-place computation of primal-dual residuals at point `pt`.
 """
 # TODO: check whether having just hsd as argument makes things slower
 # TODO: Update solution status
-function compute_residuals!(hsd::HSDSolver{T, Tv}, dat::IPMData{T, Tv, Tb, Ta}
+function compute_residuals!(hsd::HSD{T, Tv}, dat::IPMData{T, Tv, Tb, Ta}
 ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
 
     pt, res = hsd.pt, hsd.res
@@ -371,7 +371,7 @@ end
 Update status and return true if solver should stop.
 """
 function update_solver_status!(
-    hsd::HSDSolver{T, Tv}, dat::IPMData{T, Tv, Tb, Ta},
+    hsd::HSD{T, Tv}, dat::IPMData{T, Tv, Tb, Ta},
     ϵp::T, ϵd::T, ϵg::T, ϵi::T
 ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
     hsd.solver_status = Trm_Unknown
@@ -435,7 +435,7 @@ end
     optimize!
 
 """
-function ipm_optimize!(hsd::HSDSolver{T, Tv, Tk},
+function ipm_optimize!(hsd::HSD{T, Tv, Tk},
     dat::IPMData{T, Tv, Tb, Ta},
     params::Parameters{T}
 ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tk<:AbstractKKTSolver{T}}
