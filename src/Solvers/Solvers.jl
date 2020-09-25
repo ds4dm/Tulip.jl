@@ -1,67 +1,73 @@
 using Printf
 
+include("ipmdata.jl")
+
 """
-    Point{Tv<:Real}
+    Point{T, Tv}
 
 Primal-dual point.
 """
-mutable struct Point{Tv<:Real}
+mutable struct Point{T, Tv}
     # Dimensions
     m::Int  # Number of constraints
     n::Int  # Number of variables
-    p::Int  # Number of upper-bounded variables
+    p::Int  # Total number of finite variable bounds (lower and upper)
 
     # Primal variables
-    x::Vector{Tv}  # Original variables
-    w::Vector{Tv}  # Upper-bound slacks
-    t::Tv          # Homogeneous variable
+     x::Tv  # Original variables
+    xl::Tv  # Lower-bound slack: `x - xl == l` (zero if `l == -∞`)
+    xu::Tv  # Upper-bound slack: `x + xu == u` (zero if `u == +∞`)
 
     # Dual variables
-    y::Vector{Tv}  # Dual variables
-    s::Vector{Tv}  # Reduced costs
-    z::Vector{Tv}  # Dual of upper-bound
-    k::Tv          # Homogeneous variable
+     y::Tv  # Dual variables
+    zl::Tv  # Lower-bound dual, zero if `l == -∞`
+    zu::Tv  # Upper-bound dual, zero if `u == +∞`
 
-    # Regularizers
-    qp::Vector{Tv}  # Primal regularizer
-    qd::Vector{Tv}  # Dual regularizer
+    # HSD variables
+    # Only used with homogeneous form
+    τ::T
+    κ::T
 
     # Centrality parameter
-    μ::Tv
+    μ::T
 
-    Point{Tv}(ncon::Int, nvar::Int, nupb::Int) where{Tv<:Real} = new{Tv}(
-        ncon, nvar, nupb,
-        zeros(Tv, nvar), zeros(Tv, nupb), zero(Tv),
-        zeros(Tv, ncon), zeros(Tv, nvar), zeros(Tv, nupb), zero(Tv),
-        zeros(Tv, nvar), zeros(Tv, ncon),
-        zero(Tv)
+    # TODO: constructor
+    Point{T, Tv}(m, n, p) where{T, Tv<:AbstractVector{T}} = new{T, Tv}(
+        m, n, p,
+        tzeros(Tv, n), tzeros(Tv, n), tzeros(Tv, n),
+        tzeros(Tv, m), tzeros(Tv, n), tzeros(Tv, n),
+        one(T), one(T),
+        one(T)
     )
 end
 
-function update_mu!(pt::Point{Tv}) where{Tv<:Real}
-    pt.μ = ((dot(pt.x, pt.s) + dot(pt.w, pt.z) + pt.t * pt.k)) / (pt.n + pt.p + 1)
+function update_mu!(pt::Point)
+    pt.μ = (dot(pt.xl, pt.zl) + dot(pt.xu, pt.zu) + pt.τ * pt.κ) / (pt.p + 1)
     return nothing
 end
 
 
 """
-    Residuals{Tv<:Real}
+    Residuals{T, Tv}
 
+Data structure for IPM residual vectors.
 """
-mutable struct Residuals{Tv<:Real}
+mutable struct Residuals{T, Tv}
     # Primal residuals
-    rp::Vector{Tv}  # rp = t*b - A*x
-    ru::Vector{Tv}  # ru = t*u - w - U*x
+    rp::Tv  # rp = τ*b - A*x
+    rl::Tv  # rl = τ*l - (x - xl)
+    ru::Tv  # ru = τ*u - (x + xu)
 
     # Dual residuals
-    rd::Vector{Tv}  # rd = t*c - A'y - s + U'z
-    rg::Tv          # rg = c'x - b'y - u'z + k
+    rd::Tv  # rd = τ*c - (A'y + zl - zu)
+    rg::T  # rg = c'x - (b'y + l'zl - u'zu) + κ
 
     # Residuals' norms
-    rp_nrm::Tv  # |rp|
-    ru_nrm::Tv  # |ru|
-    rd_nrm::Tv  # |rd|
-    rg_nrm::Tv  # |rg|
+    rp_nrm::T  # |rp|
+    rl_nrm::T  # |rl|
+    ru_nrm::T  # |ru|
+    rd_nrm::T  # |rd|
+    rg_nrm::T  # |rg|
 end
 
 
@@ -73,9 +79,15 @@ Abstraction layer for IPM solvers.
 An IPM solver implements an interior-point algorithm.
 Currently supported:
     * Homogeneous self-dual (HSD)
-    * Mehrotra predictor-corrector (MPC)
 """
-abstract type AbstractIPMSolver{Tv<:Real} end
+abstract type AbstractIPMSolver{T} end
+
+"""
+    ipm_optimize!(ipm, dat)
+
+Run the interior-point optimizer of `ipm` on LP data `dat`.
+"""
+function ipm_optimize! end
 
 include("HSDSolver/HSDSolver.jl")
 # TODO: MPC solver

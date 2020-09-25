@@ -3,21 +3,7 @@
 
 Solver for the homogeneous self-dual algorithm.
 """
-mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
-
-    # =================
-    #   Problem data
-    # =================
-    ncon::Int  # Number of linear constraints
-    nvar::Int  # Number of variables
-    nupb::Int  # Number of upper-bounded variables
-    A::AbstractMatrix{Tv}  # Constraint matrix
-    b::Vector{Tv}  # Right-hand side
-    objsense::Bool  # true if min, false if max
-    c::Vector{Tv}  # Objective coefficients
-    c0::Tv  # Objective offset
-    uind::Vector{Int}  # Indices of upper-bounded variables
-    uval::Vector{Tv}   # Upper-bounds on variables
+mutable struct HSDSolver{T, Tv, Tk} <: AbstractIPMSolver{T}
 
     # =================
     #   Book-keeping
@@ -27,71 +13,51 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
     primal_status::SolutionStatus
     dual_status::SolutionStatus
 
-    primal_bound_unscaled::Tv  # Unscaled primal bound c'x
-    primal_bound_scaled::Tv  # Scaled primal bound (c'x) / t
-    dual_bound_unscaled::Tv  # Unscaled dual bound b'y - u'z
-    dual_bound_scaled::Tv  # Scaled dual bound (b'y - u'z) / t
+    primal_bound_unscaled::T  # Unscaled primal bound c'x
+    primal_bound_scaled::T    # Scaled primal bound (c'x) / t
+    dual_bound_unscaled::T    # Unscaled dual bound b'y - u'z
+    dual_bound_scaled::T      # Scaled dual bound (b'y - u'z) / t
 
 
     #=====================
         Working memory
     =====================#
-    pt::Point{Tv}    # Current primal-dual iterate
-    res::Residuals{Tv}  # Residuals at current iterate
-    kkt::AbstractKKTSolver{Tv}
-    regP::Vector{Tv}  # primal regularization
-    regD::Vector{Tv}  # dual regularization
-    regG::Tv  # gap regularization
-
-    # rxs::Tv  # rhs for complimentary products
-    # rwz::Tv  # rhs for complimentary products
-    # rtk::T          # rhs for homogeneous complimentary products
+    pt::Point{T, Tv}       # Current primal-dual iterate
+    res::Residuals{T, Tv}  # Residuals at current iterate
+    kkt::Tk
+    regP::Tv  # primal regularization
+    regD::Tv  # dual regularization
+    regG::T   # gap regularization
 
     # TODO: Constructor
-    function HSDSolver{Tv}(
-        params::Parameters{Tv},
-        ncon::Int, nvar::Int, nupb::Int,
-        A::AbstractMatrix{Tv}, b::Vector{Tv}, objsense::Bool, c::Vector{Tv}, c0::Tv,
-        uind::Vector{Int}, uval::Vector{Tv}
-    ) where{Tv<:Real}
-        hsd = new{Tv}()
+    function HSDSolver(
+        dat::IPMData{T, Tv, Tb, Ta}, params::Parameters{T}
+    ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
+        
+        m, n = dat.nrow, dat.ncol
+        p = sum(dat.lflag) + sum(dat.uflag)
 
-        hsd.ncon = ncon
-        hsd.nvar = nvar
-        hsd.nupb = nupb
-        hsd.A = A
-        hsd.b = b
-        hsd.objsense = objsense
-        hsd.c = c
-        hsd.c0 = c0
-        hsd.uind = uind
-        hsd.uval = uval
-
-        hsd.niter = 0
-        hsd.solver_status = Trm_Unknown
-        hsd.primal_status = SolutionStatus(0)
-        hsd.dual_status = SolutionStatus(0)
-
-        hsd.primal_bound_scaled = Tv(Inf)
-        hsd.primal_bound_unscaled = Tv(Inf)
-        hsd.dual_bound_scaled = Tv(-Inf)
-        hsd.dual_bound_unscaled = Tv(-Inf)
-
-        hsd.pt = Point{Tv}(ncon, nvar, nupb)
-        hsd.res = Residuals(
-            zeros(Tv, ncon), zeros(Tv, nupb),
-            zeros(Tv, nvar), zero(Tv),
-            zero(Tv), zero(Tv), zero(Tv), zero(Tv)
+        # Allocate some memory
+        pt  = Point{T, Tv}(m, n, p)
+        res = Residuals(
+            tzeros(Tv, m), tzeros(Tv, n), tzeros(Tv, n),
+            tzeros(Tv, n), zero(T),
+            zero(T), zero(T), zero(T), zero(T), zero(T)
         )
 
-        hsd.kkt = KKT.setup(params.KKTOptions.Ts, A; params.KKTOptions.options...)
-
         # Initial regularizations
-        hsd.regP = ones(Tv, nvar)
-        hsd.regD = ones(Tv, ncon)
-        hsd.regG = one(Tv)
+        regP = tones(Tv, n)
+        regD = tones(Tv, m)
+        regG = one(T)
 
-        return hsd
+        kkt = KKT.setup(params.KKTOptions.Ts, dat.A; params.KKTOptions.options...)
+        Tk = typeof(kkt)
+
+        return new{T, Tv, Tk}(
+            0, Trm_Unknown, Sln_Unknown, Sln_Unknown,
+            T(Inf), T(Inf), T(-Inf), T(-Inf),
+            pt, res, kkt, regP, regD, regG
+        )
     end
 
     function HSDSolver{Tv}(params::Parameters{Tv}, pb::ProblemData{Tv}) where{Tv}
@@ -327,6 +293,8 @@ mutable struct HSDSolver{Tv<:Real} <: AbstractIPMSolver{Tv}
         
         return HSDSolver{Tv}(params, ncon, nvar, nupb, A, b, pb.objsense, c, c0, uind, uval)
     end
+
+
 end
 
 include("./hsd_step.jl")
@@ -339,42 +307,58 @@ In-place computation of primal-dual residuals at point `pt`.
 """
 # TODO: check whether having just hsd as argument makes things slower
 # TODO: Update solution status
-function compute_residuals!(
-    hsd::HSDSolver{Tv},
-    res::Residuals{Tv}, pt::Point{Tv},
-    A::AbstractMatrix{Tv}, b::Vector{Tv}, c::Vector{Tv}, c0::Tv,
-    uind::Vector{Int}, uval::Vector{Tv}
-) where{Tv<:Real}
+function compute_residuals!(hsd::HSDSolver{T, Tv}, dat::IPMData{T, Tv, Tb, Ta}
+) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
 
-    # Primal residual: `rp = t*b - A*x`
-    axpby!(pt.t, b, zero(Tv), res.rp)
-    mul!(res.rp, A, pt.x, -one(Tv), one(Tv))
+    pt, res = hsd.pt, hsd.res
 
-    # Upper-bound residual: `ru = t*u - w - x`
-    axpby!(oneunit(Tv), pt.w, zero(Tv), res.ru)
-    @views axpy!(oneunit(Tv), pt.x[uind], res.ru)
-    axpby!(pt.t, uval, -one(Tv), res.ru)
+    # Primal residual
+    # rp = t*b - A*x
+    axpby!(pt.τ, dat.b, zero(T), res.rp)
+    mul!(res.rp, dat.A, pt.x, -one(T), one(T))
 
-    # Dual residual: `rd = t*c - A'*y - s + z`
-    axpby!(pt.t, c, zero(Tv), res.rd)
-    mul!(res.rd, transpose(A), pt.y, -one(Tv), one(Tv))
-    axpy!(-oneunit(Tv), pt.s, res.rd)
-    @views axpy!(oneunit(Tv), pt.z, res.rd[uind])
+    # Lower-bound residual
+    # rl_j = τ*l_j - (x_j - xl_j)  if l_j ∈ R
+    #      = 0                     if l_j = -∞
+    @. res.rl = - pt.x + pt.xl + pt.τ * dat.l
+    res.rl .*= dat.lflag
+
+    # Upper-bound residual
+    # ru_j = τ*u_j - (x_j + xu_j)  if u_j ∈ R
+    #      = 0                     if u_j = +∞
+    @. res.ru = - pt.x - pt.xu + pt.τ * dat.u
+    res.ru .*= dat.uflag
+
+    # Dual residual
+    # rd = t*c - A'y - zl + zu
+    axpby!(pt.τ, dat.c, zero(T), res.rd)
+    mul!(res.rd, transpose(dat.A), pt.y, -one(T), one(T))
+    @. res.rd += pt.zu .* dat.uflag - pt.zl .* dat.lflag
 
     # Gap residual
-    res.rg = dot(c, pt.x) - (dot(b, pt.y) - dot(uval, pt.z)) + pt.k
+    # rg = c'x - (b'y + l'zl - u'zu) + k
+    res.rg = pt.κ + (dot(dat.c, pt.x) - (
+        dot(dat.b, pt.y)
+        + dot(dat.l .* dat.lflag, pt.zl)
+        - dot(dat.u .* dat.uflag, pt.zu)
+    ))
 
     # Residuals norm
     res.rp_nrm = norm(res.rp, Inf)
+    res.rl_nrm = norm(res.ru, Inf)
     res.ru_nrm = norm(res.ru, Inf)
     res.rd_nrm = norm(res.rd, Inf)
     res.rg_nrm = norm(res.rg, Inf)
 
     # Compute primal and dual bounds
-    hsd.primal_bound_unscaled = dot(c, pt.x) + pt.t * c0
-    hsd.primal_bound_scaled   = hsd.primal_bound_unscaled / pt.t
-    hsd.dual_bound_unscaled   = dot(b, pt.y) - dot(uval, pt.z) + pt.t * c0
-    hsd.dual_bound_scaled     = hsd.dual_bound_unscaled / pt.t
+    hsd.primal_bound_unscaled = dot(dat.c, pt.x) + pt.τ * dat.c0
+    hsd.primal_bound_scaled   = hsd.primal_bound_unscaled / pt.τ
+    hsd.dual_bound_unscaled   = pt.τ * dat.c0 + (
+        dot(dat.b, pt.y)
+        + dot(dat.l .* dat.lflag, pt.zl)
+        - dot(dat.u .* dat.uflag, pt.zu)
+    )
+    hsd.dual_bound_scaled     = hsd.dual_bound_unscaled / pt.τ
 
     return nothing
 end
@@ -386,19 +370,20 @@ end
 Update status and return true if solver should stop.
 """
 function update_solver_status!(
-    hsd::HSDSolver{Tv},
-    pt::Point{Tv}, res::Residuals{Tv},
-    A, b, c, c0, uind, uval,
-    ϵp, ϵd, ϵg, ϵi
-) where{Tv<:Real}
+    hsd::HSDSolver{T, Tv}, dat::IPMData{T, Tv, Tb, Ta},
+    ϵp::T, ϵd::T, ϵg::T, ϵi::T
+) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
     hsd.solver_status = Trm_Unknown
 
+    pt, res = hsd.pt, hsd.res
+
     ρp = max(
-        res.rp_nrm / (pt.t * (oneunit(Tv) + norm(b, Inf))),
-        res.ru_nrm / (pt.t * (oneunit(Tv) + norm(uval, Inf)))
+        res.rp_nrm / (pt.τ * (one(T) + norm(dat.b, Inf))),
+        res.rl_nrm / (pt.τ * (one(T) + norm(dat.l .* dat.lflag, Inf))),
+        res.ru_nrm / (pt.τ * (one(T) + norm(dat.u .* dat.uflag, Inf)))
     )
-    ρd = res.rd_nrm / (pt.t * (oneunit(Tv) + norm(c, Inf)))
-    ρg = abs(hsd.primal_bound_unscaled - hsd.dual_bound_unscaled) / (pt.t + abs(hsd.dual_bound_unscaled))
+    ρd = res.rd_nrm / (pt.τ * (one(T) + norm(dat.c, Inf)))
+    ρg = abs(hsd.primal_bound_unscaled - hsd.dual_bound_unscaled) / (pt.τ + abs(hsd.dual_bound_unscaled))
 
     # Check for feasibility
     if ρp <= ϵp
@@ -422,16 +407,19 @@ function update_solver_status!(
     end
     
     # Check for infeasibility certificates
-    if max(norm(A*pt.x, Inf), norm(pt.x[uind] + pt.w, Inf)) * (norm(c, Inf) / max(1, norm(b, Inf))) < - ϵi * dot(c, pt.x)
+    if max(
+        norm(dat.A * pt.x, Inf),
+        norm((pt.x - pt.xl) .* dat.lflag, Inf),
+        norm((pt.x + pt.xu) .* dat.uflag, Inf)
+    ) * (norm(dat.c, Inf) / max(1, norm(dat.b, Inf))) < - ϵi * dot(dat.c, pt.x)
         # Dual infeasible, i.e., primal unbounded
         hsd.primal_status = Sln_InfeasibilityCertificate
         hsd.solver_status = Trm_DualInfeasible
         return nothing
     end
 
-    δ = A'pt.y + pt.s
-    δ[uind] .-= pt.z
-    if norm(δ, Inf) * norm(b, Inf) / (max(1, norm(c, Inf)))  < (dot(b, pt.y) - dot(uval, pt.z)) * ϵi
+    δ = dat.A' * pt.y + (pt.zl .* dat.lflag) - (pt.zu .* dat.uflag)
+    if norm(δ, Inf) * norm(dat.b, Inf) / (max(1, norm(dat.c, Inf)))  < (dot(dat.b, pt.y) + dot(dat.l .* dat.lflag, pt.zl)- dot(dat.u .* dat.uflag, pt.zu)) * ϵi
         # Primal infeasible
         hsd.dual_status = Sln_InfeasibilityCertificate
         hsd.solver_status = Trm_PrimalInfeasible
@@ -446,7 +434,10 @@ end
     optimize!
 
 """
-function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
+function ipm_optimize!(hsd::HSDSolver{T, Tv, Tk},
+    dat::IPMData{T, Tv, Tb, Ta},
+    params::Parameters{T}
+) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tk<:AbstractKKTSolver{T}}
 
     # TODO: pre-check whether model needs to be re-optimized.
     # This should happen outside of this function
@@ -458,7 +449,17 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
     # Print information about the problem
     if params.OutputLevel > 0
         @printf "\nOptimizer info\n"
-        @printf "Linear solver options\n"
+        @printf "Constraints  : %d\n" dat.nrow
+        @printf "Variables    : %d\n" dat.ncol
+        bmin, bmax = extrema(dat.b)
+        @printf "RHS          : [%+.2e, %+.2e]\n" bmin bmax
+        lmin, lmax = extrema(dat.l .* dat.lflag)
+        @printf "Lower bounds : [%+.2e, %+.2e]\n" lmin lmax
+        lmin, lmax = extrema(dat.u .* dat.uflag)
+        @printf "Upper bounds : [%+.2e, %+.2e]\n" lmin lmax
+
+
+        @printf "\nLinear solver options\n"
         @printf "  %-12s : %s\n" "Arithmetic" KKT.arithmetic(hsd.kkt)
         @printf "  %-12s : %s\n" "Backend" KKT.backend(hsd.kkt)
         @printf "  %-12s : %s\n" "System" KKT.linear_system(hsd.kkt)
@@ -471,15 +472,17 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
 
     # TODO: set starting point
     # Q: should we allocate memory for `pt` here?
-    hsd.pt.x  .= oneunit(Tv)
-    hsd.pt.w  .= oneunit(Tv)
-    hsd.pt.t   = oneunit(Tv)
-    hsd.pt.y  .= zero(Tv)
-    hsd.pt.s  .= oneunit(Tv)
-    hsd.pt.z  .= oneunit(Tv)
-    hsd.pt.k   = oneunit(Tv)
-    hsd.pt.qp .= zero(Tv)
-    hsd.pt.qd .= zero(Tv)
+    hsd.pt.x   .= zero(T)
+    hsd.pt.xl  .= one(T) .* dat.lflag
+    hsd.pt.xu  .= one(T) .* dat.uflag
+
+    hsd.pt.y   .= zero(T)
+    hsd.pt.zl  .= one(T) .* dat.lflag
+    hsd.pt.zu  .= one(T) .* dat.uflag
+    
+    hsd.pt.τ   = one(T)
+    hsd.pt.κ   = one(T)
+
     update_mu!(hsd.pt)
 
     # Main loop
@@ -490,11 +493,7 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
     while(true)
 
         # I.A - Compute residuals at current iterate
-        compute_residuals!(
-            hsd,
-            hsd.res, hsd.pt,
-            hsd.A, hsd.b, hsd.c, hsd.c0, hsd.uind, hsd.uval
-        )
+        compute_residuals!(hsd, dat)
 
         update_mu!(hsd.pt)
 
@@ -506,7 +505,7 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
             @printf "%4d" hsd.niter
             
             # Objectives
-            ϵ = hsd.objsense ? one(Tv) : -one(Tv)
+            ϵ = dat.objsense ? one(T) : -one(T)
             @printf "  %+14.7e" ϵ * hsd.primal_bound_scaled
             @printf "  %+14.7e" ϵ * hsd.dual_bound_scaled
             
@@ -529,9 +528,7 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
         #   followed by a check on the solver status to determine whether to stop
         # In particular, user limits should be checked last (if an optimal solution is found,
         # we want to report optimal, not user limits)
-        update_solver_status!(
-            hsd, hsd.pt, hsd.res,
-            hsd.A, hsd.b, hsd.c, hsd.c0, hsd.uind, hsd.uval,
+        update_solver_status!(hsd, dat,
             params.BarrierTolerancePFeas,
             params.BarrierToleranceDFeas,
             params.BarrierToleranceRGap,
@@ -557,7 +554,7 @@ function optimize!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
         # For now, include the factorization in the step function
         # Q: should we use more arguments here?
         try
-            compute_step!(hsd, params)
+            compute_step!(hsd, dat, params)
         catch err
 
             if isa(err, PosDefException) || isa(err, SingularException)

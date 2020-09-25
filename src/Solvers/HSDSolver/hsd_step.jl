@@ -15,40 +15,40 @@ Compute next IP iterate for the HSD formulation.
 - `rp, ru, rd, rg`: Primal, dual and optimality residuals
 - `x, w, y, s, z, t, k`: Primal-dual iterate
 """
-function compute_step!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Real}
+function compute_step!(hsd::HSDSolver{T, Tv, Tk},
+    dat::IPMData{T, Tv, Tb, Ta}, params::Parameters{T}
+) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tk<:AbstractKKTSolver{T}}
 
     # Names
     pt = hsd.pt
     res = hsd.res
 
-    ncon = hsd.pt.m
-    nvar = hsd.pt.n
-    nupb = hsd.pt.p
+    m, n, p = pt.m, pt.n, pt.p
 
-    A = hsd.A
-    b = hsd.b
-    c = hsd.c
-    uind = hsd.uind
-    uval = hsd.uval
+    A = dat.A
+    b = dat.b
+    c = dat.c
 
     # Compute scaling
-    θ   = pt.s ./ pt.x
-    θwz = pt.z ./ pt.w
-    @views θ[uind] .+= θwz
+    θl = (pt.zl ./ pt.xl) .* dat.lflag
+    θu = (pt.zu ./ pt.xu) .* dat.uflag
+    θinv = θl .+ θu
+
+    # Check that no NaN values appeared
+    @assert !any(isnan.(θl))
+    @assert !any(isnan.(θu))
+    @assert !any(isnan.(θinv))
 
     # Update regularizations
-    rd_min = sqrt(eps(Tv))
-    rp_min = sqrt(eps(Tv))
-    rg_min = sqrt(eps(Tv))
-    hsd.regP .= max.(rp_min, hsd.regP ./ 10)
-    hsd.regD .= max.(rd_min, hsd.regD ./ 10)
-    hsd.regG  = max( rg_min, hsd.regG  / 10)
+    hsd.regP .= max.(params.BarrierPRegMin, hsd.regP ./ 10)
+    hsd.regD .= max.(params.BarrierDRegMin, hsd.regD ./ 10)
+    hsd.regG  = max( params.BarrierPRegMin, hsd.regG  / 10)
 
     # Update factorization
     nbump = 0
     while nbump <= 3
         try
-            KKT.update!(hsd.kkt, θ, hsd.regP, hsd.regD)
+            KKT.update!(hsd.kkt, θinv, hsd.regP, hsd.regD)
             break
         catch err
             isa(err, PosDefException) || isa(err, ZeroPivotException) || rethrow(err)
@@ -61,87 +61,104 @@ function compute_step!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Rea
             @warn "Increase regularizations to $(hsd.regG)"
         end
     end
+    # TODO: throw a custom error for numerical issues
     nbump < 3 || throw(PosDefException(0))  # factorization could not be saved
 
     # Search directions
     # Predictor
-    Δ  = Point{Tv}(ncon, nvar, nupb)
-    Δc = Point{Tv}(ncon, nvar, nupb)
+    Δ  = Point(m, n, p,
+        tzeros(Tv, n), tzeros(Tv, n), tzeros(Tv, n),
+        tzeros(Tv, m), tzeros(Tv, n), tzeros(Tv, n),
+        one(T), one(T), one(T)
+    )
+    Δc = Point(m, n, p,
+        tzeros(Tv, n), tzeros(Tv, n), tzeros(Tv, n),
+        tzeros(Tv, m), tzeros(Tv, n), tzeros(Tv, n),
+        one(T), one(T), one(T)
+    )
 
     # Compute hx, hy, hz from first augmented system solve
-    hx = zeros(Tv, nvar)
-    hy = zeros(Tv, ncon)
-    hz = zeros(Tv, nupb)
-    solve_augsys_hsd!(
-        hx, hy, hz,
-        hsd.kkt, θwz, uind,
-        b, c, uval
-    )
+    hx = tzeros(Tv, n)
+    hy = tzeros(Tv, m)
+    ξ_ = dat.c - ((pt.zl ./ pt.xl) .* dat.l) .* dat.lflag - ((pt.zu ./ pt.xu) .* dat.u) .* dat.uflag
+    KKT.solve!(hx, hy, hsd.kkt, dat.b, ξ_)
+
+    # Check that no NaN values appeared
+    @assert !any(isnan.(hx))
+    @assert !any(isnan.(hy))
+
     # Recover h0 = ρg + κ / τ - c'hx + b'hy - u'hz
     h0 = (
-        hsd.regG + pt.k / pt.t
-        - dot(c, hx)
+        hsd.regG + pt.κ / pt.τ
+        + (dot(dat.l .* dat.lflag, (dat.l .* θl) .* dat.lflag)
+        + dot(dat.u .* dat.uflag, (dat.u .* θu) .* dat.uflag)
+        - dot(c + (θl .* dat.l) .* dat.lflag + (θu .* dat.u) .* dat.uflag, hx))
         + dot(b, hy)
-        - dot(uval, hz)
     )
 
+    q0 = hsd.regG + pt.κ / pt.τ
+    q1 = dot(dat.l .* dat.lflag, (dat.l .* θl) .* dat.lflag)
+    q2 = dot(dat.u .* dat.uflag, (dat.u .* θu) .* dat.uflag)
+    q3 = -dot(c + (θl .* dat.l) .* dat.lflag + (θu .* dat.u) .* dat.uflag, hx)
+    q4 = dot(b, hy)
+    # @info "Terms in h0 sum" q0 q1 q2 q3 q4
+    # @info "Ratio" (q1 + q2 + q3) / (1 + maximum(abs.((q1, q2, q3))))
+
+    @assert !isnan(h0)
+    @assert !iszero(h0)
+
     # Affine-scaling direction
-    solve_newton_hsd!(
-        Δ,
-        hsd.kkt, θwz, b, c, uind, uval,
-        hx, hy, hz, h0, pt,
+    solve_newton_system!(Δ, hsd, dat, hx, hy, h0,
         # Right-hand side of Newton system
-        res.rp, res.ru, res.rd, res.rg,
-        -pt.x .* pt.s,
-        -pt.w .* pt.z,
-        -pt.t  * pt.k
+        res.rp, res.rl, res.ru, res.rd, res.rg,
+        -(pt.xl .* pt.zl) .* dat.lflag,
+        -(pt.xu .* pt.zu) .* dat.uflag,
+        -pt.τ  * pt.κ
     )
 
     # Step length for affine-scaling direction
     α = max_step_length(pt, Δ)
-    γ = (oneunit(Tv) - α)^2 * min(oneunit(Tv) - α, params.BarrierGammaMin)
-    η = oneunit(Tv) - γ
+    # @info "Affine step length: $α"
+    γ = (one(T) - α)^2 * min(one(T) - α, params.BarrierGammaMin)
+    η = one(T) - γ
     
     # Mehrotra corrector
-    solve_newton_hsd!(
-        Δ,
-        hsd.kkt, θwz, b, c, uind, uval,
-        hx, hy, hz, h0, pt,
+    solve_newton_system!(Δ, hsd, dat, hx, hy, h0,
         # Right-hand side of Newton system
-        η .* res.rp, η .* res.ru, η .* res.rd, η * res.rg,
-        -pt.x .* pt.s .+ γ * pt.μ .- Δ.x .* Δ.s,
-        -pt.w .* pt.z .+ γ * pt.μ .- Δ.w .* Δ.z,
-        -pt.t  * pt.k  + γ * pt.μ  - Δ.t  * Δ.k
+        η .* res.rp, η .* res.rl, η .* res.ru, η .* res.rd, η * res.rg,
+        (-pt.xl .* pt.zl .+ γ * pt.μ .- Δ.xl .* Δ.zl) .* dat.lflag,
+        (-pt.xu .* pt.zu .+ γ * pt.μ .- Δ.xu .* Δ.zu) .* dat.uflag,
+        -pt.τ  * pt.κ  + γ * pt.μ  - Δ.τ  * Δ.κ
     )
     α = max_step_length(pt, Δ)
+    # @info "Corrector step length: $α"
 
     # Extra corrections
     ncor = 0
-    while ncor < params.BarrierCorrectionLimit && α < Tv(999 // 1000)
+    while ncor < params.BarrierCorrectionLimit && α < T(999 // 1000)
         α_ = α
         ncor += 1
 
         # TODO: Compute extra-corrector
-        αc = compute_higher_corrector_hsd!(
-            Δc, γ,
-            hsd.kkt, θwz, b, c, uind, uval,
-            hx, hy, hz, h0, pt,
-            Δ, α_,
-            params.BarrierCentralityOutlierThreshold,
+        αc = compute_higher_corrector_hsd!(Δc, 
+            hsd, dat, γ, 
+            hx, hy, h0,
+            Δ, α_, params.BarrierCentralityOutlierThreshold
         )
         if αc > α_
             # Use corrector
-            Δ.x .= Δc.x
-            Δ.w .= Δc.w
-            Δ.y .= Δc.y
-            Δ.s .= Δc.s
-            Δ.z .= Δc.z
-            Δ.t  = Δc.t
-            Δ.k  = Δc.k
+            Δ.x  .= Δc.x
+            Δ.xl .= Δc.xl
+            Δ.xu .= Δc.xu
+            Δ.y  .= Δc.y
+            Δ.zl .= Δc.zl
+            Δ.zu .= Δc.zu
+            Δ.τ   = Δc.τ
+            Δ.κ   = Δc.κ
             α = αc
         end
         
-        if αc < Tv(1.1) * α_
+        if αc < T(11 // 10) * α_
             break
         end
 
@@ -153,13 +170,14 @@ function compute_step!(hsd::HSDSolver{Tv}, params::Parameters{Tv}) where{Tv<:Rea
     end
     # Update current iterate
     α *= params.BarrierStepDampFactor
-    pt.x .+= α .* Δ.x
-    pt.w .+= α .* Δ.w
-    pt.t  += α  * Δ.t
-    pt.y .+= α .* Δ.y
-    pt.s .+= α .* Δ.s
-    pt.z .+= α .* Δ.z
-    pt.k  += α  * Δ.k
+    pt.x  .+= α .* Δ.x
+    pt.xl .+= α .* Δ.xl
+    pt.xu .+= α .* Δ.xu
+    pt.y  .+= α .* Δ.y
+    pt.zl .+= α .* Δ.zl
+    pt.zu .+= α .* Δ.zu
+    pt.τ   += α  * Δ.τ
+    pt.κ   += α  * Δ.κ
     update_mu!(pt)
     
     return nothing
@@ -167,17 +185,41 @@ end
 
 
 """
-    solve_newton_hsd!
+    solve_newton_system!(Δ, hsd::HSDSolver, dat::IPMData)
 
-Solve the Newton system for `dx, dw, dy, ds, dz, dτ, dκ`
-```
--Rp*dx        + A'dy  +   ds - U'dz -  c*dτ        = ξd
-  A*dx        + Rd*dy               -  b*dτ        = ξp
-  U*dx +   dw                       -  u*dτ        = ξu
- -c'dx        + b'dy         - u'dz + Rg*dτ -   dκ = ξg
-  S*dx                + X*ds                       = ξxs
-         Z*dw                + W*dz                = ξwz
-                                       k*dτ + τ*dκ = ξτκ
+Solve the Newton system
+```math
+\\begin{bmatrix}
+    A & & & R_{d} & & & -b\\\\
+    I & -I & & & & & -l\\\\
+    I & & -I & & & & -u\\\\
+    -R_{p} & & & A^{T} & I & -I & -c\\\\
+    -c^{T} & & & b^{T} & l^{T} & -u^{T} & ρ_{g} & -1\\\\
+    & Z_{l} & & & X_{l}\\\\
+    & & Z_{u} & & & X_{u}\\\\
+    &&&&&& κ & τ
+\\end{bmatrix}
+\\begin{bmatrix}
+    Δ x\\\\
+    Δ x_{l}\\\\
+    Δ x_{u}\\\\
+    Δ y\\\\
+    Δ z_{l} \\\\
+    Δ z_{u} \\\\
+    Δ τ\\\\
+    Δ κ\\\\
+\\end{bmatrix}
+=
+\\begin{bmatrix}
+    ξ_p\\\\
+    ξ_l\\\\
+    ξ_u\\\\
+    ξ_d\\\\
+    ξ_g\\\\
+    ξ_{xz}^{l}\\\\
+    ξ_{xz}^{u}\\\\
+    ξ_tk
+\\end{bmatrix}
 ```
 
 # Arguments
@@ -192,50 +234,97 @@ Solve the Newton system for `dx, dw, dy, ds, dz, dτ, dκ`
 - `pt`: Current primal-dual iterate
 - `ξp, ξd, ξu, ξg, ξxs, ξwz, ξtk`: Right-hand side vectors
 """
-function solve_newton_hsd!(
-    Δ::Point{Tv},
-    kkt, θwz, b, c, uind::Vector{Int}, uval,
-    hx::Vector{Tv}, hy::Vector{Tv}, hz::Vector{Tv}, h0::Tv, pt::Point{Tv},
-    ξp::Vector{Tv}, ξu::Vector{Tv}, ξd::Vector{Tv}, ξg::Tv,
-    ξxs::Vector{Tv}, ξwz::Vector{Tv}, ξtk::Tv
-) where{Tv<:Real}
+function solve_newton_system!(Δ::Point{T, Tv},
+    hsd::HSDSolver{T, Tv, Tk},
+    dat::IPMData{T, Tv, Tb, Ta},
+    # Information from initial augmented system solve
+    hx::Tv, hy::Tv, h0::T,
+    # Right-hand side
+    ξp::Tv, ξl::Tv, ξu::Tv, ξd::Tv, ξg::T, ξxzl::Tv, ξxzu::Tv, ξtk::T
+) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tk<:AbstractKKTSolver{T}}
 
-    # Solve reduced newton system
-    solve_augsys_hsd!(
-        Δ.x, Δ.y, Δ.z,
-        kkt, θwz, uind,
-        ξp, ξd .- (ξxs ./ pt.x), ξu .- (ξwz ./ pt.z)
+    # Check that no NaN values are in the RHS
+    @assert !any(isnan.(ξp))
+    @assert !any(isnan.(ξl))
+    @assert !any(isnan.(ξu))
+    @assert !any(isnan.(ξd))
+    @assert !any(isnan.(ξg))
+    @assert !any(isnan.(ξxzl))
+    @assert !any(isnan.(ξxzu))
+    @assert !any(isnan.(ξtk))
+
+    pt = hsd.pt
+
+    # I. Solve augmented system
+    ξd_ = copy(ξd)
+    @. ξd_ += -((ξxzl + pt.zl .* ξl) ./ pt.xl) .* dat.lflag + ((ξxzu - pt.zu .* ξu) ./ pt.xu) .* dat.uflag
+    KKT.solve!(Δ.x, Δ.y, hsd.kkt, ξp, ξd_)
+
+    @assert !any(isnan.(Δ.x))
+    @assert !any(isnan.(Δ.y))
+
+    # II. Recover Δτ, Δx, Δy
+    # Compute Δτ
+    ξg_ = (ξg + ξtk / pt.τ 
+        - dot((ξxzl ./ pt.xl) .* dat.lflag, dat.l .* dat.lflag)            # l'(Xl)^-1 * ξxzl
+        + dot((ξxzu ./ pt.xu) .* dat.uflag, dat.u .* dat.uflag) 
+        - dot(((pt.zl ./ pt.xl) .* ξl) .* dat.lflag, dat.l .* dat.lflag) 
+        - dot(((pt.zu ./ pt.xu) .* ξu) .* dat.uflag, dat.u .* dat.uflag)  # 
     )
 
-    # Compute Δτ
-    Δ.t = (
-        ξg + (ξtk / pt.t)
-        + dot(c, Δ.x)
-        - dot(b, Δ.y)
-        + dot(uval, Δ.z)
+    @assert !isnan(ξg_)
+
+    Δ.τ = (
+        ξg_
+        + dot(dat.c
+            + ((pt.zl ./ pt.xl) .* dat.l) .* dat.lflag
+            + ((pt.zu ./ pt.xu) .* dat.u) .* dat.uflag
+        , Δ.x)
+        - dot(dat.b, Δ.y)
     ) / h0
     
-    # Compute Δx, Δy, Δz
-    Δ.x .+= Δ.t .* hx
-    Δ.y .+= Δ.t .* hy
-    Δ.z .+= Δ.t .* hz
-    # TODO: use functions below
-    # axpy!(Δ.t, hx, Δ.x)
-    # axpy!(Δ.t, hy, Δ.y)
-    # axpy!(Δ.t, hz, Δ.z)
+    @assert !isnan(Δ.τ)
 
-    # Recover Δs, Δw and Δk
-    # Δs = (ξxs - s .* Δx) ./ x
-    Δ.s  .= ξxs
-    Δ.s .-= pt.s .* Δ.x
-    Δ.s ./= pt.x
+    # Compute Δx, Δy
+    Δ.x .+= Δ.τ .* hx
+    Δ.y .+= Δ.τ .* hy
 
-    # Δw = (ξwz - w .* Δx) ./ z
-    Δ.w  .= ξwz
-    Δ.w .-= pt.w .* Δ.z
-    Δ.w ./= pt.z
+    @assert !any(isnan.(Δ.x))
+    @assert !any(isnan.(Δ.y))
 
-    Δ.k = (ξtk - pt.k * Δ.t)  / pt.t
+    # III. Recover Δxl, Δxu
+    @. Δ.xl = -ξl + Δ.x - Δ.τ .* (dat.l .* dat.lflag)
+    @. Δ.xu =  ξu - Δ.x + Δ.τ .* (dat.u .* dat.uflag)
+
+    Δ.xl .*= dat.lflag
+    Δ.xu .*= dat.uflag
+
+    @assert !any(isnan.(Δ.xl))
+    @assert !any(isnan.(Δ.xu))
+
+    # IV. Recover Δzl, Δzu
+    @. Δ.zl = ((ξxzl - pt.zl .* Δ.xl) ./ pt.xl) .* dat.lflag
+    @. Δ.zu = ((ξxzu - pt.zu .* Δ.xu) ./ pt.xu) .* dat.uflag
+
+    # V. Recover Δκ
+    Δ.κ = (ξtk - pt.κ * Δ.τ) / pt.τ
+    @assert !any(isnan.(Δ.κ))
+
+    # Check Newton residuals
+    # @printf "Newton residuals:\n"
+    # @printf "|rp|   = %16.8e\n" norm(dat.A * Δ.x + hsd.regD .* Δ.y - dat.b .* Δ.τ - ξp, Inf)
+    # @printf "|rl|   = %16.8e\n" norm((Δ.x - Δ.xl - (dat.l .* Δ.τ)) .* dat.lflag - ξl, Inf)
+    # @printf "|ru|   = %16.8e\n" norm((Δ.x + Δ.xu - (dat.u .* Δ.τ)) .* dat.uflag - ξu, Inf)
+    # @printf "|rd|   = %16.8e\n" norm(-hsd.regP .* Δ.x + dat.A'Δ.y + Δ.zl - Δ.zu - dat.c .* Δ.τ - ξd, Inf)
+    # @printf "|rg|   = %16.8e\n" norm(-dat.c'Δ.x + dat.b'Δ.y + dot(dat.l .* dat.lflag, Δ.zl) - dot(dat.u .* dat.uflag, Δ.zu) + hsd.regG * Δ.τ - Δ.κ - ξg, Inf)
+    # @printf "|rxzl| = %16.8e\n" norm(pt.zl .* Δ.xl + pt.xl .* Δ.zl - ξxzl, Inf)
+    # @printf "|rxzu| = %16.8e\n" norm(pt.zu .* Δ.xu + pt.xu .* Δ.zu - ξxzu, Inf)
+    # @printf "|rtk|  = %16.8e\n" norm(pt.κ * Δ.τ + pt.τ * Δ.κ - ξtk, Inf)
+
+    @assert all(iszero.(Δ.xl .* .!(dat.lflag)))
+    @assert all(iszero.(Δ.xu .* .!(dat.uflag)))
+    @assert all(iszero.(Δ.zl .* .!(dat.lflag)))
+    @assert all(iszero.(Δ.zu .* .!(dat.uflag)))
 
     return nothing
 end
@@ -291,13 +380,13 @@ Compute maximum step size `a > 0` such that `x + a*dx >= 0`, where `x` is a
 
 Compute maximum length of homogeneous step.
 """
-function max_step_length(x::Vector{Tv}, dx::Vector{Tv}) where{Tv<:Real}
+function max_step_length(x::Vector{T}, dx::Vector{T}) where{T<:Real}
     n = size(x, 1)
     n == size(dx, 1) || throw(DimensionMismatch())
-    a = Tv(Inf)
+    a = T(Inf)
 
     #=@inbounds=# for i in Base.OneTo(n)
-        if dx[i] < zero(Tv)
+        if dx[i] < zero(T)
             if (-x[i] / dx[i]) < a
                 a = (-x[i] / dx[i])
             end
@@ -306,23 +395,23 @@ function max_step_length(x::Vector{Tv}, dx::Vector{Tv}) where{Tv<:Real}
     return a
 end
 
-function max_step_length(pt::Point{Tv}, δ::Point{Tv}) where{Tv<:Real}
-    ax = max_step_length(pt.x, δ.x)
-    aw = max_step_length(pt.w, δ.w)
-    as = max_step_length(pt.s, δ.s)
-    az = max_step_length(pt.z, δ.z)
+function max_step_length(pt::Point{T, Tv}, δ::Point{T, Tv}) where{T, Tv<:AbstractVector{T}}
+    axl = max_step_length(pt.xl, δ.xl)
+    axu = max_step_length(pt.xu, δ.xu)
+    azl = max_step_length(pt.zl, δ.zl)
+    azu = max_step_length(pt.zu, δ.zu)
 
-    at = δ.t < zero(Tv) ? (-pt.t / δ.t) : oneunit(Tv)
-    ak = δ.k < zero(Tv) ? (-pt.k / δ.k) : oneunit(Tv)
+    at = δ.τ < zero(T) ? (-pt.τ / δ.τ) : oneunit(T)
+    ak = δ.κ < zero(T) ? (-pt.κ / δ.κ) : oneunit(T)
     
-    α = min(oneunit(Tv), ax, aw, as, az, at, ak)
+    α = min(one(T), axl, axu, azl, azu, at, ak)
 
     return α
 end
 
 
 """
-    compute_higher_corrector_hsd!
+    compute_higher_corrector!(Δc, hsd, dat, γ, hx, hy, h0, Δ, α, β)
 
 Compute higher-order corrected direction.
 
@@ -345,43 +434,43 @@ Requires the solution of one Newton system.
 - `α`: Maximum step length in predictor direction 
 - `β`: Relative threshold for centrality outliers
 """
-function compute_higher_corrector_hsd!(
-    Δc::Point{Tv},
-    γ::Tv,
-    kkt, θwz, b, c, uind::Vector{Int}, uval,
-    hx, hy, hz, h0, pt::Point{Tv},
-    Δ::Point{Tv}, α::Tv,
-    β::Tv,
-) where{Tv<:Real}
+function compute_higher_corrector_hsd!(Δc::Point{T, Tv},
+    hsd::HSDSolver{T, Tv, Tk}, dat::IPMData{T, Tv, Tb, Ta}, γ::T,
+    hx::Tv, hy::Tv, h0::T,
+    Δ::Point{T, Tv}, α::T, β::T,
+) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tk<:AbstractKKTSolver{T}}
     # TODO: Sanity checks
-    
+    pt = hsd.pt
+
     # Tentative step length
-    α_ = min(oneunit(Tv), Tv(2)*α)
+    α_ = min(one(T), T(2)*α)
 
     # Tentative cross products
-    vx = (pt.x .+ α_ .* Δ.x) .* (pt.s .+ α_ .* Δ.s)
-    vw = (pt.w .+ α_ .* Δ.w) .* (pt.z .+ α_ .* Δ.z)
-    vt = (pt.t  + α_  * Δ.t)  * (pt.k  + α_  * Δ.k)
+    vl = ((pt.xl .+ α_ .* Δ.xl) .* (pt.zl .+ α_ .* Δ.zl)) .* dat.lflag
+    vu = ((pt.xu .+ α_ .* Δ.xu) .* (pt.zu .+ α_ .* Δ.zu)) .* dat.uflag
+    vt = (pt.τ   + α_  * Δ.τ)   * (pt.κ   + α_  * Δ.κ)
 
     # Compute target cross-products
     mu_l = β * pt.μ * γ
     mu_u = γ * pt.μ / β
     for i in 1:pt.n
-        if vx[i] < mu_l
-            vx[i] = mu_l - vx[i]
-        elseif vx[i] > mu_u
-            vx[i] = mu_u - vx[i]
+        dat.lflag[i] || continue
+        if vl[i] < mu_l
+            vl[i] = mu_l - vl[i]
+        elseif vl[i] > mu_u
+            vl[i] = mu_u - vl[i]
         else
-            vx[i] = zero(Tv)
+            vl[i] = zero(T)
         end
     end
-    for i in 1:pt.p
-        if vw[i] < mu_l
-            vw[i] = mu_l - vw[i]
-        elseif vx[i] > mu_u
-            vw[i] = mu_u - vw[i]
+    for i in 1:pt.n
+        dat.uflag[i] || continue
+        if vu[i] < mu_l
+            vu[i] = mu_l - vu[i]
+        elseif vu[i] > mu_u
+            vu[i] = mu_u - vu[i]
         else
-            vw[i] = zero(Tv)
+            vu[i] = zero(T)
         end
     end
     if vt < mu_l
@@ -389,35 +478,33 @@ function compute_higher_corrector_hsd!(
     elseif vt > mu_u
         vt = mu_u - vt
     else
-        vt = zero(Tv)
+        vt = zero(T)
     end
 
     # Shift target cross-product to satisfy `v' * e = 0`
-    δ = (sum(vx) + sum(vw) + vt) / (pt.n + pt.p + 1)
-    vx .-= δ
-    vw .-= δ
+    δ = (sum(vl) + sum(vu) + vt) / (pt.p + 1)
+    vl .-= δ
+    vu .-= δ
     vt  -= δ
 
     # Compute corrector
-    solve_newton_hsd!(
-        Δc,
-        kkt, θwz, b, c, uind, uval,
-        hx, hy, hz, h0, pt,
+    solve_newton_system!(Δc, hsd, dat, hx, hy, h0,
         # Right-hand sides
-        zeros(Tv, pt.m), zeros(Tv, pt.p), zeros(Tv, pt.n), zero(Tv),
-        vx,
-        vw,
+        tzeros(Tv, pt.m), tzeros(Tv, pt.n), tzeros(Tv, pt.n), tzeros(Tv, pt.n), zero(T),
+        vl,
+        vu,
         vt
     )
 
     # Update corrector
-    Δc.x .+= Δ.x
-    Δc.w .+= Δ.w
-    Δc.y .+= Δ.y
-    Δc.s .+= Δ.s
-    Δc.z .+= Δ.z
-    Δc.t  += Δ.t
-    Δc.k  += Δ.k
+    Δc.x  .+= Δ.x
+    Δc.xl .+= Δ.xl
+    Δc.xu .+= Δ.xu
+    Δc.y  .+= Δ.y
+    Δc.zl .+= Δ.zl
+    Δc.zu .+= Δ.zu
+    Δc.τ   += Δ.τ
+    Δc.κ   += Δ.κ
 
     # Compute corrected step-length
     αc = max_step_length(pt, Δc)
