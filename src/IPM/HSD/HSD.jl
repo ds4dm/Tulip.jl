@@ -420,7 +420,11 @@ function update_solver_status!(
     end
 
     δ = dat.A' * pt.y + (pt.zl .* dat.lflag) - (pt.zu .* dat.uflag)
-    if norm(δ, Inf) * norm(dat.b, Inf) / (max(1, norm(dat.c, Inf)))  < (dot(dat.b, pt.y) + dot(dat.l .* dat.lflag, pt.zl)- dot(dat.u .* dat.uflag, pt.zu)) * ϵi
+    if norm(δ, Inf) * max(
+        norm(dat.l .* dat.lflag, Inf),
+        norm(dat.u .* dat.uflag, Inf),
+        norm(dat.b, Inf)
+    ) / (max(one(T), norm(dat.c, Inf)))  < (dot(dat.b, pt.y) + dot(dat.l .* dat.lflag, pt.zl)- dot(dat.u .* dat.uflag, pt.zu)) * ϵi
         # Primal infeasible
         hsd.dual_status = Sln_InfeasibilityCertificate
         hsd.solver_status = Trm_PrimalInfeasible
