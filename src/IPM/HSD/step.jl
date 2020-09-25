@@ -1,19 +1,12 @@
 """
-    compute_step!()
+    compute_step!(hsd, dat, params)
 
 Compute next IP iterate for the HSD formulation.
 
 # Arguments
-- `model`: The optimization model
+- `hsd`: The HSD optimizer model
+- `dat`: the IPM data
 - `params`: Optimization parameters
-- `A`: Constraint matrix
-- `F`: Factorization of the normal equations' matrix
-- `b`: Right-hand side of primal constraints
-- `c`: Primal linear objective term
-- `uind, uval`: Indices and values of variables' upperbounds
-- `θ, θwz`: Diagonal scaling terms
-- `rp, ru, rd, rg`: Primal, dual and optimality residuals
-- `x, w, y, s, z, t, k`: Primal-dual iterate
 """
 function compute_step!(hsd::HSD{T, Tv, Tk},
     dat::IPMData{T, Tv, Tb, Ta}, params::Parameters{T}
@@ -76,12 +69,15 @@ function compute_step!(hsd::HSD{T, Tv, Tk},
     KKT.solve!(hx, hy, hsd.kkt, dat.b, ξ_)
 
     # Recover h0 = ρg + κ / τ - c'hx + b'hy - u'hz
+    # Some of the summands may take large values,
+    # so care must be taken for numerical stability
     h0 = (
-        hsd.regG + pt.κ / pt.τ
-        + (dot(dat.l .* dat.lflag, (dat.l .* θl) .* dat.lflag)
+          dot(dat.l .* dat.lflag, (dat.l .* θl) .* dat.lflag)
         + dot(dat.u .* dat.uflag, (dat.u .* θu) .* dat.uflag)
-        - dot(c + (θl .* dat.l) .* dat.lflag + (θu .* dat.u) .* dat.uflag, hx))
+        - dot(c + (θl .* dat.l) .* dat.lflag + (θu .* dat.u) .* dat.uflag, hx)
         + dot(b, hy)
+        + pt.κ / pt.τ
+        + hsd.regG
     )
 
     # Affine-scaling direction
@@ -95,7 +91,6 @@ function compute_step!(hsd::HSD{T, Tv, Tk},
 
     # Step length for affine-scaling direction
     α = max_step_length(pt, Δ)
-    # @info "Affine step length: $α"
     γ = (one(T) - α)^2 * min(one(T) - α, params.BarrierGammaMin)
     η = one(T) - γ
     
@@ -108,7 +103,6 @@ function compute_step!(hsd::HSD{T, Tv, Tk},
         -pt.τ  * pt.κ  + γ * pt.μ  - Δ.τ  * Δ.κ
     )
     α = max_step_length(pt, Δ)
-    # @info "Corrector step length: $α"
 
     # Extra corrections
     ncor = 0
@@ -116,8 +110,8 @@ function compute_step!(hsd::HSD{T, Tv, Tk},
         α_ = α
         ncor += 1
 
-        # TODO: Compute extra-corrector
-        αc = compute_higher_corrector_hsd!(Δc, 
+        # Compute extra-corrector
+        αc = compute_higher_corrector!(Δc, 
             hsd, dat, γ, 
             hx, hy, h0,
             Δ, α_, params.BarrierCentralityOutlierThreshold
@@ -145,6 +139,7 @@ function compute_step!(hsd::HSD{T, Tv, Tk},
         # end
         
     end
+
     # Update current iterate
     α *= params.BarrierStepDampFactor
     pt.x  .+= α .* Δ.x
@@ -162,7 +157,7 @@ end
 
 
 """
-    solve_newton_system!(Δ, hsd::HSD, dat::IPMData)
+    solve_newton_system!(Δ, hsd, dat, hx, hy, h0, ξp, ξd, ξu, ξg, ξxs, ξwz, ξtk)
 
 Solve the Newton system
 ```math
@@ -201,14 +196,9 @@ Solve the Newton system
 
 # Arguments
 - `Δ`: Search direction, modified
-- `kkt`: Linear solver for the augmented system
-- `θwz`: Diagonal scaling term
-- `b`: Right-hand side of primal constraints
-- `c`: Primal objective term
-- `uind`: Indices of upper-bounded variables
-- `uval`: Upper bound values
+- `hsd`: The HSD optimizer
+- `dat`: The problem data, in `IPMData` form
 - `hx, hy, hz, h0`: Terms obtained in the preliminary augmented system solve
-- `pt`: Current primal-dual iterate
 - `ξp, ξd, ξu, ξg, ξxs, ξwz, ξtk`: Right-hand side vectors
 """
 function solve_newton_system!(Δ::Point{T, Tv},
@@ -220,16 +210,6 @@ function solve_newton_system!(Δ::Point{T, Tv},
     ξp::Tv, ξl::Tv, ξu::Tv, ξd::Tv, ξg::T, ξxzl::Tv, ξxzu::Tv, ξtk::T
 ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tk<:AbstractKKTSolver{T}}
 
-    # Check that no NaN values are in the RHS
-    # @assert !any(isnan.(ξp))
-    # @assert !any(isnan.(ξl))
-    # @assert !any(isnan.(ξu))
-    # @assert !any(isnan.(ξd))
-    # @assert !any(isnan.(ξg))
-    # @assert !any(isnan.(ξxzl))
-    # @assert !any(isnan.(ξxzu))
-    # @assert !any(isnan.(ξtk))
-
     pt = hsd.pt
 
     # I. Solve augmented system
@@ -238,9 +218,6 @@ function solve_newton_system!(Δ::Point{T, Tv},
         @. ξd_ += -((ξxzl + pt.zl .* ξl) ./ pt.xl) .* dat.lflag + ((ξxzu - pt.zu .* ξu) ./ pt.xu) .* dat.uflag
     end
     @timeit hsd.timer "KKT" KKT.solve!(Δ.x, Δ.y, hsd.kkt, ξp, ξd_)
-
-    # @assert !any(isnan.(Δ.x))
-    # @assert !any(isnan.(Δ.y))
 
     # II. Recover Δτ, Δx, Δy
     # Compute Δτ
@@ -251,8 +228,6 @@ function solve_newton_system!(Δ::Point{T, Tv},
         - dot(((pt.zu ./ pt.xu) .* ξu) .* dat.uflag, dat.u .* dat.uflag)  # 
     )
 
-    # @assert !isnan(ξg_)
-
     @timeit hsd.timer "Δτ" Δ.τ = (
         ξg_
         + dot(dat.c
@@ -261,15 +236,11 @@ function solve_newton_system!(Δ::Point{T, Tv},
         , Δ.x)
         - dot(dat.b, Δ.y)
     ) / h0
-    
-    # @assert !isnan(Δ.τ)
+
 
     # Compute Δx, Δy
     @timeit hsd.timer "Δx" Δ.x .+= Δ.τ .* hx
     @timeit hsd.timer "Δy" Δ.y .+= Δ.τ .* hy
-
-    # @assert !any(isnan.(Δ.x))
-    # @assert !any(isnan.(Δ.y))
 
     # III. Recover Δxl, Δxu
     @timeit hsd.timer "Δxl" begin
@@ -281,16 +252,12 @@ function solve_newton_system!(Δ::Point{T, Tv},
         Δ.xu .*= dat.uflag
     end
 
-    # @assert !any(isnan.(Δ.xl))
-    # @assert !any(isnan.(Δ.xu))
-
     # IV. Recover Δzl, Δzu
     @timeit hsd.timer "Δzl" @. Δ.zl = ((ξxzl - pt.zl .* Δ.xl) ./ pt.xl) .* dat.lflag
     @timeit hsd.timer "Δzu" @. Δ.zu = ((ξxzu - pt.zu .* Δ.xu) ./ pt.xu) .* dat.uflag
 
     # V. Recover Δκ
     Δ.κ = (ξtk - pt.κ * Δ.τ) / pt.τ
-    # @assert !any(isnan.(Δ.κ))
 
     # Check Newton residuals
     # @printf "Newton residuals:\n"
@@ -303,51 +270,6 @@ function solve_newton_system!(Δ::Point{T, Tv},
     # @printf "|rxzu| = %16.8e\n" norm(pt.zu .* Δ.xu + pt.xu .* Δ.zu - ξxzu, Inf)
     # @printf "|rtk|  = %16.8e\n" norm(pt.κ * Δ.τ + pt.τ * Δ.κ - ξtk, Inf)
 
-    # @assert all(iszero.(Δ.xl .* .!(dat.lflag)))
-    # @assert all(iszero.(Δ.xu .* .!(dat.uflag)))
-    # @assert all(iszero.(Δ.zl .* .!(dat.lflag)))
-    # @assert all(iszero.(Δ.zu .* .!(dat.uflag)))
-
-    return nothing
-end
-
-
-"""
-    solve_augsys_hsd!
-
-Solve the augmented system for `dx, dy, dz`
-```
--(S/X + Rp)*dx +  A'dy     - U'dz = ξd
-          A*dx + Rd*dy            = ξp
-          U*dx          -(Z/W)*dz = ξu
-```
-
-# Arguments
-- `dx, dy, dz`: Vectors of unknowns, modified in-place
-- `kkt`: Linear solver for the augmented system
-- `θwz`: Diagonal scaling `z ./ w`
-- `uind`: Vector of indices of upper-bounded variables
-- `ξp, ξd, ξu`: Right-hand-side vectors
-"""
-function solve_augsys_hsd!(
-    dx::Vector{Tv}, dy::Vector{Tv}, dz::Vector{Tv},
-    kkt::AbstractKKTSolver{Tv},
-    θwz::Vector{Tv}, uind::Vector{Int},
-    ξp::Vector{Tv}, ξd::Vector{Tv}, ξu::Vector{Tv}
-) where{Tv<:Real}
-    
-    # Set-up right-hand side
-    ξd_ = copy(ξd)
-    @views ξd_[uind] .-= (ξu .* θwz)
-
-    KKT.solve!(dx, dy, kkt, ξp, ξd_)
-
-    # Recover dz
-    dz .= zero(Tv)
-    dz .-= ξu
-    @views dz .+= dx[uind]
-    dz .*= θwz
-
     return nothing
 end
 
@@ -355,14 +277,9 @@ end
 """
     max_step_length(x, dx)
 
-Compute maximum step size `a > 0` such that `x + a*dx >= 0`, where `x` is a 
-    non-negative vector.
-
-    max_step_length(...)
-
-Compute maximum length of homogeneous step.
+Compute the maximum value `a ≥ 0` such that `x + a*dx ≥ 0`, where `x ≥ 0`.
 """
-function max_step_length(x::Vector{T}, dx::Vector{T}) where{T<:Real}
+function max_step_length(x::Vector{T}, dx::Vector{T}) where{T}
     n = size(x, 1)
     n == size(dx, 1) || throw(DimensionMismatch())
     a = T(Inf)
@@ -377,6 +294,11 @@ function max_step_length(x::Vector{T}, dx::Vector{T}) where{T<:Real}
     return a
 end
 
+"""
+    max_step_length(pt, δ)
+
+Compute maximum length of homogeneous step.
+"""
 function max_step_length(pt::Point{T, Tv}, δ::Point{T, Tv}) where{T, Tv<:AbstractVector{T}}
     axl = max_step_length(pt.xl, δ.xl)
     axu = max_step_length(pt.xu, δ.xu)
@@ -401,22 +323,15 @@ Requires the solution of one Newton system.
 
 # Arguments
 - `Δc`: Corrected search direction, modified in-place
-- `γ`
-- `kkt`: Linear solver for the augmented system
-- `θwz`: Diagonal scaling term
-- `b`: Right-hand side of primal constraints
-- `c`: Primal objective term
-- `uind`: Indices of upper-bounded variables
-- `uval`: Upper bound values
-- `hx, hy, hz, h0`: Terms obtained in the preliminary augmented system solve
-- `regP, regD`: Primal and dual regularizers
-- `x̄, ȳ`: Primal and dual proximal points
-- `pt`: Current primal-dual iterate
+- `hsd`: The HSD optimizer
+- `dat`: problem data, in IPM form
+- `γ`: 
+- `hx, hy, h0`: Terms obtained from the preliminary augmented system solve
 - `Δ`: Current predictor direction
-- `α`: Maximum step length in predictor direction 
+- `α`: Maximum step length in predictor direction
 - `β`: Relative threshold for centrality outliers
 """
-function compute_higher_corrector_hsd!(Δc::Point{T, Tv},
+function compute_higher_corrector!(Δc::Point{T, Tv},
     hsd::HSD{T, Tv, Tk}, dat::IPMData{T, Tv, Tb, Ta}, γ::T,
     hx::Tv, hy::Tv, h0::T,
     Δ::Point{T, Tv}, α::T, β::T,
@@ -491,5 +406,4 @@ function compute_higher_corrector_hsd!(Δc::Point{T, Tv},
     # Compute corrected step-length
     αc = max_step_length(pt, Δc)
     return αc
-
 end
