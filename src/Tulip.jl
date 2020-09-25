@@ -5,6 +5,8 @@ using Logging
 using Printf
 using SparseArrays
 
+using TimerOutputs
+
 # Linear algebra
 include("LinearAlgebra/LinearAlgebra.jl")
 import .TLPLinearAlgebra.construct_matrix

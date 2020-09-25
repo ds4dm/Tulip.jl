@@ -48,7 +48,7 @@ function compute_step!(hsd::HSDSolver{T, Tv, Tk},
     nbump = 0
     while nbump <= 3
         try
-            KKT.update!(hsd.kkt, θinv, hsd.regP, hsd.regD)
+            @timeit hsd.timer "Factorization" KKT.update!(hsd.kkt, θinv, hsd.regP, hsd.regD)
             break
         catch err
             isa(err, PosDefException) || isa(err, ZeroPivotException) || rethrow(err)
@@ -75,10 +75,6 @@ function compute_step!(hsd::HSDSolver{T, Tv, Tk},
     ξ_ = dat.c - ((pt.zl ./ pt.xl) .* dat.l) .* dat.lflag - ((pt.zu ./ pt.xu) .* dat.u) .* dat.uflag
     KKT.solve!(hx, hy, hsd.kkt, dat.b, ξ_)
 
-    # Check that no NaN values appeared
-    @assert !any(isnan.(hx))
-    @assert !any(isnan.(hy))
-
     # Recover h0 = ρg + κ / τ - c'hx + b'hy - u'hz
     h0 = (
         hsd.regG + pt.κ / pt.τ
@@ -88,19 +84,8 @@ function compute_step!(hsd::HSDSolver{T, Tv, Tk},
         + dot(b, hy)
     )
 
-    q0 = hsd.regG + pt.κ / pt.τ
-    q1 = dot(dat.l .* dat.lflag, (dat.l .* θl) .* dat.lflag)
-    q2 = dot(dat.u .* dat.uflag, (dat.u .* θu) .* dat.uflag)
-    q3 = -dot(c + (θl .* dat.l) .* dat.lflag + (θu .* dat.u) .* dat.uflag, hx)
-    q4 = dot(b, hy)
-    # @info "Terms in h0 sum" q0 q1 q2 q3 q4
-    # @info "Ratio" (q1 + q2 + q3) / (1 + maximum(abs.((q1, q2, q3))))
-
-    @assert !isnan(h0)
-    @assert !iszero(h0)
-
     # Affine-scaling direction
-    solve_newton_system!(Δ, hsd, dat, hx, hy, h0,
+    @timeit hsd.timer "Newton" solve_newton_system!(Δ, hsd, dat, hx, hy, h0,
         # Right-hand side of Newton system
         res.rp, res.rl, res.ru, res.rd, res.rg,
         -(pt.xl .* pt.zl) .* dat.lflag,
@@ -115,7 +100,7 @@ function compute_step!(hsd::HSDSolver{T, Tv, Tk},
     η = one(T) - γ
     
     # Mehrotra corrector
-    solve_newton_system!(Δ, hsd, dat, hx, hy, h0,
+    @timeit hsd.timer "Newton" solve_newton_system!(Δ, hsd, dat, hx, hy, h0,
         # Right-hand side of Newton system
         η .* res.rp, η .* res.rl, η .* res.ru, η .* res.rd, η * res.rg,
         (-pt.xl .* pt.zl .+ γ * pt.μ .- Δ.xl .* Δ.zl) .* dat.lflag,
@@ -236,37 +221,39 @@ function solve_newton_system!(Δ::Point{T, Tv},
 ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tk<:AbstractKKTSolver{T}}
 
     # Check that no NaN values are in the RHS
-    @assert !any(isnan.(ξp))
-    @assert !any(isnan.(ξl))
-    @assert !any(isnan.(ξu))
-    @assert !any(isnan.(ξd))
-    @assert !any(isnan.(ξg))
-    @assert !any(isnan.(ξxzl))
-    @assert !any(isnan.(ξxzu))
-    @assert !any(isnan.(ξtk))
+    # @assert !any(isnan.(ξp))
+    # @assert !any(isnan.(ξl))
+    # @assert !any(isnan.(ξu))
+    # @assert !any(isnan.(ξd))
+    # @assert !any(isnan.(ξg))
+    # @assert !any(isnan.(ξxzl))
+    # @assert !any(isnan.(ξxzu))
+    # @assert !any(isnan.(ξtk))
 
     pt = hsd.pt
 
     # I. Solve augmented system
-    ξd_ = copy(ξd)
-    @. ξd_ += -((ξxzl + pt.zl .* ξl) ./ pt.xl) .* dat.lflag + ((ξxzu - pt.zu .* ξu) ./ pt.xu) .* dat.uflag
-    KKT.solve!(Δ.x, Δ.y, hsd.kkt, ξp, ξd_)
+    @timeit hsd.timer "ξd_"  begin
+        ξd_ = copy(ξd)
+        @. ξd_ += -((ξxzl + pt.zl .* ξl) ./ pt.xl) .* dat.lflag + ((ξxzu - pt.zu .* ξu) ./ pt.xu) .* dat.uflag
+    end
+    @timeit hsd.timer "KKT" KKT.solve!(Δ.x, Δ.y, hsd.kkt, ξp, ξd_)
 
-    @assert !any(isnan.(Δ.x))
-    @assert !any(isnan.(Δ.y))
+    # @assert !any(isnan.(Δ.x))
+    # @assert !any(isnan.(Δ.y))
 
     # II. Recover Δτ, Δx, Δy
     # Compute Δτ
-    ξg_ = (ξg + ξtk / pt.τ 
+    @timeit hsd.timer "ξg_" ξg_ = (ξg + ξtk / pt.τ 
         - dot((ξxzl ./ pt.xl) .* dat.lflag, dat.l .* dat.lflag)            # l'(Xl)^-1 * ξxzl
         + dot((ξxzu ./ pt.xu) .* dat.uflag, dat.u .* dat.uflag) 
         - dot(((pt.zl ./ pt.xl) .* ξl) .* dat.lflag, dat.l .* dat.lflag) 
         - dot(((pt.zu ./ pt.xu) .* ξu) .* dat.uflag, dat.u .* dat.uflag)  # 
     )
 
-    @assert !isnan(ξg_)
+    # @assert !isnan(ξg_)
 
-    Δ.τ = (
+    @timeit hsd.timer "Δτ" Δ.τ = (
         ξg_
         + dot(dat.c
             + ((pt.zl ./ pt.xl) .* dat.l) .* dat.lflag
@@ -275,32 +262,35 @@ function solve_newton_system!(Δ::Point{T, Tv},
         - dot(dat.b, Δ.y)
     ) / h0
     
-    @assert !isnan(Δ.τ)
+    # @assert !isnan(Δ.τ)
 
     # Compute Δx, Δy
-    Δ.x .+= Δ.τ .* hx
-    Δ.y .+= Δ.τ .* hy
+    @timeit hsd.timer "Δx" Δ.x .+= Δ.τ .* hx
+    @timeit hsd.timer "Δy" Δ.y .+= Δ.τ .* hy
 
-    @assert !any(isnan.(Δ.x))
-    @assert !any(isnan.(Δ.y))
+    # @assert !any(isnan.(Δ.x))
+    # @assert !any(isnan.(Δ.y))
 
     # III. Recover Δxl, Δxu
-    @. Δ.xl = -ξl + Δ.x - Δ.τ .* (dat.l .* dat.lflag)
-    @. Δ.xu =  ξu - Δ.x + Δ.τ .* (dat.u .* dat.uflag)
+    @timeit hsd.timer "Δxl" begin
+        @. Δ.xl = -ξl + Δ.x - Δ.τ .* (dat.l .* dat.lflag)
+        Δ.xl .*= dat.lflag
+    end
+    @timeit hsd.timer "Δxu" begin
+        @. Δ.xu =  ξu - Δ.x + Δ.τ .* (dat.u .* dat.uflag)
+        Δ.xu .*= dat.uflag
+    end
 
-    Δ.xl .*= dat.lflag
-    Δ.xu .*= dat.uflag
-
-    @assert !any(isnan.(Δ.xl))
-    @assert !any(isnan.(Δ.xu))
+    # @assert !any(isnan.(Δ.xl))
+    # @assert !any(isnan.(Δ.xu))
 
     # IV. Recover Δzl, Δzu
-    @. Δ.zl = ((ξxzl - pt.zl .* Δ.xl) ./ pt.xl) .* dat.lflag
-    @. Δ.zu = ((ξxzu - pt.zu .* Δ.xu) ./ pt.xu) .* dat.uflag
+    @timeit hsd.timer "Δzl" @. Δ.zl = ((ξxzl - pt.zl .* Δ.xl) ./ pt.xl) .* dat.lflag
+    @timeit hsd.timer "Δzu" @. Δ.zu = ((ξxzu - pt.zu .* Δ.xu) ./ pt.xu) .* dat.uflag
 
     # V. Recover Δκ
     Δ.κ = (ξtk - pt.κ * Δ.τ) / pt.τ
-    @assert !any(isnan.(Δ.κ))
+    # @assert !any(isnan.(Δ.κ))
 
     # Check Newton residuals
     # @printf "Newton residuals:\n"
@@ -313,10 +303,10 @@ function solve_newton_system!(Δ::Point{T, Tv},
     # @printf "|rxzu| = %16.8e\n" norm(pt.zu .* Δ.xu + pt.xu .* Δ.zu - ξxzu, Inf)
     # @printf "|rtk|  = %16.8e\n" norm(pt.κ * Δ.τ + pt.τ * Δ.κ - ξtk, Inf)
 
-    @assert all(iszero.(Δ.xl .* .!(dat.lflag)))
-    @assert all(iszero.(Δ.xu .* .!(dat.uflag)))
-    @assert all(iszero.(Δ.zl .* .!(dat.lflag)))
-    @assert all(iszero.(Δ.zu .* .!(dat.uflag)))
+    # @assert all(iszero.(Δ.xl .* .!(dat.lflag)))
+    # @assert all(iszero.(Δ.xu .* .!(dat.uflag)))
+    # @assert all(iszero.(Δ.zl .* .!(dat.lflag)))
+    # @assert all(iszero.(Δ.zu .* .!(dat.uflag)))
 
     return nothing
 end
@@ -480,7 +470,7 @@ function compute_higher_corrector_hsd!(Δc::Point{T, Tv},
     vt  -= δ
 
     # Compute corrector
-    solve_newton_system!(Δc, hsd, dat, hx, hy, h0,
+    @timeit hsd.timer "Newton" solve_newton_system!(Δc, hsd, dat, hx, hy, h0,
         # Right-hand sides
         tzeros(Tv, pt.m), tzeros(Tv, pt.n), tzeros(Tv, pt.n), tzeros(Tv, pt.n), zero(T),
         vl,

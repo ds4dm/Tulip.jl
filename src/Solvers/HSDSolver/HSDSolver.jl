@@ -18,6 +18,7 @@ mutable struct HSDSolver{T, Tv, Tk} <: AbstractIPMSolver{T}
     dual_bound_unscaled::T    # Unscaled dual bound b'y + l' zl - u'zu
     dual_bound_scaled::T      # Scaled dual bound (b'y + l' zl - u'zu) / τ
 
+    timer::TimerOutput
 
     #=====================
         Working memory
@@ -29,7 +30,6 @@ mutable struct HSDSolver{T, Tv, Tk} <: AbstractIPMSolver{T}
     regD::Tv  # dual regularization
     regG::T   # gap regularization
 
-    # TODO: Constructor
     function HSDSolver(
         dat::IPMData{T, Tv, Tb, Ta}, params::Parameters{T}
     ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
@@ -56,10 +56,12 @@ mutable struct HSDSolver{T, Tv, Tk} <: AbstractIPMSolver{T}
         return new{T, Tv, Tk}(
             0, Trm_Unknown, Sln_Unknown, Sln_Unknown,
             T(Inf), T(Inf), T(-Inf), T(-Inf),
+            TimerOutput(),
             pt, res, kkt, regP, regD, regG
         )
     end
 
+    # TODO: remove and convert ProblemData --> IPMData
     function HSDSolver{Tv}(params::Parameters{Tv}, pb::ProblemData{Tv}) where{Tv}
         nvar = pb.nvar
         ncon = pb.ncon
@@ -294,7 +296,6 @@ mutable struct HSDSolver{T, Tv, Tk} <: AbstractIPMSolver{T}
         return HSDSolver{Tv}(params, ncon, nvar, nupb, A, b, pb.objsense, c, c0, uind, uval)
     end
 
-
 end
 
 include("./hsd_step.jl")
@@ -443,6 +444,7 @@ function ipm_optimize!(hsd::HSDSolver{T, Tv, Tk},
     # This should happen outside of this function
 
     # Initialization
+    TimerOutputs.reset_timer!(hsd.timer)
     tstart = time()
     hsd.niter = 0
 
@@ -490,10 +492,10 @@ function ipm_optimize!(hsd::HSDSolver{T, Tv, Tk},
     # Therefore, there is no numerical factorization before the first log is printed.
     # If the maximum number of iterations is set to 0, the only computation that occurs
     # is computing the residuals at the initial point.
-    while(true)
+    @timeit hsd.timer "Main loop" while(true)
 
         # I.A - Compute residuals at current iterate
-        compute_residuals!(hsd, dat)
+        @timeit hsd.timer "Residuals" compute_residuals!(hsd, dat)
 
         update_mu!(hsd.pt)
 
@@ -528,7 +530,7 @@ function ipm_optimize!(hsd::HSDSolver{T, Tv, Tk},
         #   followed by a check on the solver status to determine whether to stop
         # In particular, user limits should be checked last (if an optimal solution is found,
         # we want to report optimal, not user limits)
-        update_solver_status!(hsd, dat,
+        @timeit hsd.timer "update status" update_solver_status!(hsd, dat,
             params.BarrierTolerancePFeas,
             params.BarrierToleranceDFeas,
             params.BarrierToleranceRGap,
@@ -554,7 +556,7 @@ function ipm_optimize!(hsd::HSDSolver{T, Tv, Tk},
         # For now, include the factorization in the step function
         # Q: should we use more arguments here?
         try
-            compute_step!(hsd, dat, params)
+            @timeit hsd.timer "Step" compute_step!(hsd, dat, params)
         catch err
 
             if isa(err, PosDefException) || isa(err, SingularException)
