@@ -8,15 +8,15 @@ mutable struct HSDSolver{T, Tv, Tk} <: AbstractIPMSolver{T}
     # =================
     #   Book-keeping
     # =================
-    niter::Int  # Number of IPM iterations
+    niter::Int                        # Number of IPM iterations
     solver_status::TerminationStatus  # Optimization status
-    primal_status::SolutionStatus
-    dual_status::SolutionStatus
+    primal_status::SolutionStatus     # Primal solution status
+    dual_status::SolutionStatus       # Dual   solution status
 
     primal_bound_unscaled::T  # Unscaled primal bound c'x
-    primal_bound_scaled::T    # Scaled primal bound (c'x) / t
-    dual_bound_unscaled::T    # Unscaled dual bound b'y - u'z
-    dual_bound_scaled::T      # Scaled dual bound (b'y - u'z) / t
+    primal_bound_scaled::T    # Scaled primal bound (c'x) / τ
+    dual_bound_unscaled::T    # Unscaled dual bound b'y + l' zl - u'zu
+    dual_bound_scaled::T      # Scaled dual bound (b'y + l' zl - u'zu) / τ
 
 
     #=====================

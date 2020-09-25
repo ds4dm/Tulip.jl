@@ -66,16 +66,8 @@ function compute_step!(hsd::HSDSolver{T, Tv, Tk},
 
     # Search directions
     # Predictor
-    Δ  = Point(m, n, p,
-        tzeros(Tv, n), tzeros(Tv, n), tzeros(Tv, n),
-        tzeros(Tv, m), tzeros(Tv, n), tzeros(Tv, n),
-        one(T), one(T), one(T)
-    )
-    Δc = Point(m, n, p,
-        tzeros(Tv, n), tzeros(Tv, n), tzeros(Tv, n),
-        tzeros(Tv, m), tzeros(Tv, n), tzeros(Tv, n),
-        one(T), one(T), one(T)
-    )
+    Δ  = Point{T, Tv}(m, n, p)
+    Δc = Point{T, Tv}(m, n, p)
 
     # Compute hx, hy, hz from first augmented system solve
     hx = tzeros(Tv, n)
