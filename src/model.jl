@@ -60,11 +60,11 @@ function Base.empty!(m::Model{Tv}) where{Tv}
 end
 
 """
-    optimize!(model::Model{Tv})
+    optimize!(model::Model{T})
 
 Solve the optimization problem.
 """
-function optimize!(model::Model{Tv}) where{Tv}
+function optimize!(model::Model{T}) where{T}
 
     # Set number of threads
     model.params.Threads >= 1 || error(
@@ -105,7 +105,7 @@ function optimize!(model::Model{Tv}) where{Tv}
             model.params.OutputLevel > 0 && println("Presolve solved the problem.")
             
             # Perform post-solve
-            sol0 = Solution{Tv}(model.pbdata.ncon, model.pbdata.nvar)
+            sol0 = Solution{T}(model.pbdata.ncon, model.pbdata.nvar)
             postsolve!(sol0, model.presolve_data.solution, model.presolve_data)
             model.solution = sol0
 
@@ -122,20 +122,23 @@ function optimize!(model::Model{Tv}) where{Tv}
         pb_ = model.presolve_data.pb_red
     end
 
+    # Extract data in IPM form
+    dat = IPMData(pb_, model.params.MatrixOptions)
+
     # Instantiate the IPM solver
-    model.solver = HSD{Tv}(model.params, pb_)
+    model.solver = HSD(dat, model.params)
 
     # Solve the problem
     # TODO: add a try-catch for error handling
-    optimize!(model.solver, model.params)
+    ipm_optimize!(model.solver, dat, model.params)
 
     # Recover solution in original space
-    sol_inner = Solution{Tv}(pb_.ncon, pb_.nvar)
+    sol_inner = Solution{T}(pb_.ncon, pb_.nvar)
     _extract_solution!(sol_inner, pb_, model.solver)
 
     # Post-solve
     if model.params.Presolve > 0
-        sol_outer = Solution{Tv}(model.pbdata.ncon, model.pbdata.nvar)
+        sol_outer = Solution{T}(model.pbdata.ncon, model.pbdata.nvar)
         postsolve!(sol_outer, sol_inner, model.presolve_data)
         model.solution = sol_outer
     else
@@ -148,7 +151,11 @@ function optimize!(model::Model{Tv}) where{Tv}
     return nothing
 end
 
-function _extract_solution!(sol::Solution{Tv}, pb::ProblemData{Tv}, hsd::HSD{Tv}) where{Tv}
+function _extract_solution!(sol::Solution{T},
+    pb::ProblemData{T}, hsd::HSD{T}
+) where{T}
+
+    m, n = pb.ncon, pb.nvar
 
     # Extract column information
     # TODO: check for ray vs vertex
@@ -159,51 +166,19 @@ function _extract_solution!(sol::Solution{Tv}, pb::ProblemData{Tv}, hsd::HSD{Tv}
     is_dual_ray = (sol.dual_status == Sln_InfeasibilityCertificate)
     sol.is_primal_ray = is_primal_ray
     sol.is_dual_ray = is_dual_ray
-    τ_ = (is_primal_ray || is_dual_ray) ? one(Tv) : inv(hsd.pt.t)
+    τ_ = (is_primal_ray || is_dual_ray) ? one(T) : inv(hsd.pt.τ)
     
-    nfree = 0
-    nvarupb = 0
-    for (j, (l, u)) in enumerate(zip(pb.lvar, pb.uvar))
-        # Recover primal variable and its reduced cost
-        j_ = j + nfree
-        if l == Tv(-Inf) && u == Tv(Inf)
-            # free variable
-            sol.x[j] = (hsd.pt.x[j_] - hsd.pt.x[j_+1]) * τ_
-            s = (hsd.pt.s[j_] - hsd.pt.s[j_+1]) * τ_
-            nfree += 1
-        elseif l == Tv(-Inf) && isfinite(u)
-            # Un-flip and push upper bound
-            sol.x[j] = (!is_primal_ray * u) - hsd.pt.x[j_] * τ_
-            # Un-flip reduced cost
-            s = -hsd.pt.s[j_] * τ_
-        elseif isfinite(l) && isfinite(u)
-            nvarupb += 1
-            # Un-push lower bound
-            sol.x[j] = (!is_primal_ray * l) + hsd.pt.x[j_] * τ_
-            # Reduced cost has two components
-            s = (hsd.pt.s[j_] - hsd.pt.z[nvarupb]) * τ_
-        else
-            sol.x[j] = (!is_primal_ray * l) + hsd.pt.x[j_] * τ_
-            s = hsd.pt.s[j_] * τ_
-        end
-
-        # Reduced cost
-        sol.s_lower[j] = pos_part(s)
-        sol.s_upper[j] = neg_part(s)
-    end
+    @. sol.x = hsd.pt.x[1:n] * τ_
+    @. sol.s_lower = hsd.pt.zl[1:n] * τ_
+    @. sol.s_upper = hsd.pt.zu[1:n] * τ_
 
     # Extract row information
-    nslack = 0
-    nslackupb = 0
-    for i in 1:pb.ncon
-        y = hsd.pt.y[i] * τ_
-        sol.y_lower[i] = pos_part(y)
-        sol.y_upper[i] = neg_part(y)
-    end
+    @. sol.y_lower = pos_part.(hsd.pt.y) * τ_
+    @. sol.y_upper = neg_part.(hsd.pt.y) * τ_
 
     # Compute row primal
     for (i, row) in enumerate(pb.arows)
-        ax = zero(Tv)
+        ax = zero(T)
         for (j, aij) in zip(row.nzind, row.nzval)
             ax += aij * sol.x[j]
         end
@@ -213,8 +188,8 @@ function _extract_solution!(sol::Solution{Tv}, pb::ProblemData{Tv}, hsd::HSD{Tv}
     # Primal and dual objectives
     if sol.primal_status == Sln_InfeasibilityCertificate
         # Unbounded ray
-        sol.z_primal = -Inf
-        sol.z_dual = -Inf
+        sol.z_primal = -T(Inf)
+        sol.z_dual = -T(Inf)
     elseif sol.primal_status == Sln_Optimal || sol.primal_status == Sln_FeasiblePoint
         sol.z_primal = hsd.primal_bound_scaled
     else
@@ -224,8 +199,8 @@ function _extract_solution!(sol::Solution{Tv}, pb::ProblemData{Tv}, hsd::HSD{Tv}
 
     if sol.dual_status == Sln_InfeasibilityCertificate
         # Farkas proof of infeasibility
-        sol.z_primal = Inf
-        sol.z_dual = Inf
+        sol.z_primal = T(Inf)
+        sol.z_dual = T(Inf)
     elseif sol.dual_status == Sln_Optimal || sol.dual_status == Sln_FeasiblePoint
         # Dual solution is feasible
         sol.z_dual = hsd.dual_bound_scaled
