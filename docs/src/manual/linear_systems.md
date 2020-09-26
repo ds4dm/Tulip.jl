@@ -47,15 +47,15 @@ To enable the use of fast external libraries and/or specialized routines, the re
 
 Here is a list of currently supported linear solvers:
 
-| Linear solver type | `Tv` | System | Backend | Method |
-|:-------------------|:-----|:-------|:--------|:-------|
-| [`Dense_SymPosDef`](@ref) | `Real` | Normal equations | Dense / LAPACK | Cholesky
-| [`Cholmod_SymQuasDef`](@ref) | `Float64` | Augmented system | CHOLMOD | LDLᵀ
-| [`Cholmod_SymPosDef`](@ref) | `Float64` | Normal equations | CHOLMOD | Cholesky
-| [`LDLFact_SymQuasDef`](@ref) | `Real` | Augmented system | [LDLFactorizations.jl](https://github.com/JuliaSmoothOptimizers/LDLFactorizations.jl) | LDLᵀ
-| [`KrylovSPDSolver`](@ref) | `Real` | Normal equations | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
-| [`KrylovSIDSolver`](@ref) | `Real` | Augmented system[^1] | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
-| [`KrylovSQDSolver`](@ref) | `Real` | Augmented system[^1] | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
+| Linear solver type | System | Backend | Method |
+|:-------------------|:-------|:--------|:-------|
+| [`Dense_SymPosDef`](@ref) | Normal equations | Dense / LAPACK | Cholesky
+| [`Cholmod_SymQuasDef`](@ref) | Augmented system | CHOLMOD | LDLᵀ
+| [`Cholmod_SymPosDef`](@ref) | Normal equations | CHOLMOD | Cholesky
+| [`LDLFact_SymQuasDef`](@ref) | Augmented system | [LDLFactorizations.jl](https://github.com/JuliaSmoothOptimizers/LDLFactorizations.jl) | LDLᵀ
+| [`KrylovSPDSolver`](@ref) | Normal equations | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
+| [`KrylovSIDSolver`](@ref) | Augmented system[^1] | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
+| [`KrylovSQDSolver`](@ref) | Augmented system[^1] | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
 
 [^1]: [`KrylovSIDSolver`](@ref)s view the augmented system as a symmetric indefinite system,
     while [`KrylovSQDSolver`](@ref)s exploit its 2x2 structure and quasi-definite property.
