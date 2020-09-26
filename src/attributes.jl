@@ -64,7 +64,7 @@ struct NumberOfVariables <: AbstractModelAttribute end
 
 Objective value of the current primal solution.
 
-**Type:** `Tv`
+**Type:** `T`
 
 **Modifiable:** No
 
@@ -81,7 +81,7 @@ struct ObjectiveValue <: AbstractModelAttribute end
 
 Objective value of the current dual solution.
 
-**Type:** `Tv`
+**Type:** `T`
 
 **Modifiable:** No
 
@@ -98,14 +98,14 @@ struct DualObjectiveValue <: AbstractModelAttribute end
 
 Constant objective offset, defaults to zero.
 
-**Type:** `Tv`
+**Type:** `T`
 
 **Modifiable:** Yes
 
 ### Examples
 
 ```julia
-Tulip.set_attribute(model, Tulip.ObjectiveConstant(), zero(Tv))
+Tulip.set_attribute(model, Tulip.ObjectiveConstant(), zero(T))
 Tulip.get_attribute(model, Tulip.ObjectiveConstant())
 ```
 """
@@ -180,19 +180,20 @@ struct SolutionTime <: AbstractModelAttribute end
 #
 # ==============================================================================
 abstract type AbstractVariableAttribute <: AbstractAttribute end
+
 """
     VariableLowerBound
 
 Variable lower bound.
 
-**Type:** `Tv`
+**Type:** `T`
 
 **Modifiable:** Yes
 
 ### Examples
 
 ```julia
-Tulip.set_attribute(model, Tulip.VariableLowerBound(), 1, zero(Tv))
+Tulip.set_attribute(model, Tulip.VariableLowerBound(), 1, zero(T))
 Tulip.get_attribute(model, Tulip.VariableLowerBound(), 1)
 ```
 """
@@ -203,14 +204,14 @@ struct VariableLowerBound <: AbstractVariableAttribute end
 
 Variable upper bound.
 
-**Type:** `Tv`
+**Type:** `T`
 
 **Modifiable:** Yes
 
 ### Examples
 
 ```julia
-Tulip.set_attribute(model, Tulip.VariableUpperBound(), 1, one(Tv))
+Tulip.set_attribute(model, Tulip.VariableUpperBound(), 1, one(T))
 Tulip.get_attribute(model, Tulip.VariableUpperBound(), 1)
 ```
 """
@@ -221,14 +222,14 @@ struct VariableUpperBound <: AbstractVariableAttribute end
 
 Objective coefficient of the variable.
 
-**Type:** `Tv`
+**Type:** `T`
 
 **Modifiable:** Yes
 
 ### Examples
 
 ```julia
-Tulip.set_attribute(model, Tulip.VariableObjectiveCoeff(), 1, one(Tv))
+Tulip.set_attribute(model, Tulip.VariableObjectiveCoeff(), 1, one(T))
 Tulip.get_attribute(model, Tulip.VariableObjectiveCoeff(), 1)
 ```
 """
@@ -265,14 +266,14 @@ abstract type AbstractConstraintAttribute <: AbstractAttribute end
 
 Constraint lower bound.
 
-**Type:** `Tv`
+**Type:** `T`
 
 **Modifiable:** Yes
 
 ### Examples
 
 ```julia
-Tulip.set_attribute(model, Tulip.ConstraintLowerBound(), 1, zero(Tv))
+Tulip.set_attribute(model, Tulip.ConstraintLowerBound(), 1, zero(T))
 Tulip.get_attribute(model, Tulip.ConstraintLowerBound(), 1)
 ```
 """
@@ -283,14 +284,14 @@ struct ConstraintLowerBound <: AbstractConstraintAttribute end
 
 Constraint upper bound.
 
-**Type:** `Tv`
+**Type:** `T`
 
 **Modifiable:** Yes
 
 ### Examples
 
 ```julia
-Tulip.set_attribute(model, Tulip.ConstraintUpperBound(), 1, one(Tv))
+Tulip.set_attribute(model, Tulip.ConstraintUpperBound(), 1, one(T))
 Tulip.get_attribute(model, Tulip.ConstraintUpperBound(), 1)
 ```
 """
