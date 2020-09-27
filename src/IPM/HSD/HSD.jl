@@ -3,7 +3,10 @@
 
 Solver for the homogeneous self-dual algorithm.
 """
-mutable struct HSD{T, Tv, Tk} <: AbstractIPMOptimizer{T}
+mutable struct HSD{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
+
+    # Problem data, in standard form
+    dat::IPMData{T, Tv, Tb, Ta}
 
     # =================
     #   Book-keeping
@@ -53,7 +56,7 @@ mutable struct HSD{T, Tv, Tk} <: AbstractIPMOptimizer{T}
         kkt = KKT.setup(params.KKTOptions.Ts, dat.A; params.KKTOptions.options...)
         Tk = typeof(kkt)
 
-        return new{T, Tv, Tk}(
+        return new{T, Tv, Tb, Ta, Tk}(dat,
             0, Trm_Unknown, Sln_Unknown, Sln_Unknown,
             T(Inf), T(Inf), T(-Inf), T(-Inf),
             TimerOutput(),
@@ -73,10 +76,11 @@ In-place computation of primal-dual residuals at point `pt`.
 """
 # TODO: check whether having just hsd as argument makes things slower
 # TODO: Update solution status
-function compute_residuals!(hsd::HSD{T, Tv}, dat::IPMData{T, Tv, Tb, Ta}
-) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
+function compute_residuals!(hsd::HSD{T}
+) where{T}
 
     pt, res = hsd.pt, hsd.res
+    dat = hsd.dat
 
     # Primal residual
     # rp = t*b - A*x
@@ -135,13 +139,11 @@ end
 
 Update status and return true if solver should stop.
 """
-function update_solver_status!(
-    hsd::HSD{T, Tv}, dat::IPMData{T, Tv, Tb, Ta},
-    ϵp::T, ϵd::T, ϵg::T, ϵi::T
-) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
+function update_solver_status!(hsd::HSD{T}, ϵp::T, ϵd::T, ϵg::T, ϵi::T) where{T}
     hsd.solver_status = Trm_Unknown
 
     pt, res = hsd.pt, hsd.res
+    dat = hsd.dat
 
     ρp = max(
         res.rp_nrm / (pt.τ * (one(T) + norm(dat.b, Inf))),
@@ -204,13 +206,10 @@ end
     optimize!
 
 """
-function ipm_optimize!(hsd::HSD{T, Tv, Tk},
-    dat::IPMData{T, Tv, Tb, Ta},
-    params::Parameters{T}
-) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tk<:AbstractKKTSolver{T}}
-
+function ipm_optimize!(hsd::HSD{T}, params::Parameters{T}) where{T}
     # TODO: pre-check whether model needs to be re-optimized.
     # This should happen outside of this function
+    dat = hsd.dat
 
     # Initialization
     TimerOutputs.reset_timer!(hsd.timer)
@@ -263,7 +262,7 @@ function ipm_optimize!(hsd::HSD{T, Tv, Tk},
     @timeit hsd.timer "Main loop" while(true)
 
         # I.A - Compute residuals at current iterate
-        @timeit hsd.timer "Residuals" compute_residuals!(hsd, dat)
+        @timeit hsd.timer "Residuals" compute_residuals!(hsd)
 
         update_mu!(hsd.pt)
 
@@ -298,7 +297,7 @@ function ipm_optimize!(hsd::HSD{T, Tv, Tk},
         #   followed by a check on the solver status to determine whether to stop
         # In particular, user limits should be checked last (if an optimal solution is found,
         # we want to report optimal, not user limits)
-        @timeit hsd.timer "update status" update_solver_status!(hsd, dat,
+        @timeit hsd.timer "update status" update_solver_status!(hsd,
             params.BarrierTolerancePFeas,
             params.BarrierToleranceDFeas,
             params.BarrierToleranceRGap,
@@ -324,7 +323,7 @@ function ipm_optimize!(hsd::HSD{T, Tv, Tk},
         # For now, include the factorization in the step function
         # Q: should we use more arguments here?
         try
-            @timeit hsd.timer "Step" compute_step!(hsd, dat, params)
+            @timeit hsd.timer "Step" compute_step!(hsd, params)
         catch err
 
             if isa(err, PosDefException) || isa(err, SingularException)

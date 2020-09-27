@@ -80,8 +80,8 @@ function run_tests_hsd(T::Type)
     ϵ = sqrt(eps(T))
 
     @testset "Residuals" begin
-        @inferred TLP.compute_residuals!(hsd, dat)
-        TLP.compute_residuals!(hsd, dat)
+        @inferred TLP.compute_residuals!(hsd)
+        TLP.compute_residuals!(hsd)
         
         @test isapprox(hsd.res.rp_nrm, zero(T); atol=ϵ, rtol=ϵ)
         @test isapprox(hsd.res.ru_nrm, zero(T); atol=ϵ, rtol=ϵ)
@@ -93,7 +93,7 @@ function run_tests_hsd(T::Type)
     @testset "Convergence" begin
 
         hsd.solver_status = TLP.Trm_Unknown
-        TLP.update_solver_status!(hsd, dat, ϵ, ϵ, ϵ, ϵ)
+        TLP.update_solver_status!(hsd, ϵ, ϵ, ϵ, ϵ)
         @test hsd.solver_status == TLP.Trm_Optimal
 
         # TODO: dual infeasible

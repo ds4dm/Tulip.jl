@@ -83,11 +83,10 @@ Currently supported:
 abstract type AbstractIPMOptimizer{T} end
 
 """
-    ipm_optimize!(ipm, dat)
+    ipm_optimize!(ipm)
 
-Run the interior-point optimizer of `ipm` on LP data `dat`.
+Run the interior-point optimizer of `ipm`.
 """
 function ipm_optimize! end
 
 include("HSD/HSD.jl")
-# TODO: MPC solver

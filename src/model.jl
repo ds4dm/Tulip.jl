@@ -130,7 +130,7 @@ function optimize!(model::Model{T}) where{T}
 
     # Solve the problem
     # TODO: add a try-catch for error handling
-    ipm_optimize!(model.solver, dat, model.params)
+    ipm_optimize!(model.solver, model.params)
 
     # Recover solution in original space
     sol_inner = Solution{T}(pb_.ncon, pb_.nvar)

@@ -1,18 +1,16 @@
 """
-    compute_step!(hsd, dat, params)
+    compute_step!(hsd, params)
 
 Compute next IP iterate for the HSD formulation.
 
 # Arguments
 - `hsd`: The HSD optimizer model
-- `dat`: the IPM data
 - `params`: Optimization parameters
 """
-function compute_step!(hsd::HSD{T, Tv, Tk},
-    dat::IPMData{T, Tv, Tb, Ta}, params::Parameters{T}
-) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tk<:AbstractKKTSolver{T}}
+function compute_step!(hsd::HSD{T, Tv}, params::Parameters{T}) where{T, Tv<:AbstractVector{T}}
 
     # Names
+    dat = hsd.dat
     pt = hsd.pt
     res = hsd.res
 
@@ -26,11 +24,6 @@ function compute_step!(hsd::HSD{T, Tv, Tk},
     θl = (pt.zl ./ pt.xl) .* dat.lflag
     θu = (pt.zu ./ pt.xu) .* dat.uflag
     θinv = θl .+ θu
-
-    # Check that no NaN values appeared
-    @assert !any(isnan.(θl))
-    @assert !any(isnan.(θu))
-    @assert !any(isnan.(θinv))
 
     # Update regularizations
     hsd.regP .= max.(params.BarrierPRegMin, hsd.regP ./ 10)
@@ -81,7 +74,7 @@ function compute_step!(hsd::HSD{T, Tv, Tk},
     )
 
     # Affine-scaling direction
-    @timeit hsd.timer "Newton" solve_newton_system!(Δ, hsd, dat, hx, hy, h0,
+    @timeit hsd.timer "Newton" solve_newton_system!(Δ, hsd, hx, hy, h0,
         # Right-hand side of Newton system
         res.rp, res.rl, res.ru, res.rd, res.rg,
         -(pt.xl .* pt.zl) .* dat.lflag,
@@ -95,7 +88,7 @@ function compute_step!(hsd::HSD{T, Tv, Tk},
     η = one(T) - γ
     
     # Mehrotra corrector
-    @timeit hsd.timer "Newton" solve_newton_system!(Δ, hsd, dat, hx, hy, h0,
+    @timeit hsd.timer "Newton" solve_newton_system!(Δ, hsd, hx, hy, h0,
         # Right-hand side of Newton system
         η .* res.rp, η .* res.rl, η .* res.ru, η .* res.rd, η * res.rg,
         (-pt.xl .* pt.zl .+ γ * pt.μ .- Δ.xl .* Δ.zl) .* dat.lflag,
@@ -112,7 +105,7 @@ function compute_step!(hsd::HSD{T, Tv, Tk},
 
         # Compute extra-corrector
         αc = compute_higher_corrector!(Δc, 
-            hsd, dat, γ, 
+            hsd, γ, 
             hx, hy, h0,
             Δ, α_, params.BarrierCentralityOutlierThreshold
         )
@@ -157,7 +150,7 @@ end
 
 
 """
-    solve_newton_system!(Δ, hsd, dat, hx, hy, h0, ξp, ξd, ξu, ξg, ξxs, ξwz, ξtk)
+    solve_newton_system!(Δ, hsd, hx, hy, h0, ξp, ξd, ξu, ξg, ξxs, ξwz, ξtk)
 
 Solve the Newton system
 ```math
@@ -197,20 +190,19 @@ Solve the Newton system
 # Arguments
 - `Δ`: Search direction, modified
 - `hsd`: The HSD optimizer
-- `dat`: The problem data, in `IPMData` form
 - `hx, hy, hz, h0`: Terms obtained in the preliminary augmented system solve
 - `ξp, ξd, ξu, ξg, ξxs, ξwz, ξtk`: Right-hand side vectors
 """
 function solve_newton_system!(Δ::Point{T, Tv},
-    hsd::HSD{T, Tv, Tk},
-    dat::IPMData{T, Tv, Tb, Ta},
+    hsd::HSD{T, Tv},
     # Information from initial augmented system solve
     hx::Tv, hy::Tv, h0::T,
     # Right-hand side
     ξp::Tv, ξl::Tv, ξu::Tv, ξd::Tv, ξg::T, ξxzl::Tv, ξxzu::Tv, ξtk::T
-) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tk<:AbstractKKTSolver{T}}
+) where{T, Tv<:AbstractVector{T}}
 
     pt = hsd.pt
+    dat = hsd.dat
 
     # I. Solve augmented system
     @timeit hsd.timer "ξd_"  begin
@@ -315,7 +307,7 @@ end
 
 
 """
-    compute_higher_corrector!(Δc, hsd, dat, γ, hx, hy, h0, Δ, α, β)
+    compute_higher_corrector!(Δc, hsd, γ, hx, hy, h0, Δ, α, β)
 
 Compute higher-order corrected direction.
 
@@ -324,7 +316,6 @@ Requires the solution of one Newton system.
 # Arguments
 - `Δc`: Corrected search direction, modified in-place
 - `hsd`: The HSD optimizer
-- `dat`: problem data, in IPM form
 - `γ`: 
 - `hx, hy, h0`: Terms obtained from the preliminary augmented system solve
 - `Δ`: Current predictor direction
@@ -332,12 +323,13 @@ Requires the solution of one Newton system.
 - `β`: Relative threshold for centrality outliers
 """
 function compute_higher_corrector!(Δc::Point{T, Tv},
-    hsd::HSD{T, Tv, Tk}, dat::IPMData{T, Tv, Tb, Ta}, γ::T,
+    hsd::HSD{T, Tv}, γ::T,
     hx::Tv, hy::Tv, h0::T,
     Δ::Point{T, Tv}, α::T, β::T,
-) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tk<:AbstractKKTSolver{T}}
+) where{T, Tv<:AbstractVector{T}}
     # TODO: Sanity checks
     pt = hsd.pt
+    dat = hsd.dat
 
     # Tentative step length
     α_ = min(one(T), T(2)*α)
@@ -385,7 +377,7 @@ function compute_higher_corrector!(Δc::Point{T, Tv},
     vt  -= δ
 
     # Compute corrector
-    @timeit hsd.timer "Newton" solve_newton_system!(Δc, hsd, dat, hx, hy, h0,
+    @timeit hsd.timer "Newton" solve_newton_system!(Δc, hsd, hx, hy, h0,
         # Right-hand sides
         tzeros(Tv, pt.m), tzeros(Tv, pt.n), tzeros(Tv, pt.n), tzeros(Tv, pt.n), zero(T),
         vl,
