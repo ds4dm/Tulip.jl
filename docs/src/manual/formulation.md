@@ -26,12 +26,11 @@ Internally, Tulip solves LPs of the form
     & c^{T} x + \ c_{0}\\
     s.t.
     & A x = b\\
-    & x \leq u\\
-    & x \geq 0
+    & l \leq x \leq u\\
     \end{array}
 ```
-where ``x, c, u \in \mathbb{R}^{n}``, ``A \in \mathbb{R}^{m \times n}`` and ``b \in \mathbb{R}^{m}``.
-Some ``u_{j}`` may may take infinite value, i.e., the corresponding variable ``x_{j}`` has no upper bound.
+where ``x, c \in \mathbb{R}^{n}``, ``A \in \mathbb{R}^{m \times n}``, ``b \in \mathbb{R}^{m}``,
+and  ``l, u \in (\mathbb{R} \cup \{-\infty, +\infty \})^{n}``, i.e., some bounds may be infinite.
 
 The original problem is automatically reformulated into standard form before the optimization is performed.
 This transformation is transparent to the user.

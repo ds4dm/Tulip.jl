@@ -5,32 +5,34 @@ using Logging
 using Printf
 using SparseArrays
 
+using TimerOutputs
+
 # Linear algebra
 include("LinearAlgebra/LinearAlgebra.jl")
 import .TLPLinearAlgebra.construct_matrix
 const TLA = TLPLinearAlgebra
 
 # KKT solvers
-include("./KKTSolver/KKTSolver.jl")
+include("KKT/KKT.jl")
 using .KKT
 
-# Core data structures
+# Commons data structures
 # TODO: put this in a module
-include("Core/utils.jl")
-include("Core/status.jl")    # Termination and solution statuses
-include("Core/problemData.jl")
-include("Core/parameters.jl")
-include("Core/solution.jl")
-include("Core/attributes.jl")
+include("utils.jl")
+include("status.jl")    # Termination and solution statuses
+include("problemData.jl")
+include("parameters.jl")
+include("solution.jl")
+include("attributes.jl")
 
 # Presolve module
 include("Presolve/Presolve.jl")
 
 # IPM solvers
-include("./Solvers/Solvers.jl")
+include("./IPM/IPM.jl")
 
 # Model
-include("./model.jl")
+include("model.jl")
 
 # Interfaces
 include("Interfaces/tulip_julia_api.jl")
