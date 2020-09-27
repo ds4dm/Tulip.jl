@@ -7,13 +7,13 @@ using SuiteSparse.CHOLMOD
 Uses CHOLMOD's factorization routines to solve the augmented system.
 
 To use an LDLᵀ factorization of the augmented system
-(see [`Cholmod_SymQuasDef`](@ref))
+(see [`CholmodSQD`](@ref))
 ```julia
 model.params.KKTOptions = Tulip.KKT.SolverOptions(CholmodSolver, normal_equations=false)
 ```
 
 To use a Cholesky factorization of the normal equations system
-(see [`Cholmod_SymPosDef`](@ref))
+(see [`CholmodSPD`](@ref))
 ```julia
 model.params.KKTOptions = Tulip.KKT.SolverOptions(CholmodSolver, normal_equations=true)
 ```
@@ -29,25 +29,25 @@ function CholmodSolver(
     kwargs...
 )
     if normal_equations
-        return Cholmod_SymPosDef(A; kwargs...)
+        return CholmodSPD(A; kwargs...)
     else
-        return Cholmod_SymQuasDef(A; kwargs...)
+        return CholmodSQD(A; kwargs...)
     end
 end
 
 
 # ==============================================================================
-#   Cholmod_SymQuasDef
+#   CholmodSQD
 # ==============================================================================
 
 """
-    Cholmod_SymQuasDef
+    CholmodSQD
 
 Linear solver for the 2x2 augmented system with ``A`` sparse.
 
 Uses an LDLᵀ factorization of the quasi-definite augmented system.
 """
-mutable struct Cholmod_SymQuasDef <: CholmodSolver
+mutable struct CholmodSQD <: CholmodSolver
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -67,7 +67,7 @@ mutable struct Cholmod_SymQuasDef <: CholmodSolver
     F::CHOLMOD.Factor{Float64}
 
     # TODO: constructor with initial memory allocation
-    function Cholmod_SymQuasDef(A::AbstractMatrix{Float64})
+    function CholmodSQD(A::AbstractMatrix{Float64})
         m, n = size(A)
         θ = ones(Float64, n)
 
@@ -84,8 +84,8 @@ mutable struct Cholmod_SymQuasDef <: CholmodSolver
 
 end
 
-backend(::Cholmod_SymQuasDef) = "CHOLMOD"
-linear_system(::Cholmod_SymQuasDef) = "Augmented system"
+backend(::CholmodSQD) = "CHOLMOD"
+linear_system(::CholmodSQD) = "Augmented system"
 
 """
     update!(kkt, θ, regP, regD)
@@ -97,7 +97,7 @@ Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
 Throws a `PosDefException` if matrix is not quasi-definite.
 """
 function update!(
-    kkt::Cholmod_SymQuasDef,
+    kkt::CholmodSQD,
     θ::AbstractVector{Float64},
     regP::AbstractVector{Float64},
     regD::AbstractVector{Float64}
@@ -143,7 +143,7 @@ Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve!(
     dx::Vector{Float64}, dy::Vector{Float64},
-    kkt::Cholmod_SymQuasDef,
+    kkt::CholmodSQD,
     ξp::Vector{Float64}, ξd::Vector{Float64}
 )
     m, n = kkt.m, kkt.n
@@ -178,11 +178,11 @@ function solve!(
 end
 
 # ==============================================================================
-#   Cholmod_SymPosDef
+#   CholmodSPD
 # ==============================================================================
 
 """
-    Cholmod_SymPosDef
+    CholmodSPD
 
 Linear solver for the 2x2 augmented system
 ```
@@ -197,7 +197,7 @@ Uses a Cholesky factorization of the positive definite normal equations system
                               dx = (Θ⁻¹ + Rp)⁻¹ * (Aᵀ * dy - xi_d)
 ```
 """
-mutable struct Cholmod_SymPosDef <: CholmodSolver
+mutable struct CholmodSPD <: CholmodSolver
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -216,7 +216,7 @@ mutable struct Cholmod_SymPosDef <: CholmodSolver
 
     # Constructor and initial memory allocation
     # TODO: symbolic only + allocation
-    function Cholmod_SymPosDef(A::AbstractMatrix{Float64})
+    function CholmodSPD(A::AbstractMatrix{Float64})
         m, n = size(A)
         θ = ones(Float64, n)
 
@@ -230,8 +230,8 @@ mutable struct Cholmod_SymPosDef <: CholmodSolver
 
 end
 
-backend(::Cholmod_SymPosDef) = "CHOLMOD - Cholesky"
-linear_system(::Cholmod_SymPosDef) = "Normal equations"
+backend(::CholmodSPD) = "CHOLMOD - Cholesky"
+linear_system(::CholmodSPD) = "Normal equations"
 
 """
     update!(kkt, θ, regP, regD)
@@ -239,7 +239,7 @@ linear_system(::Cholmod_SymPosDef) = "Normal equations"
 Compute normal equation system matrix, and update the factorization.
 """
 function update!(
-    kkt::Cholmod_SymPosDef,
+    kkt::CholmodSPD,
     θ::AbstractVector{Float64},
     regP::AbstractVector{Float64},
     regD::AbstractVector{Float64}
@@ -280,7 +280,7 @@ Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve!(
     dx::Vector{Float64}, dy::Vector{Float64},
-    kkt::Cholmod_SymPosDef,
+    kkt::CholmodSPD,
     ξp::Vector{Float64}, ξd::Vector{Float64}
 )
     m, n = kkt.m, kkt.n

@@ -1,12 +1,12 @@
 """
-    PresolveTransformation{Tv}
+    PresolveTransformation{T}
 
 Abstract type for pre-solve transformations.
 """
-abstract type PresolveTransformation{Tv} end
+abstract type PresolveTransformation{T} end
 
 """
-    PresolveData{Tv}
+    PresolveData{T}
 
 Stores information about an LP in the form
 ```
@@ -21,16 +21,16 @@ whose dual writes
                y⁺,     y⁻,     s⁺,     s⁻ ⩾ 0
 ```
 """
-mutable struct PresolveData{Tv}
+mutable struct PresolveData{T}
     updated::Bool
     status::TerminationStatus
 
     # Original problem
-    pb0::ProblemData{Tv}
+    pb0::ProblemData{T}
     # Reduced problem
     # Nothing until the reduced problem is extracted
-    pb_red::Union{Nothing, ProblemData{Tv}}
-    solution::Solution{Tv}  # only used if presolve solves the problem
+    pb_red::Union{Nothing, ProblemData{T}}
+    solution::Solution{T}  # only used if presolve solves the problem
 
     # Presolved data
 
@@ -44,28 +44,28 @@ mutable struct PresolveData{Tv}
 
     # Objective
     objsense::Bool
-    obj::Vector{Tv}
-    obj0::Tv
+    obj::Vector{T}
+    obj0::T
 
     # Current number of constraints/variables in presolved problem
     nrow::Int
     ncol::Int
 
     # Primal bounds
-    lrow::Vector{Tv}
-    urow::Vector{Tv}
-    lcol::Vector{Tv}
-    ucol::Vector{Tv}
+    lrow::Vector{T}
+    urow::Vector{T}
+    lcol::Vector{T}
+    ucol::Vector{T}
 
     # Dual bounds
-    ly::Vector{Tv}
-    uy::Vector{Tv}
-    ls::Vector{Tv}
-    us::Vector{Tv}
+    ly::Vector{T}
+    uy::Vector{T}
+    ls::Vector{T}
+    us::Vector{T}
 
     # Scaling
-    row_scaling::Vector{Tv}
-    col_scaling::Vector{Tv}
+    row_scaling::Vector{T}
+    col_scaling::Vector{T}
     # TODO: objective and RHS scaling
 
     # Old <-> new index mapping
@@ -80,17 +80,17 @@ mutable struct PresolveData{Tv}
     free_col_singletons::Vector{Int}  # (implied) free column singletons
 
     # TODO: set of transformations for pre-post crush
-    ops::Vector{PresolveTransformation{Tv}}
+    ops::Vector{PresolveTransformation{T}}
 
-    function PresolveData(pb::ProblemData{Tv}) where{Tv}
-        ps = new{Tv}()
+    function PresolveData(pb::ProblemData{T}) where{T}
+        ps = new{T}()
 
         ps.updated = false
         ps.status = Trm_Unknown
 
         ps.pb0 = pb
         ps.pb_red = nothing
-        ps.solution = Solution{Tv}(pb.ncon, pb.nvar)
+        ps.solution = Solution{T}(pb.ncon, pb.nvar)
 
         ps.nrow = pb.ncon
         ps.ncol = pb.nvar
@@ -128,22 +128,22 @@ mutable struct PresolveData{Tv}
         ps.ucol = copy(pb.uvar)
 
         # Set dual bounds
-        ps.ly = Vector{Tv}(undef, ps.nrow)
-        ps.uy = Vector{Tv}(undef, ps.nrow)
-        ps.ls = Vector{Tv}(undef, ps.ncol)
-        ps.us = Vector{Tv}(undef, ps.ncol)
+        ps.ly = Vector{T}(undef, ps.nrow)
+        ps.uy = Vector{T}(undef, ps.nrow)
+        ps.ls = Vector{T}(undef, ps.ncol)
+        ps.us = Vector{T}(undef, ps.ncol)
         for (i, (lc, uc)) in enumerate(zip(ps.lrow, ps.urow))
-            ps.ly[i] = (uc == Tv( Inf)) ? zero(Tv) : Tv(-Inf)
-            ps.uy[i] = (lc == Tv(-Inf)) ? zero(Tv) : Tv( Inf)
+            ps.ly[i] = (uc == T( Inf)) ? zero(T) : T(-Inf)
+            ps.uy[i] = (lc == T(-Inf)) ? zero(T) : T( Inf)
         end
         for (j, (lv, uv)) in enumerate(zip(ps.lcol, ps.ucol))
-            ps.ls[j] = (uv == Tv( Inf)) ? zero(Tv) : Tv(-Inf)
-            ps.us[j] = (lv == Tv(-Inf)) ? zero(Tv) : Tv( Inf)
+            ps.ls[j] = (uv == T( Inf)) ? zero(T) : T(-Inf)
+            ps.us[j] = (lv == T(-Inf)) ? zero(T) : T( Inf)
         end
 
         # Scalings
-        ps.row_scaling = ones(Tv, ps.nrow)
-        ps.col_scaling = ones(Tv, ps.ncol)
+        ps.row_scaling = ones(T, ps.nrow)
+        ps.col_scaling = ones(T, ps.ncol)
 
         # Index mappings
         ps.new_con_idx = Int[]
@@ -155,16 +155,16 @@ mutable struct PresolveData{Tv}
         ps.row_singletons = Int[]
         ps.free_col_singletons = Int[]
 
-        ps.ops = PresolveTransformation{Tv}[]
+        ps.ops = PresolveTransformation{T}[]
 
         return ps
     end
 end
 
 # Extract pre-solved problem data, to be passed to the IPM solver
-function extract_reduced_problem!(ps::PresolveData{Tv}) where{Tv<:Real}
+function extract_reduced_problem!(ps::PresolveData{T}) where{T}
     
-    pb = ProblemData{Tv}()
+    pb = ProblemData{T}()
 
     pb.ncon = sum(ps.rowflag)
     pb.nvar = sum(ps.colflag)
@@ -185,7 +185,7 @@ function extract_reduced_problem!(ps::PresolveData{Tv}) where{Tv<:Real}
     pb.ucon = ps.urow[ps.rowflag]
 
     # Extract new rows
-    pb.arows = Vector{Row{Tv}}(undef, pb.ncon)
+    pb.arows = Vector{Row{T}}(undef, pb.ncon)
     inew = 0
     for (iold, row) in enumerate(ps.pb0.arows)
         ps.rowflag[iold] || continue
@@ -193,7 +193,7 @@ function extract_reduced_problem!(ps::PresolveData{Tv}) where{Tv<:Real}
         inew += 1
         # Compute new row
         rind = Vector{Int}(undef, ps.nzrow[iold])
-        rval = Vector{Tv}(undef, ps.nzrow[iold])
+        rval = Vector{T}(undef, ps.nzrow[iold])
 
         k = 0
         for (jold, aij) in zip(row.nzind, row.nzval)
@@ -207,11 +207,11 @@ function extract_reduced_problem!(ps::PresolveData{Tv}) where{Tv<:Real}
         end
 
         # Set new row
-        pb.arows[inew] = Row{Tv}(rind, rval)
+        pb.arows[inew] = Row{T}(rind, rval)
     end
 
     # Extract new columns
-    pb.acols = Vector{Col{Tv}}(undef, pb.nvar)
+    pb.acols = Vector{Col{T}}(undef, pb.nvar)
     jnew = 0
     for (jold, col) in enumerate(ps.pb0.acols)
         ps.colflag[jold] || continue
@@ -219,7 +219,7 @@ function extract_reduced_problem!(ps::PresolveData{Tv}) where{Tv<:Real}
         jnew += 1
         # Compute new row
         cind = Vector{Int}(undef, ps.nzcol[jold])
-        cval = Vector{Tv}(undef, ps.nzcol[jold]) 
+        cval = Vector{T}(undef, ps.nzcol[jold]) 
 
         k = 0
         for (iold, aij) in zip(col.nzind, col.nzval)
@@ -233,7 +233,7 @@ function extract_reduced_problem!(ps::PresolveData{Tv}) where{Tv<:Real}
         end
 
         # Set new column
-        pb.acols[jnew] = Col{Tv}(cind, cval)
+        pb.acols[jnew] = Col{T}(cind, cval)
     end
 
     # Variable and constraint names
@@ -242,19 +242,19 @@ function extract_reduced_problem!(ps::PresolveData{Tv}) where{Tv<:Real}
     pb.con_names = ps.pb0.con_names[ps.rowflag]
 
     # Scaling
-    rscale = zeros(Tv, ps.nrow)
-    cscale = zeros(Tv, ps.ncol)
+    rscale = zeros(T, ps.nrow)
+    cscale = zeros(T, ps.ncol)
 
     # Compute norm of each row and column
     # TODO: use a parameter p and do norm(.., p)
     p = 2
     for (i, row) in enumerate(pb.arows)
         r = norm(row.nzval, p)
-        rscale[i] = r > zero(Tv) ? r : one(Tv)
+        rscale[i] = r > zero(T) ? r : one(T)
     end
     for (j, col) in enumerate(pb.acols)
         r = norm(col.nzval, p)
-        cscale[j] = r > zero(Tv) ? r : one(Tv)
+        cscale[j] = r > zero(T) ? r : one(T)
     end
 
     map!(sqrt, cscale, cscale)
@@ -306,7 +306,7 @@ include("dominated_column.jl")
 
 Perform post-solve.
 """
-function postsolve!(sol::Solution{Tv}, sol_::Solution{Tv}, ps::PresolveData{Tv}) where{Tv}
+function postsolve!(sol::Solution{T}, sol_::Solution{T}, ps::PresolveData{T}) where{T}
 
     # Check dimensions
     (sol_.m, sol_.n) == (ps.nrow, ps.ncol) || error(
@@ -343,7 +343,7 @@ function postsolve!(sol::Solution{Tv}, sol_::Solution{Tv}, ps::PresolveData{Tv})
 
     # Compute row primals
     for (i, row) in enumerate(ps.pb0.arows)
-        sol.Ax[i] = zero(Tv)
+        sol.Ax[i] = zero(T)
         for (j, aij) in zip(row.nzind, row.nzval)
             sol.Ax[i] += aij * sol.x[j]
         end
@@ -359,7 +359,7 @@ end
 
 Perform pre-solve.
 """
-function presolve!(ps::PresolveData{Tv}) where{Tv<:Real}
+function presolve!(ps::PresolveData{T}) where{T}
 
     # Check bound consistency on all rows/columns
     st = bounds_consistency_checks!(ps)
@@ -487,7 +487,7 @@ Check that all primal & dual bounds are consistent.
 
 TODO: If not, declare primal/dual infeasibility and extract ray.
 """
-function bounds_consistency_checks!(ps::PresolveData{Tv}) where{Tv}
+function bounds_consistency_checks!(ps::PresolveData{T}) where{T}
     # Check primal bounds
     for (i, (l, u)) in enumerate(zip(ps.lrow, ps.urow))
         if ps.rowflag[i] && l > u
@@ -499,21 +499,21 @@ function bounds_consistency_checks!(ps::PresolveData{Tv}) where{Tv}
             # Resize problem            
             compute_index_mapping!(ps)
             resize!(ps.solution, ps.nrow, ps.ncol)
-            ps.solution.x .= zero(Tv)
-            ps.solution.y_lower .= zero(Tv)
-            ps.solution.y_upper .= zero(Tv)
-            ps.solution.s_lower .= zero(Tv)
-            ps.solution.s_upper .= zero(Tv)
+            ps.solution.x .= zero(T)
+            ps.solution.y_lower .= zero(T)
+            ps.solution.y_upper .= zero(T)
+            ps.solution.s_lower .= zero(T)
+            ps.solution.s_upper .= zero(T)
 
             # Farkas ray: y⁺_i = y⁻_i = 1 (any > 0 value works)
             ps.solution.primal_status = Sln_Unknown
             ps.solution.dual_status = Sln_InfeasibilityCertificate
             ps.solution.is_primal_ray = false
             ps.solution.is_dual_ray = true
-            ps.solution.z_primal = ps.solution.z_dual = Tv(Inf)
+            ps.solution.z_primal = ps.solution.z_dual = T(Inf)
             i_ = ps.new_con_idx[i]
-            ps.solution.y_lower[i_] = one(Tv)
-            ps.solution.y_upper[i_] = one(Tv)
+            ps.solution.y_lower[i_] = one(T)
+            ps.solution.y_upper[i_] = one(T)
             
             return
         end
@@ -528,21 +528,21 @@ function bounds_consistency_checks!(ps::PresolveData{Tv}) where{Tv}
             # Resize problem            
             compute_index_mapping!(ps)
             resize!(ps.solution, ps.nrow, ps.ncol)
-            ps.solution.x .= zero(Tv)
-            ps.solution.y_lower .= zero(Tv)
-            ps.solution.y_upper .= zero(Tv)
-            ps.solution.s_lower .= zero(Tv)
-            ps.solution.s_upper .= zero(Tv)
+            ps.solution.x .= zero(T)
+            ps.solution.y_lower .= zero(T)
+            ps.solution.y_upper .= zero(T)
+            ps.solution.s_lower .= zero(T)
+            ps.solution.s_upper .= zero(T)
 
             # Farkas ray: y⁺_i = y⁻_i = 1 (any > 0 value works)
             ps.solution.primal_status = Sln_Unknown
             ps.solution.dual_status = Sln_InfeasibilityCertificate
             ps.solution.is_primal_ray = false
             ps.solution.is_dual_ray = true
-            ps.solution.z_primal = ps.solution.z_dual = Tv(Inf)
+            ps.solution.z_primal = ps.solution.z_dual = T(Inf)
             j_ = ps.new_var_idx[j]
-            ps.solution.s_lower[j_] = one(Tv)
-            ps.solution.s_upper[j_] = one(Tv)
+            ps.solution.s_lower[j_] = one(T)
+            ps.solution.s_upper[j_] = one(T)
             
             return
         end
@@ -561,7 +561,7 @@ Remove all empty rows.
 Called once at the beginning of the presolve procedure.
 If an empty row is created later, it is removed on the spot.
 """
-function remove_empty_rows!(ps::PresolveData{Tv}) where{Tv}
+function remove_empty_rows!(ps::PresolveData{T}) where{T}
     nempty = 0
     for i in 1:ps.pb0.ncon
         (ps.rowflag[i] && (ps.nzrow[i] == 0)) || continue
@@ -580,7 +580,7 @@ Remove all empty columns.
 Called once at the beginning of the presolve procedure.
 If an empty column is created later, it is removed on the spot.
 """
-function remove_empty_columns!(ps::PresolveData{Tv}) where{Tv}
+function remove_empty_columns!(ps::PresolveData{T}) where{T}
     for j in 1:ps.pb0.nvar
         remove_empty_column!(ps, j)
         ps.status == Trm_Unknown || break
@@ -593,7 +593,7 @@ end
 
 Remove all fixed variables.
 """
-function remove_fixed_variables!(ps::PresolveData{Tv}) where{Tv}
+function remove_fixed_variables!(ps::PresolveData{T}) where{T}
     for (j, flag) in enumerate(ps.colflag)
         flag || continue
         remove_fixed_variable!(ps, j)
@@ -601,7 +601,7 @@ function remove_fixed_variables!(ps::PresolveData{Tv}) where{Tv}
     return nothing
 end
 
-function remove_row_singletons!(ps::PresolveData{Tv}) where{Tv}
+function remove_row_singletons!(ps::PresolveData{T}) where{T}
     nsingletons = 0
     for i in ps.row_singletons
         remove_row_singleton!(ps, i)
@@ -633,7 +633,7 @@ function remove_free_column_singletons!(ps::PresolveData)
     return nothing
 end
 
-function remove_dominated_columns!(ps::PresolveData{Tv}) where{Tv}
+function remove_dominated_columns!(ps::PresolveData{T}) where{T}
     # Strengthen dual bounds with column singletons
     for (j, (l, u)) in enumerate(zip(ps.lcol, ps.ucol))
         (ps.colflag[j] && ps.nzcol[j] == 1) || continue
@@ -641,7 +641,7 @@ function remove_dominated_columns!(ps::PresolveData{Tv}) where{Tv}
         col = ps.pb0.acols[j]
         # Find non-zero index
         nz = 0
-        i, aij = 0, zero(Tv)
+        i, aij = 0, zero(T)
         for (i_, a_) in zip(col.nzind, col.nzval)
             if ps.rowflag[i_] && !iszero(a_)
                 nz += 1; nz <= 1 || break
@@ -664,7 +664,7 @@ function remove_dominated_columns!(ps::PresolveData{Tv}) where{Tv}
             # TODO
         elseif isfinite(l) && !isfinite(u)
             # Lower-bounded variable: `aij * yi ≤ cj`
-            if aij > zero(Tv)
+            if aij > zero(T)
                 # yi ≤ cj / aij
                 @debug "Col $j forces y$i <= $y_"
                 ps.uy[i] = min(ps.uy[i],  y_)
@@ -676,7 +676,7 @@ function remove_dominated_columns!(ps::PresolveData{Tv}) where{Tv}
         
         elseif !isfinite(l) && isfinite(u)
             # Upper-bounded variable: `aij * yi ≥ cj`
-            if aij > zero(Tv)
+            if aij > zero(T)
                 # yi ≥ cj / aij
                 @debug "Col $j forces y$i >= $y_"
                 ps.ly[i] = max(ps.ly[i],  y_)

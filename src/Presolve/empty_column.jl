@@ -1,10 +1,10 @@
-struct EmptyColumn{Tv} <: PresolveTransformation{Tv}
+struct EmptyColumn{T} <: PresolveTransformation{T}
     j::Int  # variable index
-    x::Tv  # Variable value
-    s::Tv  # Reduced cost
+    x::T  # Variable value
+    s::T  # Reduced cost
 end
 
-function remove_empty_column!(ps::PresolveData{Tv}, j::Int) where{Tv}
+function remove_empty_column!(ps::PresolveData{T}, j::Int) where{T}
     # Sanity check
     (ps.colflag[j] && (ps.nzcol[j] == 0)) || return nothing
 
@@ -13,7 +13,7 @@ function remove_empty_column!(ps::PresolveData{Tv}, j::Int) where{Tv}
     cj = ps.obj[j]
     @debug "Removing empty column $j" cj lb ub
 
-    if cj > zero(Tv)
+    if cj > zero(T)
         if isfinite(lb)
             # Set variable to lower bound
             # Update objective constant
@@ -28,24 +28,24 @@ function remove_empty_column!(ps::PresolveData{Tv}, j::Int) where{Tv}
             # Resize problem
             compute_index_mapping!(ps)
             resize!(ps.solution, ps.nrow, ps.ncol)
-            ps.solution.x .= zero(Tv)
-            ps.solution.y_lower .= zero(Tv)
-            ps.solution.y_upper .= zero(Tv)
-            ps.solution.s_lower .= zero(Tv)
-            ps.solution.s_upper .= zero(Tv)
+            ps.solution.x .= zero(T)
+            ps.solution.y_lower .= zero(T)
+            ps.solution.y_upper .= zero(T)
+            ps.solution.s_lower .= zero(T)
+            ps.solution.s_upper .= zero(T)
 
             # Unbounded ray: xj = -1
             ps.solution.primal_status = Sln_InfeasibilityCertificate
             ps.solution.dual_status = Sln_Unknown
             ps.solution.is_primal_ray = true
             ps.solution.is_dual_ray = false
-            ps.solution.z_primal = ps.solution.z_dual = -Tv(Inf)
+            ps.solution.z_primal = ps.solution.z_dual = -T(Inf)
             j_ = ps.new_var_idx[j]
-            ps.solution.x[j_] = -one(Tv)
+            ps.solution.x[j_] = -one(T)
 
             return nothing
         end
-    elseif cj < zero(Tv)
+    elseif cj < zero(T)
         if isfinite(ub)
             # Set variable to upper bound
             # Update objective constant
@@ -60,32 +60,32 @@ function remove_empty_column!(ps::PresolveData{Tv}, j::Int) where{Tv}
             # Resize problem
             compute_index_mapping!(ps)
             resize!(ps.solution, ps.nrow, ps.ncol)
-            ps.solution.x .= zero(Tv)
-            ps.solution.y_lower .= zero(Tv)
-            ps.solution.y_upper .= zero(Tv)
-            ps.solution.s_lower .= zero(Tv)
-            ps.solution.s_upper .= zero(Tv)
+            ps.solution.x .= zero(T)
+            ps.solution.y_lower .= zero(T)
+            ps.solution.y_upper .= zero(T)
+            ps.solution.s_lower .= zero(T)
+            ps.solution.s_upper .= zero(T)
 
             # Unbounded ray: xj = 1
             ps.solution.primal_status = Sln_InfeasibilityCertificate
             ps.solution.dual_status = Sln_Unknown
             ps.solution.is_primal_ray = true
             ps.solution.is_dual_ray = false
-            ps.solution.z_primal = ps.solution.z_dual = -Tv(Inf)
+            ps.solution.z_primal = ps.solution.z_dual = -T(Inf)
             j_ = ps.new_var_idx[j]
-            ps.solution.x[j_] = one(Tv)
+            ps.solution.x[j_] = one(T)
             
             return
         end
     else
         # Any feasible value works
         if isfinite(lb)
-            push!(ps.ops, EmptyColumn(j, lb, zero(Tv)))
+            push!(ps.ops, EmptyColumn(j, lb, zero(T)))
         elseif isfinite(ub)
-            push!(ps.ops, EmptyColumn(j, ub, zero(Tv)))
+            push!(ps.ops, EmptyColumn(j, ub, zero(T)))
         else
             # Free variable with zero coefficient and empty column
-            push!(ps.ops, EmptyColumn(j, zero(Tv), zero(Tv)))
+            push!(ps.ops, EmptyColumn(j, zero(T), zero(T)))
         end
 
     end
@@ -97,7 +97,7 @@ function remove_empty_column!(ps::PresolveData{Tv}, j::Int) where{Tv}
     return nothing
 end
 
-function postsolve!(sol::Solution{Tv}, op::EmptyColumn{Tv}) where{Tv}
+function postsolve!(sol::Solution{T}, op::EmptyColumn{T}) where{T}
     sol.x[op.j] = op.x
     sol.s_lower[op.j] = pos_part(op.s)
     sol.s_upper[op.j] = neg_part(op.s)

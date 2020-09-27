@@ -1,17 +1,17 @@
 using SparseArrays
 
-mutable struct RowOrCol{Tv}
+mutable struct RowOrCol{T}
     nzind::Vector{Int}
-    nzval::Vector{Tv}
+    nzval::Vector{T}
 end
 
 const Row = RowOrCol
 const Col = RowOrCol
 
 """
-    ProblemData{Tv}
+    ProblemData{T}
 
-Data structure for storing problem data in precision `Tv`.
+Data structure for storing problem data in precision `T`.
 
 The LP is represented in canonical form
 
@@ -23,7 +23,7 @@ The LP is represented in canonical form
 \\end{array}
 ```
 """
-mutable struct ProblemData{Tv}
+mutable struct ProblemData{T}
 
     name::String
 
@@ -34,42 +34,42 @@ mutable struct ProblemData{Tv}
     # Objective
     # TODO: objective sense
     objsense::Bool  # true is min, false is max
-    obj::Vector{Tv}
-    obj0::Tv  # Constant objective offset
+    obj::Vector{T}
+    obj0::T  # Constant objective offset
 
     # Constraint matrix
     # We store both rows and columns. It is redundant but simplifies access.
     # TODO: put this in its own data structure? (would allow more flexibility in modelling)
-    arows::Vector{Row{Tv}}
-    acols::Vector{Col{Tv}}
+    arows::Vector{Row{T}}
+    acols::Vector{Col{T}}
 
     # TODO: Data structures for QP
     # qrows
     # qcols
 
     # Bounds
-    lcon::Vector{Tv}
-    ucon::Vector{Tv}
-    lvar::Vector{Tv}
-    uvar::Vector{Tv}
+    lcon::Vector{T}
+    ucon::Vector{T}
+    lvar::Vector{T}
+    uvar::Vector{T}
 
     # Names
     con_names::Vector{String}
     var_names::Vector{String}
 
     # Only allow empty problems to be instantiated for now
-    ProblemData{Tv}(pbname::String="") where {Tv} = new{Tv}(
+    ProblemData{T}(pbname::String="") where {T} = new{T}(
         pbname, 0, 0,
-        true, Tv[], zero(Tv),
-        Row{Tv}[], Col{Tv}[],
-        Tv[], Tv[], Tv[], Tv[],
+        true, T[], zero(T),
+        Row{T}[], Col{T}[],
+        T[], T[], T[], T[],
         String[], String[]
     )
 end
 
 import Base.empty!
 
-function Base.empty!(pb::ProblemData{Tv}) where{Tv}
+function Base.empty!(pb::ProblemData{T}) where{T}
     
     pb.name = ""
     
@@ -77,16 +77,16 @@ function Base.empty!(pb::ProblemData{Tv}) where{Tv}
     pb.nvar = 0
     
     pb.objsense = true
-    pb.obj = Tv[]
-    pb.obj0 = zero(Tv)
+    pb.obj = T[]
+    pb.obj0 = zero(T)
     
-    pb.arows = Row{Tv}[]
-    pb.acols = Col{Tv}[]
+    pb.arows = Row{T}[]
+    pb.acols = Col{T}[]
     
-    pb.lcon = Tv[]
-    pb.ucon = Tv[]
-    pb.lvar = Tv[]
-    pb.uvar = Tv[]
+    pb.lcon = T[]
+    pb.ucon = T[]
+    pb.lvar = T[]
+    pb.uvar = T[]
 
     pb.con_names = String[]
     pb.var_names = String[]
@@ -126,20 +126,20 @@ end
 Add one linear constraint to the problem.
 
 # Arguments
-* `pb::ProblemData{Tv}`: the problem to which the new row is added
+* `pb::ProblemData{T}`: the problem to which the new row is added
 * `rind::Vector{Int}`: column indices in the new row
-* `rval::Vector{Tv}`: non-zero values in the new row
-* `l::Tv`
-* `u::Tv`
+* `rval::Vector{T}`: non-zero values in the new row
+* `l::T`
+* `u::T`
 * `name::String`: row name (defaults to `""`)
 * `issorted::Bool`: indicates whether the row indices are already issorted.
 """
-function add_constraint!(pb::ProblemData{Tv},
-    rind::Vector{Int}, rval::Vector{Tv},
-    l::Tv, u::Tv,
+function add_constraint!(pb::ProblemData{T},
+    rind::Vector{Int}, rval::Vector{T},
+    l::T, u::T,
     name::String="";
     issorted::Bool=false
-)::Int where{Tv}
+)::Int where{T}
     # Sanity checks
     nz = length(rind)
     nz == length(rval) || throw(DimensionMismatch(
@@ -154,7 +154,7 @@ function add_constraint!(pb::ProblemData{Tv},
 
     if nz == 0
         # emtpy row
-        push!(pb.arows, Row{Tv}(Int[], Tv[]))
+        push!(pb.arows, Row{T}(Int[], T[]))
         return pb.ncon
     end
 
@@ -166,11 +166,11 @@ function add_constraint!(pb::ProblemData{Tv},
     
     # Create new row
     if issorted
-        row = Row{Tv}(copy(rind), copy(rval))
+        row = Row{T}(copy(rind), copy(rval))
     else
         # Sort indices first
         p = sortperm(rind)
-        row = Row{Tv}(rind[p], rval[p])
+        row = Row{T}(rind[p], rval[p])
     end
     push!(pb.arows, row)
 
@@ -192,21 +192,21 @@ end
 Add one variable to the problem.
 
 # Arguments
-* `pb::ProblemData{Tv}`: the problem to which the new column is added
+* `pb::ProblemData{T}`: the problem to which the new column is added
 * `cind::Vector{Int}`: row indices in the new column
-* `cval::Vector{Tv}`: non-zero values in the new column
-* `obj::Tv`: objective coefficient
-* `l::Tv`: column lower bound
-* `u::Tv`: column upper bound
+* `cval::Vector{T}`: non-zero values in the new column
+* `obj::T`: objective coefficient
+* `l::T`: column lower bound
+* `u::T`: column upper bound
 * `name::String`: column name (defaults to `""`)
 * `issorted::Bool`: indicates whether the column indices are already issorted.
 """
-function add_variable!(pb::ProblemData{Tv},
-    cind::Vector{Int}, cval::Vector{Tv},
-    obj::Tv, l::Tv, u::Tv,
+function add_variable!(pb::ProblemData{T},
+    cind::Vector{Int}, cval::Vector{T},
+    obj::T, l::T, u::T,
     name::String="";
     issorted::Bool=false
-)::Int where{Tv}
+)::Int where{T}
     # Sanity checks
     nz = length(cind)
     nz == length(cval) || throw(DimensionMismatch(
@@ -221,7 +221,7 @@ function add_variable!(pb::ProblemData{Tv},
     push!(pb.obj, obj)
 
     if nz == 0
-        push!(pb.acols, Col{Tv}(Int[], Tv[]))
+        push!(pb.acols, Col{T}(Int[], T[]))
         return pb.nvar  # empty column
     end
 
@@ -229,11 +229,11 @@ function add_variable!(pb::ProblemData{Tv},
 
     # Create a new column
     if issorted
-        col = Col{Tv}(copy(cind), copy(cval))
+        col = Col{T}(copy(cind), copy(cval))
     else
         # Sort indices
         p = sortperm(cind)
-        col = Col{Tv}(cind[p], cind[p])
+        col = Col{T}(cind[p], cind[p])
     end
     push!(pb.acols, col)
 
@@ -254,14 +254,14 @@ end
 
 Load entire problem.
 """
-function load_problem!(pb::ProblemData{Tv},
+function load_problem!(pb::ProblemData{T},
     name::String,
-    objsense::Bool, obj::Vector{Tv}, obj0::Tv,
+    objsense::Bool, obj::Vector{T}, obj0::T,
     A::SparseMatrixCSC,
-    lcon::Vector{Tv}, ucon::Vector{Tv},
-    lvar::Vector{Tv}, uvar::Vector{Tv},
+    lcon::Vector{T}, ucon::Vector{T},
+    lvar::Vector{T}, uvar::Vector{T},
     con_names::Vector{String}, var_names::Vector{String}
-) where{Tv}
+) where{T}
     empty!(pb)
 
     # Sanity checks
@@ -289,17 +289,17 @@ function load_problem!(pb::ProblemData{Tv},
     pb.var_names = copy(var_names)
 
     # Load coefficients
-    pb.acols = Vector{Col{Tv}}(undef, nvar)
-    pb.arows = Vector{Row{Tv}}(undef, ncon)
+    pb.acols = Vector{Col{T}}(undef, nvar)
+    pb.arows = Vector{Row{T}}(undef, ncon)
     for j in 1:nvar
         col = A[:, j]
-        pb.acols[j] = Col{Tv}(col.nzind, col.nzval)
+        pb.acols[j] = Col{T}(col.nzind, col.nzval)
     end
 
     At = sparse(A')
     for i in 1:ncon
         row = At[:, i]
-        pb.arows[i] = Row{Tv}(row.nzind, row.nzval)
+        pb.arows[i] = Row{T}(row.nzind, row.nzval)
     end
 
     return pb
@@ -314,7 +314,7 @@ end
 
 Delete a single constraint from problem `pb`.
 """
-function delete_constraint!(pb::ProblemData{Tv}, rind::Int) where{Tv}
+function delete_constraint!(pb::ProblemData{T}, rind::Int) where{T}
     # Sanity checks
     1 <= rind <= pb.ncon || error("Invalid row index $rind")
 
@@ -359,7 +359,7 @@ Delete rows in collection `rind` from problem `pb`.
 * `pb::ProblemData`
 * `rinds`: collection of row indices to be removed
 """
-function delete_constraints!(pb::ProblemData{Tv}, rinds) where{Tv}
+function delete_constraints!(pb::ProblemData{T}, rinds) where{T}
     # TODO: don't use fallback 
     for i in rinds
         delete_constraint!(pb, i)
@@ -372,7 +372,7 @@ end
 
 Delete a single column from problem `pb`.
 """
-function delete_variable!(pb::ProblemData{Tv}, cind::Int) where{Tv}
+function delete_variable!(pb::ProblemData{T}, cind::Int) where{T}
     # Sanity checks
     1 <= cind <= pb.nvar || error("Invalid column index $cind")
 
@@ -418,7 +418,7 @@ Delete a collection of columns from problem `pb`.
 * `pb::ProblemData`
 * `cinds`: collection of row indices to be removed
 """
-function delete_variables!(pb::ProblemData{Tv}, cinds) where{Tv}
+function delete_variables!(pb::ProblemData{T}, cinds) where{T}
     # TODO: don't use fallback 
     for j in cinds
         delete_variable!(pb, j)
@@ -432,12 +432,12 @@ end
 Set the coefficient `(i, j)` to value `v`.
 
 # Arguments
-* `pb::ProblemData{Tv}`: the problem whose coefficient
+* `pb::ProblemData{T}`: the problem whose coefficient
 * `i::Int`: row index
 * `j::Int`: column index
-* `v::Tv`: coefficient value
+* `v::T`: coefficient value
 """
-function set_coefficient!(pb::ProblemData{Tv}, i::Int, j::Int, v::Tv) where{Tv}
+function set_coefficient!(pb::ProblemData{T}, i::Int, j::Int, v::T) where{T}
     # Sanity checks
     1 <= i <= pb.ncon && 1 <= j <= pb.nvar || error(
         "Cannot access coeff $((i, j)) in a model of size ($(pb.ncon), $(pb.nvar))"
@@ -451,11 +451,11 @@ function set_coefficient!(pb::ProblemData{Tv}, i::Int, j::Int, v::Tv) where{Tv}
 end
 
 """
-    _set_coefficient!(roc::RowOrCol{Tv}, ind::Int, v::Tv)
+    _set_coefficient!(roc::RowOrCol{T}, ind::Int, v::T)
 
 Set coefficient to value `v`.
 """
-function _set_coefficient!(roc::RowOrCol{Tv}, ind::Int, v::Tv) where{Tv}
+function _set_coefficient!(roc::RowOrCol{T}, ind::Int, v::T) where{T}
     # Check if index already exists
     k = searchsortedfirst(roc.nzind, ind)
 

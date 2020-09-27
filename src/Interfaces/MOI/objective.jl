@@ -1,17 +1,17 @@
 # =============================================
 #   1. Supported objectives
 # =============================================
-MOI.supports(::Optimizer{Tv}, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}}) where{Tv} = true
+MOI.supports(::Optimizer{T}, ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}}) where{T} = true
 
 # =============================================
 #   2. Get/set objective function
 # =============================================
 function MOI.get(
-    m::Optimizer{Tv},
-    ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}}
-) where{Tv}
+    m::Optimizer{T},
+    ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}}
+) where{T}
     # Objective coeffs
-    terms = MOI.ScalarAffineTerm{Tv}[]
+    terms = MOI.ScalarAffineTerm{T}[]
     for (j, cj) in enumerate(m.inner.pbdata.obj)
         !iszero(cj) && push!(terms, MOI.ScalarAffineTerm(cj, m.var_indices_moi[j]))
     end
@@ -24,10 +24,10 @@ end
 
 # TODO: use inner API
 function MOI.set(
-    m::Optimizer{Tv},
-    ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}},
-    f::MOI.ScalarAffineFunction{Tv}
-) where{Tv}
+    m::Optimizer{T},
+    ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}},
+    f::MOI.ScalarAffineFunction{T}
+) where{T}
 
     # Sanity checks
     isfinite(f.constant) || error("Objective constant term must be finite")
@@ -36,7 +36,7 @@ function MOI.set(
     end
 
     # Update inner model
-    m.inner.pbdata.obj .= zero(Tv) # Reset inner objective to zero
+    m.inner.pbdata.obj .= zero(T) # Reset inner objective to zero
     for t in f.terms
         j = m.var_indices[t.variable_index]
         m.inner.pbdata.obj[j] += t.coefficient  # there may be dupplicates
@@ -50,10 +50,10 @@ end
 #   3. Modify objective
 # ============================================= 
 function MOI.modify(
-    m::Optimizer{Tv},
-    c::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}},
-    chg::MOI.ScalarCoefficientChange{Tv}
-) where{Tv}
+    m::Optimizer{T},
+    c::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}},
+    chg::MOI.ScalarCoefficientChange{T}
+) where{T}
     # Sanity checks
     v = chg.variable
     MOI.throw_if_not_valid(m, v)
@@ -65,10 +65,10 @@ function MOI.modify(
 end
 
 function MOI.modify(
-    m::Optimizer{Tv},
-    ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Tv}},
-    chg::MOI.ScalarConstantChange{Tv}
-) where{Tv}
+    m::Optimizer{T},
+    ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}},
+    chg::MOI.ScalarConstantChange{T}
+) where{T}
     isfinite(chg.new_constant) || error("Objective constant term must be finite")
     m.inner.pbdata.obj0 = chg.new_constant
     return nothing

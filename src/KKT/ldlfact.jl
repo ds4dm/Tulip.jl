@@ -2,21 +2,21 @@ import LDLFactorizations
 const LDLF = LDLFactorizations
 
 # ==============================================================================
-#   LDLFact_SymQuasDef
+#   LDLFactSQD
 # ==============================================================================
 
 """
-    LDLFact_SymQuasDef{Tv}
+    LDLFactSQD{T}
 
 Linear solver for the 2x2 augmented system with ``A`` sparse.
 
 Uses LDLFactorizations.jl to compute an LDLᵀ factorization of the quasi-definite augmented system.
 
 ```julia
-model.params.KKTOptions = Tulip.KKT.SolverOptions(LDLFact_SymQuasDef)
+model.params.KKTOptions = Tulip.KKT.SolverOptions(LDLFactSQD)
 ```
 """
-mutable struct LDLFact_SymQuasDef{Tv<:Real} <: AbstractKKTSolver{Tv}
+mutable struct LDLFactSQD{T<:Real} <: AbstractKKTSolver{T}
     m::Int  # Number of rows
     n::Int  # Number of columns
 
@@ -24,40 +24,40 @@ mutable struct LDLFact_SymQuasDef{Tv<:Real} <: AbstractKKTSolver{Tv}
     #   and add flag (default to false) to know whether user ordering should be used
 
     # Problem data
-    A::SparseMatrixCSC{Tv, Int}
-    θ::Vector{Tv}
-    regP::Vector{Tv}  # primal regularization
-    regD::Vector{Tv}  # dual regularization
+    A::SparseMatrixCSC{T, Int}
+    θ::Vector{T}
+    regP::Vector{T}  # primal regularization
+    regD::Vector{T}  # dual regularization
 
     # Left-hand side matrix
-    S::SparseMatrixCSC{Tv, Int}
+    S::SparseMatrixCSC{T, Int}
 
     # Factorization
-    F::LDLF.LDLFactorization{Tv}
+    F::LDLF.LDLFactorization{T}
 
     # TODO: constructor with initial memory allocation
-    function LDLFact_SymQuasDef(A::AbstractMatrix{Tv}) where{Tv<:Real}
+    function LDLFactSQD(A::AbstractMatrix{T}) where{T<:Real}
         m, n = size(A)
-        θ = ones(Tv, n)
+        θ = ones(T, n)
 
         S = [
             spdiagm(0 => -θ)  A';
-            spzeros(Tv, m, n) spdiagm(0 => ones(m))
+            spzeros(T, m, n) spdiagm(0 => ones(m))
         ]
 
         # TODO: PSD-ness checks
         # TODO: symbolic factorization only
         F = LDLF.ldl_analyze(Symmetric(S))
 
-        return new{Tv}(m, n, A, θ, ones(Tv, n), ones(Tv, m), S, F)
+        return new{T}(m, n, A, θ, ones(T, n), ones(T, m), S, F)
     end
 
 end
 
-setup(::Type{LDLFact_SymQuasDef}, A) = LDLFact_SymQuasDef(A)
+setup(::Type{LDLFactSQD}, A) = LDLFactSQD(A)
 
-backend(::LDLFact_SymQuasDef) = "LDLFactorizations.jl"
-linear_system(::LDLFact_SymQuasDef) = "Augmented system"
+backend(::LDLFactSQD) = "LDLFactorizations.jl"
+linear_system(::LDLFactSQD) = "Augmented system"
 
 """
     update!(kkt, θ, regP, regD)
@@ -69,11 +69,11 @@ Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
 Throws a `PosDefException` if matrix is not quasi-definite.
 """
 function update!(
-    kkt::LDLFact_SymQuasDef{Tv},
-    θ::AbstractVector{Tv},
-    regP::AbstractVector{Tv},
-    regD::AbstractVector{Tv}
-) where{Tv<:Real}
+    kkt::LDLFactSQD{T},
+    θ::AbstractVector{T},
+    regP::AbstractVector{T},
+    regD::AbstractVector{T}
+) where{T<:Real}
     # Sanity checks
     length(θ)  == kkt.n || throw(DimensionMismatch(
         "θ has length $(length(θ)) but linear solver is for n=$(kkt.n)."
@@ -119,10 +119,10 @@ end
 Solve the augmented system, overwriting `dx, dy` with the result.
 """
 function solve!(
-    dx::Vector{Tv}, dy::Vector{Tv},
-    kkt::LDLFact_SymQuasDef{Tv},
-    ξp::Vector{Tv}, ξd::Vector{Tv}
-) where{Tv<:Real}
+    dx::Vector{T}, dy::Vector{T},
+    kkt::LDLFactSQD{T},
+    ξp::Vector{T}, ξd::Vector{T}
+) where{T<:Real}
     m, n = kkt.m, kkt.n
     
     # Set-up right-hand side

@@ -7,15 +7,15 @@ using LinearAlgebra
 
 """
 function run_ls_tests(
-    A::AbstractMatrix{Tv},
-    kkt::AbstractKKTSolver{Tv};
-    atol::Tv=sqrt(eps(Tv))
-) where{Tv<:Real}
+    A::AbstractMatrix{T},
+    kkt::AbstractKKTSolver{T};
+    atol::T=sqrt(eps(T))
+) where{T}
 
     # Check that required methods are implemented
     @testset "Required methods" begin
         Tls = typeof(kkt)
-        V = Vector{Tv}
+        V = Vector{T}
         @test hasmethod(update!, Tuple{Tls, V, V, V})
         @test hasmethod(solve!, Tuple{V, V, Tls, V, V})
     end
@@ -23,16 +23,16 @@ function run_ls_tests(
     m, n = size(A)
 
     # Factorization/pre-conditionner update
-    θ = ones(Tv, n)
-    regP = ones(Tv, n)
-    regD = ones(Tv, m)
+    θ = ones(T, n)
+    regP = ones(T, n)
+    regD = ones(T, m)
     update!(kkt, θ, regP, regD)
 
     # Solve linear system
-    ξp = ones(Tv, m)
-    ξd = ones(Tv, n)
-    dx = zeros(Tv, n)
-    dy = zeros(Tv, m)
+    ξp = ones(T, m)
+    ξd = ones(T, n)
+    dx = zeros(T, n)
+    dy = zeros(T, m)
     solve!(dx, dy, kkt, ξp, ξd)
 
     # Check residuals

@@ -1,11 +1,11 @@
 @testset "LAPACK" begin
-    for Tv in TvTYPES
-        @testset "$Tv" begin
-            A = Matrix{Tv}([
+    for T in TvTYPES
+        @testset "$T" begin
+            A = Matrix{T}([
                 1 0 1 0;
                 0 1 0 1
             ])
-            kkt = KKT.Dense_SymPosDef(A)
+            kkt = KKT.DenseSPD(A)
             KKT.run_ls_tests(A, kkt)
         end
     end

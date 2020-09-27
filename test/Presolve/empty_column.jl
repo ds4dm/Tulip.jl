@@ -1,4 +1,4 @@
-function emtpy_column_tests(Tv::Type)
+function emtpy_column_tests(T::Type)
 
     # We test all the following combinations:
     #=
@@ -17,18 +17,18 @@ function emtpy_column_tests(Tv::Type)
         ------------------------------
     =#
     function build_problem(l, u, c)
-        pb = Tulip.ProblemData{Tv}()
+        pb = Tulip.ProblemData{T}()
 
         Tulip.load_problem!(pb, "Test", 
-            true, [c], zero(Tv),
-            spzeros(Tv, 0, 1), Tv[], Tv[], [l], [u], String[], ["x"]
+            true, [c], zero(T),
+            spzeros(T, 0, 1), T[], T[], [l], [u], String[], ["x"]
         )
         return pb
     end
 
-    L = Tv.([-Inf,  -1])
-    U = Tv.([   1, Inf])
-    C = Tv.([-1, 0, 1])
+    L = T.([-Inf,  -1])
+    U = T.([   1, Inf])
+    C = T.([-1, 0, 1])
     for l in L, u in U, c in C
         @testset "$((l, u, c))" begin
             pb = build_problem(l, u, c)
@@ -75,7 +75,7 @@ function emtpy_column_tests(Tv::Type)
 end
 
 @testset "Empty column" begin
-    for Tv in TvTYPES
-        @testset "$Tv" begin emtpy_column_tests(Tv) end
+    for T in TvTYPES
+        @testset "$T" begin emtpy_column_tests(T) end
     end
 end

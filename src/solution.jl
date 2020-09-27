@@ -1,4 +1,4 @@
-mutable struct Solution{Tv}
+mutable struct Solution{T}
     m::Int
     n::Int
 
@@ -7,22 +7,22 @@ mutable struct Solution{Tv}
     is_primal_ray::Bool
     is_dual_ray::Bool
 
-    z_primal::Tv
-    z_dual::Tv
+    z_primal::T
+    z_dual::T
 
-    x::Vector{Tv}
-    Ax::Vector{Tv}
-    y_lower::Vector{Tv}
-    y_upper::Vector{Tv}
-    s_lower::Vector{Tv}
-    s_upper::Vector{Tv}
+    x::Vector{T}
+    Ax::Vector{T}
+    y_lower::Vector{T}
+    y_upper::Vector{T}
+    s_lower::Vector{T}
+    s_upper::Vector{T}
 
-    Solution{Tv}(m, n) where{Tv} = new{Tv}(
+    Solution{T}(m, n) where{T} = new{T}(
         m, n, Sln_Unknown, Sln_Unknown, false, false,
-        zero(Tv), zero(Tv),
-        zeros(Tv, n), zeros(Tv, m),
-        zeros(Tv, m), zeros(Tv, m),
-        zeros(Tv, n), zeros(Tv, n)
+        zero(T), zero(T),
+        zeros(T, n), zeros(T, m),
+        zeros(T, m), zeros(T, m),
+        zeros(T, n), zeros(T, n)
     )
 end
 

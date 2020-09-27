@@ -1,7 +1,7 @@
-mutable struct Model{Tv}
+mutable struct Model{T}
 
     # Parameters
-    params::Parameters{Tv}
+    params::Parameters{T}
 
     # TODO: model status
     #= Use an enum
@@ -16,22 +16,22 @@ mutable struct Model{Tv}
     status::TerminationStatus
 
     # Problem data
-    pbdata::ProblemData{Tv}
+    pbdata::ProblemData{T}
 
     # Presolved problem
     # If presolved is disabled, this will point to m.pbdata
-    presolve_data::Union{Nothing, PresolveData{Tv}}
+    presolve_data::Union{Nothing, PresolveData{T}}
 
     # IPM solver
     # If required, the problem is transformed to standard form
     # when instantiating the IPMSolver object.
-    solver::Union{Nothing, AbstractIPMOptimizer{Tv}}
+    solver::Union{Nothing, AbstractIPMOptimizer{T}}
 
     # Problem solution (in original space)
-    solution::Union{Nothing, Solution{Tv}}
+    solution::Union{Nothing, Solution{T}}
 
-    Model{Tv}() where{Tv} = new{Tv}(
-        Parameters{Tv}(), Trm_NotCalled, ProblemData{Tv}(),
+    Model{T}() where{T} = new{T}(
+        Parameters{T}(), Trm_NotCalled, ProblemData{T}(),
         nothing, nothing, nothing
     )
 end
@@ -49,8 +49,8 @@ end
 
 import Base.empty!
 
-function Base.empty!(m::Model{Tv}) where{Tv}
-    m.pbdata = ProblemData{Tv}()
+function Base.empty!(m::Model{T}) where{T}
+    m.pbdata = ProblemData{T}()
     m.status = Trm_NotCalled
     m.presolve_data = nothing
     m.solver = nothing

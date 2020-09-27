@@ -111,8 +111,8 @@ MOI.get(m::Optimizer, ::MOI.NumberOfVariables) = m.inner.pbdata.nvar
 #   ObjectiveFunctionType
 #
 MOI.get(
-    m::Optimizer{Tv}, ::MOI.ObjectiveFunctionType
-) where{Tv} = MOI.ScalarAffineFunction{Tv}
+    m::Optimizer{T}, ::MOI.ObjectiveFunctionType
+) where{T} = MOI.ScalarAffineFunction{T}
 
 #
 #   ObjectiveSense
@@ -140,7 +140,7 @@ end
 #
 #   ObjectiveValue
 #
-function MOI.get(m::Optimizer{Tv}, attr::MOI.ObjectiveValue) where{Tv}
+function MOI.get(m::Optimizer{T}, attr::MOI.ObjectiveValue) where{T}
     MOI.check_result_index_bounds(m, attr)
     return get_attribute(m.inner, ObjectiveValue())
 end
@@ -148,7 +148,7 @@ end
 #
 #   DualObjectiveValue
 #
-function MOI.get(m::Optimizer{Tv}, attr::MOI.DualObjectiveValue) where{Tv}
+function MOI.get(m::Optimizer{T}, attr::MOI.DualObjectiveValue) where{T}
     MOI.check_result_index_bounds(m, attr)
     return get_attribute(m.inner, DualObjectiveValue())
 end
@@ -161,11 +161,11 @@ MOI.get(m::Optimizer, ::MOI.RawSolver) = m.inner
 #
 #   RelativeGap
 #
-function MOI.get(m::Optimizer{Tv}, ::MOI.RelativeGap) where{Tv}
+function MOI.get(m::Optimizer{T}, ::MOI.RelativeGap) where{T}
     # TODO: dispatch a function call on m.inner
     zp = m.inner.solver.primal_bound_scaled
     zd = m.inner.solver.dual_bound_scaled
-    return (abs(zp - zd) / (Tv(1 // 10^6)) + abs(zd))
+    return (abs(zp - zd) / (T(1 // 10^6)) + abs(zd))
 end
 
 #

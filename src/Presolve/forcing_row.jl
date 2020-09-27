@@ -1,26 +1,26 @@
-struct ForcingRow{Tv} <: PresolveTransformation{Tv}
+struct ForcingRow{T} <: PresolveTransformation{T}
     i::Int  # Row index
     at_lower::Bool  # Whether row is forced to its lower bound (false means upper)
-    row::Row{Tv}  # Row
-    cols::Vector{Col{Tv}}  # Columns of variables in forcing row
-    xs::Vector{Tv}  # Primal values of variables in the row (upper or lower bound)
-    cs::Vector{Tv}  # Objective coeffs of variables in forcing row
+    row::Row{T}  # Row
+    cols::Vector{Col{T}}  # Columns of variables in forcing row
+    xs::Vector{T}  # Primal values of variables in the row (upper or lower bound)
+    cs::Vector{T}  # Objective coeffs of variables in forcing row
 end
 
-struct DominatedRow{Tv} <: PresolveTransformation{Tv}
+struct DominatedRow{T} <: PresolveTransformation{T}
     i::Int  # Row index
 end
 
-function remove_forcing_row!(ps::PresolveData{Tv}, i::Int) where{Tv}
+function remove_forcing_row!(ps::PresolveData{T}, i::Int) where{T}
     ps.rowflag[i] || return
     ps.nzrow[i] == 1 && return  # skip row singletons 
 
     # Implied row bounds
     row = ps.pb0.arows[i]
-    l_ = u_ = zero(Tv)
+    l_ = u_ = zero(T)
     for (j, aij) in zip(row.nzind, row.nzval)
         ps.colflag[j] || continue
-        if aij < zero(Tv)
+        if aij < zero(T)
             l_ += aij * ps.ucol[j]
             u_ += aij * ps.lcol[j]
         else
@@ -39,7 +39,7 @@ function remove_forcing_row!(ps::PresolveData{Tv}, i::Int) where{Tv}
         ps.updated = true
         ps.nrow -= 1
 
-        push!(ps.ops, DominatedRow{Tv}(i))
+        push!(ps.ops, DominatedRow{T}(i))
         # Update column non-zeros
         for (j, aij) in zip(row.nzind, row.nzval)
             ps.colflag[j] || continue
@@ -54,15 +54,15 @@ function remove_forcing_row!(ps::PresolveData{Tv}, i::Int) where{Tv}
             [  j for (j, aij) in zip(row.nzind, row.nzval) if ps.colflag[j]],
             [aij for (j, aij) in zip(row.nzind, row.nzval) if ps.colflag[j]]
         )
-        cols_ = Col{Tv}[]
-        xs = Tv[]
-        cs = Tv[]
+        cols_ = Col{T}[]
+        xs = T[]
+        cs = T[]
         for (j, aij) in zip(row.nzind, row.nzval)
             ps.colflag[j] || continue
             # Extract column j
             col = ps.pb0.acols[j]
 
-            col_ = Col{Tv}(Int[], Tv[])
+            col_ = Col{T}(Int[], T[])
 
             # Fix variable to its bound
             # TODO: put this in a function and mutualize with fixed variables
@@ -116,15 +116,15 @@ function remove_forcing_row!(ps::PresolveData{Tv}, i::Int) where{Tv}
             [  j for (j, aij) in zip(row.nzind, row.nzval) if ps.colflag[j]],
             [aij for (j, aij) in zip(row.nzind, row.nzval) if ps.colflag[j]]
         )
-        cols_ = Col{Tv}[]
-        xs = Tv[]
-        cs = Tv[]
+        cols_ = Col{T}[]
+        xs = T[]
+        cs = T[]
         for (j, aij) in zip(row.nzind, row.nzval)
             ps.colflag[j] || continue
             # Extract column j
             col = ps.pb0.acols[j]
 
-            col_ = Col{Tv}(Int[], Tv[])
+            col_ = Col{T}(Int[], T[])
 
             # Fix variable to its bound
             # TODO: put this in a function and mutualize with fixed variables
@@ -175,14 +175,14 @@ function remove_forcing_row!(ps::PresolveData{Tv}, i::Int) where{Tv}
     return nothing
 end
 
-function postsolve!(sol::Solution{Tv}, op::DominatedRow{Tv}) where{Tv}
-    sol.y_lower[op.i] = zero(Tv)
-    sol.y_upper[op.i] = zero(Tv)
+function postsolve!(sol::Solution{T}, op::DominatedRow{T}) where{T}
+    sol.y_lower[op.i] = zero(T)
+    sol.y_upper[op.i] = zero(T)
     return nothing
 end
 
 # TODO: postsolve of forcing rows
-function postsolve!(sol::Solution{Tv}, op::ForcingRow{Tv}) where{Tv}
+function postsolve!(sol::Solution{T}, op::ForcingRow{T}) where{T}
 
     # Primal
     for (j, xj) in zip(op.row.nzind, op.xs)

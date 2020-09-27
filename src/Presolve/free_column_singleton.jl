@@ -1,14 +1,14 @@
-struct FreeColumnSingleton{Tv} <: PresolveTransformation{Tv}
+struct FreeColumnSingleton{T} <: PresolveTransformation{T}
     i::Int  # Row index
     j::Int  # Column index
-    l::Tv  # Row lower bound
-    u::Tv  # Row upper bound
-    aij::Tv
-    y::Tv  # Dual variable
-    row::Row{Tv}
+    l::T  # Row lower bound
+    u::T  # Row upper bound
+    aij::T
+    y::T  # Dual variable
+    row::Row{T}
 end
 
-function remove_free_column_singleton!(ps::PresolveData{Tv}, j::Int) where{Tv}
+function remove_free_column_singleton!(ps::PresolveData{T}, j::Int) where{T}
 
     ps.colflag[j] && ps.nzcol[j] == 1 || return nothing  # only column singletons
 
@@ -17,7 +17,7 @@ function remove_free_column_singleton!(ps::PresolveData{Tv}, j::Int) where{Tv}
     # Find non-zero index
     # TODO: put this in a function
     nz = 0
-    i, aij = 0, zero(Tv)
+    i, aij = 0, zero(T)
     for (i_, a_) in zip(col.nzind, col.nzval)
         if ps.rowflag[i_]
             nz += !iszero(a_); nz <= 1 || break
@@ -41,7 +41,7 @@ function remove_free_column_singleton!(ps::PresolveData{Tv}, j::Int) where{Tv}
     l, u = ps.lcol[j], ps.ucol[j]
     if isfinite(l) || isfinite(u)
         # Not a free variable, compute implied bounds
-        if aij > zero(Tv)
+        if aij > zero(T)
             l_, u_ = lr, ur
             for (k, aik) in zip(row.nzind, row.nzval)
                 (ps.colflag[k] && k != j) || continue
@@ -84,8 +84,8 @@ function remove_free_column_singleton!(ps::PresolveData{Tv}, j::Int) where{Tv}
     y = ps.obj[j] / aij  # dual of row i
 
     # Update objective
-    ps.obj0 += (y >= zero(Tv)) ? y * lr : y * ur
-    row_ = Row{Tv}(Int[], Tv[])
+    ps.obj0 += (y >= zero(T)) ? y * lr : y * ur
+    row_ = Row{T}(Int[], T[])
     for (j_, aij_) in zip(row.nzind, row.nzval)
         ps.colflag[j_] && (j_ != j) || continue
 
@@ -108,16 +108,16 @@ function remove_free_column_singleton!(ps::PresolveData{Tv}, j::Int) where{Tv}
     return nothing
 end
 
-function postsolve!(sol::Solution{Tv}, op::FreeColumnSingleton{Tv}) where{Tv}
+function postsolve!(sol::Solution{T}, op::FreeColumnSingleton{T}) where{T}
     # Dual
     y = op.y
     sol.y_lower[op.i] = pos_part(y)
     sol.y_upper[op.i] = neg_part(y)
-    sol.s_lower[op.j] = zero(Tv)
-    sol.s_upper[op.j] = zero(Tv)
+    sol.s_lower[op.j] = zero(T)
+    sol.s_upper[op.j] = zero(T)
 
     # Primal
-    sol.x[op.j] = sol.is_primal_ray ? zero(Tv) : (y >= zero(Tv) ? op.l : op.u)
+    sol.x[op.j] = sol.is_primal_ray ? zero(T) : (y >= zero(T) ? op.l : op.u)
     for (k, aik) in zip(op.row.nzind, op.row.nzval)
         sol.x[op.j] -= aik * sol.x[k]
     end

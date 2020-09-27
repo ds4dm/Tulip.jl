@@ -1,13 +1,13 @@
-struct RowSingleton{Tv} <: PresolveTransformation{Tv}
+struct RowSingleton{T} <: PresolveTransformation{T}
     i::Int  # Row index
     j::Int  # Column index
-    aij::Tv  # Row coefficient
+    aij::T  # Row coefficient
     force_lower::Bool  # Whether row was forcing the lower bound
     force_upper::Bool  # Whether row was forcing the upper bound
 end
 
 
-function remove_row_singleton!(ps::PresolveData{Tv}, i::Int) where{Tv}
+function remove_row_singleton!(ps::PresolveData{T}, i::Int) where{T}
     # Sanity checks
     (ps.rowflag[i] && ps.nzrow[i] == 1) || return nothing
 
@@ -15,7 +15,7 @@ function remove_row_singleton!(ps::PresolveData{Tv}, i::Int) where{Tv}
 
     # Find non-zero coefficient and its column index
     nz = 0
-    j, aij = 0, zero(Tv)
+    j, aij = 0, zero(T)
     for (j_, aij_) in zip(row.nzind, row.nzval)
         if ps.colflag[j_] && !iszero(aij_)
             nz += 1; nz <= 1 || break  # not a row singleton
@@ -37,7 +37,7 @@ function remove_row_singleton!(ps::PresolveData{Tv}, i::Int) where{Tv}
     end
 
     # Compute implied bounds
-    if aij > zero(Tv)
+    if aij > zero(T)
         l = ps.lrow[i] / aij
         u = ps.urow[i] / aij
     else
@@ -78,23 +78,23 @@ function remove_row_singleton!(ps::PresolveData{Tv}, i::Int) where{Tv}
     return nothing
 end
 
-function postsolve!(sol::Solution{Tv}, op::RowSingleton{Tv}) where{Tv}
+function postsolve!(sol::Solution{T}, op::RowSingleton{T}) where{T}
 
     if op.force_lower
-        if op.aij > zero(Tv)
+        if op.aij > zero(T)
             sol.y_lower[op.i] = sol.s_lower[op.j] / op.aij
         else
             sol.y_upper[op.i] = sol.s_lower[op.j] / abs(op.aij)
         end
-        sol.s_lower[op.j] = zero(Tv)
+        sol.s_lower[op.j] = zero(T)
     end
     if op.force_upper
-        if op.aij > zero(Tv)
+        if op.aij > zero(T)
             sol.y_upper[op.i] = sol.s_upper[op.j] / op.aij
         else
             sol.y_lower[op.i] = sol.s_upper[op.j] / abs(op.aij)
         end
-        sol.s_upper[op.j] = zero(Tv)
+        sol.s_upper[op.j] = zero(T)
     end
 
     return nothing

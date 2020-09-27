@@ -44,7 +44,7 @@ CurrentModule = Tulip.KKT
 ## Dense/LAPACK
 
 ```@docs
-Dense_SymPosDef
+DenseSPD
 ```
 
 ## CHOLMOD
@@ -54,17 +54,17 @@ CholmodSolver
 ```
 
 ```@docs
-Cholmod_SymQuasDef
+CholmodSQD
 ```
 
 ```@docs
-Cholmod_SymPosDef
+CholmodSPD
 ```
 
 ## LDLFactorizations
 
 ```@docs
-LDLFact_SymQuasDef
+LDLFactSQD
 ```
 
 ## Krylov
@@ -75,13 +75,13 @@ LDLFact_SymQuasDef
 
 
 ```@docs
-KrylovSPDSolver
+KrylovSPD
 ```
 
 ```@docs
-KrylovSIDSolver
+KrylovSID
 ```
 
 ```@docs
-KrylovSQDSolver
+KrylovSQD
 ```
