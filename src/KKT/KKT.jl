@@ -107,7 +107,7 @@ include("test.jl")
 include("lapack.jl")
 include("cholmod.jl")
 include("ldlfact.jl")
-include("krylov.jl")
+include("Krylov/krylov.jl")
 
 """
     default_options(T)
