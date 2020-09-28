@@ -5,7 +5,7 @@ using LinearAlgebra
 export AbstractKKTSolver
 
 """
-    AbstractKKTSolver{Tv}
+    AbstractKKTSolver{T}
 
 Abstract container for solving an augmented system
 ```
@@ -14,7 +14,7 @@ Abstract container for solving an augmented system
 ```
 where `ξd` and `ξp` are given right-hand side.
 """
-abstract type AbstractKKTSolver{Tv} end
+abstract type AbstractKKTSolver{T} end
 
 """
     SolverOptions
@@ -54,10 +54,10 @@ After this call, `kkt` can be used to solve the augmented system
 for given right-hand sides `ξd` and `ξp`.
 
 # Arguments
-* `kkt::AbstractKKTSolver{Tv}`: the KKT solver object
-* `θinv::AbstractVector{Tv}`: ``θ⁻¹``
-* `regP::AbstractVector{Tv}`: primal regularizations
-* `regD::AbstractVector{Tv}`: dual regularizations
+* `kkt::AbstractKKTSolver{T}`: the KKT solver object
+* `θinv::AbstractVector{T}`: ``θ⁻¹``
+* `regP::AbstractVector{T}`: primal regularizations
+* `regD::AbstractVector{T}`: dual regularizations
 """
 function update! end
 
@@ -84,7 +84,7 @@ function solve! end
 
 Return the arithmetic used by the solver.
 """
-arithmetic(kkt::AbstractKKTSolver{Tv}) where Tv = Tv
+arithmetic(kkt::AbstractKKTSolver{T}) where T = T
 
 """
     backend(kkt)
@@ -110,15 +110,15 @@ include("ldlfact.jl")
 include("krylov.jl")
 
 """
-    default_options(Tv)
+    default_options(T)
 
 Use CHOLMOD for `Float64` and LDLFactorizations otherwise.
 """
-function default_options(::Type{Tv}) where{Tv}
-    if Tv == Float64
+function default_options(::Type{T}) where{T}
+    if T == Float64
         return SolverOptions(CholmodSolver; normal_equations=false)
     else
-        return SolverOptions(LDLFact_SymQuasDef)
+        return SolverOptions(LDLFactSQD)
     end
 end
 

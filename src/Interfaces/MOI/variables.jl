@@ -24,11 +24,11 @@ function MOI.is_valid(m::Optimizer, x::MOI.VariableIndex)
     return haskey(m.var_indices, x)
 end
 
-function MOI.add_variable(m::Optimizer{Tv}) where{Tv}
+function MOI.add_variable(m::Optimizer{T}) where{T}
     # TODO: dispatch a function call to m.inner instead of m.inner.pbdata
     m.var_counter += 1
     x = MOI.VariableIndex(m.var_counter)
-    j = Tulip.add_variable!(m.inner.pbdata, Int[], Tv[], zero(Tv), Tv(-Inf), Tv(Inf))
+    j = Tulip.add_variable!(m.inner.pbdata, Int[], T[], zero(T), T(-Inf), T(Inf))
     
     # Update tracking of variables
     m.var_indices[x] = j
@@ -110,10 +110,10 @@ function MOI.set(m::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex, name::S
     return nothing
 end
 
-function MOI.get(m::Optimizer{Tv},
+function MOI.get(m::Optimizer{T},
     attr::MOI.VariablePrimal,
     x::MOI.VariableIndex
-) where{Tv}
+) where{T}
     MOI.throw_if_not_valid(m, x)
     MOI.check_result_index_bounds(m, attr)
 

@@ -10,7 +10,7 @@ import Krylov
                         1 0 1 0;
                         0 1 0 1
                     ])
-                    kkt = KKT.KrylovSPDSolver(f, A)
+                    kkt = KKT.KrylovSPD(f, A)
                     KKT.run_ls_tests(A, kkt)
                 end
             end
@@ -21,7 +21,7 @@ import Krylov
                         1 0 1 0;
                         0 1 0 1
                     ])
-                    kkt = KKT.KrylovSIDSolver(f, A)
+                    kkt = KKT.KrylovSID(f, A)
                     KKT.run_ls_tests(A, kkt)
                 end
             end
@@ -32,7 +32,7 @@ import Krylov
                         1 0 1 0;
                         0 1 0 1
                     ])
-                    kkt = KKT.KrylovSQDSolver(f, A)
+                    kkt = KKT.KrylovSQD(f, A)
                     KKT.run_ls_tests(A, kkt)
                 end
             end

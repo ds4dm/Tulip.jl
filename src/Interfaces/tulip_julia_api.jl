@@ -8,27 +8,27 @@ using QPSReader
 
 
 """
-    load_problem!(m::Model{Tv}, fname::String)
+    load_problem!(m::Model{T}, fname::String)
 
 Read a model from file `fname` and load it into model `m`.
 
 Only free MPS files are currently supported.
 """
-function load_problem!(m::Model{Tv}, fname::String) where{Tv}
+function load_problem!(m::Model{T}, fname::String) where{T}
     Base.empty!(m)
 
     dat = with_logger(Logging.NullLogger()) do
         readqps(fname, mpsformat=:free)
     end
 
-    # TODO: avoid allocations when Tv is Float64
+    # TODO: avoid allocations when T is Float64
     objsense = !(dat.objsense == :max)
     load_problem!(m.pbdata,
         dat.name,
-        objsense, Tv.(dat.c), Tv(dat.c0),
-        sparse(dat.arows, dat.acols, Tv.(dat.avals), dat.ncon, dat.nvar),
-        Tv.(dat.lcon), Tv.(dat.ucon),
-        Tv.(dat.lvar), Tv.(dat.uvar),
+        objsense, T.(dat.c), T(dat.c0),
+        sparse(dat.arows, dat.acols, T.(dat.avals), dat.ncon, dat.nvar),
+        T.(dat.lcon), T.(dat.ucon),
+        T.(dat.lvar), T.(dat.uvar),
         dat.connames, dat.varnames
     )
 
@@ -72,11 +72,11 @@ function get_attribute(m::Model, ::BarrierIterations)
 end
 
 """
-    set_attribute(m::Model{Tv}, ::VariableLowerBound, j::Int, lb::Tv)
+    set_attribute(m::Model{T}, ::VariableLowerBound, j::Int, lb::T)
 
 Set the lower bound of variable `j` in model `m` to `lb`.
 """
-function set_attribute(m::Model{Tv}, ::VariableLowerBound, j::Int, lb::Tv) where{Tv}
+function set_attribute(m::Model{T}, ::VariableLowerBound, j::Int, lb::T) where{T}
     # sanity checks
     1 <= j <= m.pbdata.nvar || error("Invalid variable index $j")
 
@@ -86,7 +86,7 @@ function set_attribute(m::Model{Tv}, ::VariableLowerBound, j::Int, lb::Tv) where
 end
 
 """
-    get_attribute(m::Model{Tv}, ::VariableLowerBound, j::Int)
+    get_attribute(m::Model{T}, ::VariableLowerBound, j::Int)
 
 Query the lower bound of variable `j` in model `m`.
 """
@@ -99,11 +99,11 @@ function get_attribute(m::Model, ::VariableLowerBound, j::Int)
 end
 
 """
-    set_attribute(m::Model{Tv}, ::VariableUpperBound, j::Int, ub::Tv)
+    set_attribute(m::Model{T}, ::VariableUpperBound, j::Int, ub::T)
 
 Set the upper bound of variable `j` in model `m` to `ub`.
 """
-function set_attribute(m::Model{Tv}, ::VariableUpperBound, j::Int, ub::Tv) where{Tv}
+function set_attribute(m::Model{T}, ::VariableUpperBound, j::Int, ub::T) where{T}
     # sanity checks
     1 <= j <= m.pbdata.nvar || error("Invalid variable index $j")
 
@@ -113,11 +113,11 @@ function set_attribute(m::Model{Tv}, ::VariableUpperBound, j::Int, ub::Tv) where
 end
 
 """
-    set_attribute(m::Model{Tv}, ::ConstraintLowerBound, i::Int, lb::Tv)
+    set_attribute(m::Model{T}, ::ConstraintLowerBound, i::Int, lb::T)
 
 Set the lower bound of constraint `i` in model `m` to `lb`.
 """
-function set_attribute(m::Model{Tv}, ::ConstraintLowerBound, i::Int, lb::Tv) where{Tv}
+function set_attribute(m::Model{T}, ::ConstraintLowerBound, i::Int, lb::T) where{T}
     # sanity checks
     1 <= i <= m.pbdata.nvar || error("Invalid constraint index $i")
 
@@ -127,11 +127,11 @@ function set_attribute(m::Model{Tv}, ::ConstraintLowerBound, i::Int, lb::Tv) whe
 end
 
 """
-    set_attribute(m::Model{Tv}, ::ConstraintUpperBound, i::Int, ub::Tv)
+    set_attribute(m::Model{T}, ::ConstraintUpperBound, i::Int, ub::T)
 
 Set the upper bound of constraint `i` in model `m` to `ub`.
 """
-function set_attribute(m::Model{Tv}, ::ConstraintUpperBound, i::Int, ub::Tv) where{Tv}
+function set_attribute(m::Model{T}, ::ConstraintUpperBound, i::Int, ub::T) where{T}
     # sanity checks
     1 <= i <= m.pbdata.nvar || error("Invalid constraint index $i")
 
@@ -206,14 +206,14 @@ end
 
 # TODO: Query solution value
 get_attribute(m::Model, ::ObjectiveConstant) = m.pbdata.obj0
-set_attribute(m::Model{Tv}, ::ObjectiveConstant, obj0::Tv) where{Tv} = (m.pbdata.obj0 = obj0; return nothing)
+set_attribute(m::Model{T}, ::ObjectiveConstant, obj0::T) where{T} = (m.pbdata.obj0 = obj0; return nothing)
 
 """
     get_attribute(model::Model, ::ObjectiveValue)
 
 Query the `ObjectiveValue` attribute from `model`
 """
-function get_attribute(m::Model{Tv}, ::ObjectiveValue) where{Tv}
+function get_attribute(m::Model{T}, ::ObjectiveValue) where{T}
     if isnothing(m.solution)
         error("Model has no solution")
     else
@@ -227,7 +227,7 @@ end
 
 Query the `DualObjectiveValue` attribute from `model`
 """
-function get_attribute(m::Model{Tv}, ::DualObjectiveValue) where{Tv}
+function get_attribute(m::Model{T}, ::DualObjectiveValue) where{T}
     if isnothing(m.solution)
         error("Model has no solution")
     else

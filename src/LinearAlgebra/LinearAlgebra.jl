@@ -33,9 +33,9 @@ function construct_matrix end
 
 function construct_matrix(
     ::Type{Matrix}, m::Int, n::Int,
-    aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{Tv}
-) where{Tv<:Real}
-    A = zeros(Tv, m, n)
+    aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{T}
+) where{T}
+    A = zeros(T, m, n)
     # TODO: may be more efficient to first sort indices so that
     # A is accessed in column-major order.
     for(i, j, v) in zip(aI, aJ, aV)
@@ -46,7 +46,7 @@ end
 
 construct_matrix(
     ::Type{SparseMatrixCSC}, m::Int, n::Int,
-    aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{Tv}
-) where{Tv<:Real} = sparse(aI, aJ, aV, m, n)
+    aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{T}
+) where{T} = sparse(aI, aJ, aV, m, n)
 
 end  # module

@@ -49,14 +49,14 @@ Here is a list of currently supported linear solvers:
 
 | Linear solver type | System | Backend | Method |
 |:-------------------|:-------|:--------|:-------|
-| [`Dense_SymPosDef`](@ref) | Normal equations | Dense / LAPACK | Cholesky
-| [`Cholmod_SymQuasDef`](@ref) | Augmented system | CHOLMOD | LDLᵀ
-| [`Cholmod_SymPosDef`](@ref) | Normal equations | CHOLMOD | Cholesky
-| [`LDLFact_SymQuasDef`](@ref) | Augmented system | [LDLFactorizations.jl](https://github.com/JuliaSmoothOptimizers/LDLFactorizations.jl) | LDLᵀ
-| [`KrylovSPDSolver`](@ref) | Normal equations | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
-| [`KrylovSIDSolver`](@ref) | Augmented system[^1] | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
-| [`KrylovSQDSolver`](@ref) | Augmented system[^1] | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
+| [`DenseSPD`](@ref) | Normal equations | Dense / LAPACK | Cholesky
+| [`CholmodSQD`](@ref) | Augmented system | CHOLMOD | LDLᵀ
+| [`CholmodSPD`](@ref) | Normal equations | CHOLMOD | Cholesky
+| [`LDLFactSQD`](@ref) | Augmented system | [LDLFactorizations.jl](https://github.com/JuliaSmoothOptimizers/LDLFactorizations.jl) | LDLᵀ
+| [`KrylovSPD`](@ref) | Normal equations | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
+| [`KrylovSID`](@ref) | Augmented system[^1] | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
+| [`KrylovSQD`](@ref) | Augmented system[^1] | [Krylov.jl](https://github.com/JuliaSmoothOptimizers/Krylov.jl) | Krylov
 
-[^1]: [`KrylovSIDSolver`](@ref)s view the augmented system as a symmetric indefinite system,
-    while [`KrylovSQDSolver`](@ref)s exploit its 2x2 structure and quasi-definite property.
+[^1]: [`KrylovSID`](@ref)s view the augmented system as a symmetric indefinite system,
+    while [`KrylovSQD`](@ref)s exploit its 2x2 structure and quasi-definite property.
     See the reference documentation for more details.

@@ -42,7 +42,7 @@ Numerical tolerances for the interior-point algorithm.
 | Parameter | Description | Default |
 |:----------|:------------|:--------|
 | `MatrixOptions` | See [`TLA.MatrixOptions`](@ref) | `SparseMatrixCSC`
-| `KKTOptions` | See [`KKT.SolverOptions`](@ref) | [`KKT.Cholmod_SymQuasDef`](@ref) for `Float64`, [`KKT.LDLFact_SymQuasDef`](@ref) otherwise |
+| `KKTOptions` | See [`KKT.SolverOptions`](@ref) | [`KKT.CholmodSQD`](@ref) for `Float64`, [`KKT.LDLFactSQD`](@ref) otherwise |
 | `BarrierPRegMin` | Minimum value of primal regularization | ``\sqrt{\epsilon}`` |
 | `BarrierDregMin` | Minimum value of dual regularization | ``\sqrt{\epsilon}``
 

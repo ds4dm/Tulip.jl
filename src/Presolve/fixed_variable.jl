@@ -1,8 +1,8 @@
-struct FixedVariable{Tv} <: PresolveTransformation{Tv}
+struct FixedVariable{T} <: PresolveTransformation{T}
     j::Int  # variable index
-    x::Tv  # primal value
-    c::Tv  # current objective coeff
-    col::Col{Tv}  # current column
+    x::T  # primal value
+    c::T  # current objective coeff
+    col::Col{T}  # current column
 end
 
 function remove_fixed_variable!(ps::PresolveData, j::Int)
@@ -56,9 +56,9 @@ function remove_fixed_variable!(ps::PresolveData, j::Int)
     return nothing
 end
 
-function postsolve!(sol::Solution{Tv}, op::FixedVariable{Tv}) where{Tv}
+function postsolve!(sol::Solution{T}, op::FixedVariable{T}) where{T}
     sol.x[op.j] = op.x
-    s = sol.is_dual_ray ? zero(Tv) : op.c
+    s = sol.is_dual_ray ? zero(T) : op.c
     for (i, aij) in zip(op.col.nzind, op.col.nzval)
         s -= aij * (sol.y_lower[i] - sol.y_upper[i])
     end

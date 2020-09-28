@@ -1,21 +1,21 @@
-struct DominatedColumn{Tv} <: PresolveTransformation{Tv}
+struct DominatedColumn{T} <: PresolveTransformation{T}
     j::Int
-    x::Tv  # Primal value
-    cj::Tv  # Objective
-    col::Col{Tv}  # Column
+    x::T  # Primal value
+    cj::T  # Objective
+    col::Col{T}  # Column
 end
 
-function remove_dominated_column!(ps::PresolveData{Tv}, j::Int; tol::Tv=100*sqrt(eps(Tv))) where{Tv}
+function remove_dominated_column!(ps::PresolveData{T}, j::Int; tol::T=100*sqrt(eps(T))) where{T}
     ps.colflag[j] || return nothing
 
     # Compute implied bounds on reduced cost: `ls ≤ s ≤ us`
-    ls = us = zero(Tv)
+    ls = us = zero(T)
     col = ps.pb0.acols[j]
     for (i, aij) in zip(col.nzind, col.nzval)
         (ps.rowflag[i] && !iszero(aij)) || continue
 
-        ls += aij * ( (aij >= zero(Tv)) ? ps.ly[i] : ps.uy[i] )
-        us += aij * ( (aij >= zero(Tv)) ? ps.uy[i] : ps.ly[i] )
+        ls += aij * ( (aij >= zero(T)) ? ps.ly[i] : ps.uy[i] )
+        us += aij * ( (aij >= zero(T)) ? ps.uy[i] : ps.ly[i] )
     end
 
     # Check if column is dominated
@@ -34,20 +34,20 @@ function remove_dominated_column!(ps::PresolveData{Tv}, j::Int; tol::Tv=100*sqrt
             # Resize problem
             compute_index_mapping!(ps)
             resize!(ps.solution, ps.nrow, ps.ncol)
-            ps.solution.x .= zero(Tv)
-            ps.solution.y_lower .= zero(Tv)
-            ps.solution.y_upper .= zero(Tv)
-            ps.solution.s_lower .= zero(Tv)
-            ps.solution.s_upper .= zero(Tv)
+            ps.solution.x .= zero(T)
+            ps.solution.y_lower .= zero(T)
+            ps.solution.y_upper .= zero(T)
+            ps.solution.s_lower .= zero(T)
+            ps.solution.s_upper .= zero(T)
 
             # Unbounded ray: xj = -1
             ps.solution.primal_status = Sln_InfeasibilityCertificate
             ps.solution.dual_status = Sln_Unknown
             ps.solution.is_primal_ray = true
             ps.solution.is_dual_ray = false
-            ps.solution.z_primal = ps.solution.z_dual = -Tv(Inf)
+            ps.solution.z_primal = ps.solution.z_dual = -T(Inf)
             j_ = ps.new_var_idx[j]
-            ps.solution.x[j_] = -one(Tv)
+            ps.solution.x[j_] = -one(T)
 
             return nothing
         end
@@ -56,7 +56,7 @@ function remove_dominated_column!(ps::PresolveData{Tv}, j::Int; tol::Tv=100*sqrt
         ps.obj0 += cj * lb
 
         # Extract column and update rows
-        col_ = Col{Tv}(Int[], Tv[])
+        col_ = Col{T}(Int[], T[])
         for (i, aij) in zip(col.nzind, col.nzval)
             ps.rowflag[i] || continue
 
@@ -91,20 +91,20 @@ function remove_dominated_column!(ps::PresolveData{Tv}, j::Int; tol::Tv=100*sqrt
             # Resize solution
             compute_index_mapping!(ps)
             resize!(ps.solution, ps.nrow, ps.ncol)
-            ps.solution.x .= zero(Tv)
-            ps.solution.y_lower .= zero(Tv)
-            ps.solution.y_upper .= zero(Tv)
-            ps.solution.s_lower .= zero(Tv)
-            ps.solution.s_upper .= zero(Tv)
+            ps.solution.x .= zero(T)
+            ps.solution.y_lower .= zero(T)
+            ps.solution.y_upper .= zero(T)
+            ps.solution.s_lower .= zero(T)
+            ps.solution.s_upper .= zero(T)
 
             # Unbounded ray: xj = -1
             ps.solution.primal_status = Sln_InfeasibilityCertificate
             ps.solution.dual_status = Sln_Unknown
             ps.solution.is_primal_ray = true
             ps.solution.is_dual_ray = false
-            ps.solution.z_primal = ps.solution.z_dual = -Tv(Inf)
+            ps.solution.z_primal = ps.solution.z_dual = -T(Inf)
             j_ = ps.new_var_idx[j]
-            ps.solution.x[j_] = one(Tv)
+            ps.solution.x[j_] = one(T)
 
             return nothing
         end
@@ -115,7 +115,7 @@ function remove_dominated_column!(ps::PresolveData{Tv}, j::Int; tol::Tv=100*sqrt
         ps.obj0 += cj * ub
 
         # Extract column and update rows
-        col_ = Col{Tv}(Int[], Tv[])
+        col_ = Col{T}(Int[], T[])
         for (i, aij) in zip(col.nzind, col.nzval)
             ps.rowflag[i] || continue
 
@@ -140,12 +140,12 @@ function remove_dominated_column!(ps::PresolveData{Tv}, j::Int; tol::Tv=100*sqrt
     return nothing
 end
 
-function postsolve!(sol::Solution{Tv}, op::DominatedColumn{Tv}) where{Tv}
+function postsolve!(sol::Solution{T}, op::DominatedColumn{T}) where{T}
     # Primal value
     sol.x[op.j] = op.x
 
     # Reduced cost
-    s = sol.is_dual_ray ? zero(Tv) : op.cj
+    s = sol.is_dual_ray ? zero(T) : op.cj
     for (i, aij) in zip(op.col.nzind, op.col.nzval)
         s -= aij * (sol.y_lower[i] - sol.y_upper[i])
     end

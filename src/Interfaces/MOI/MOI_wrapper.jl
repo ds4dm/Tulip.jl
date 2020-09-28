@@ -53,17 +53,17 @@ end
     _bounds(s)
 
 """
-_bounds(s::MOI.EqualTo{Tv}) where{Tv} = s.value, s.value
-_bounds(s::MOI.LessThan{Tv}) where{Tv}  = Tv(-Inf), s.upper
-_bounds(s::MOI.GreaterThan{Tv}) where{Tv}  = s.lower, Tv(Inf)
-_bounds(s::MOI.Interval{Tv}) where{Tv}  = s.lower, s.upper
+_bounds(s::MOI.EqualTo{T}) where{T} = s.value, s.value
+_bounds(s::MOI.LessThan{T}) where{T}  = T(-Inf), s.upper
+_bounds(s::MOI.GreaterThan{T}) where{T}  = s.lower, T(Inf)
+_bounds(s::MOI.Interval{T}) where{T}  = s.lower, s.upper
 
-const SCALAR_SETS{Tv} = Union{
-    MOI.LessThan{Tv},
-    MOI.GreaterThan{Tv},
-    MOI.EqualTo{Tv},
-    MOI.Interval{Tv}
-} where{Tv}
+const SCALAR_SETS{T} = Union{
+    MOI.LessThan{T},
+    MOI.GreaterThan{T},
+    MOI.EqualTo{T},
+    MOI.Interval{T}
+} where{T}
 
 
 
@@ -76,12 +76,12 @@ const SCALAR_SETS{Tv} = Union{
 # ==============================================================================
 
 """
-    Optimizer{Tv}
+    Optimizer{T}
 
 Wrapper for MOI.
 """
-mutable struct Optimizer{Tv} <: MOI.AbstractOptimizer
-    inner::Model{Tv}
+mutable struct Optimizer{T} <: MOI.AbstractOptimizer
+    inner::Model{T}
 
     is_feas::Bool  # Model is feasibility problem if true
 
@@ -91,7 +91,7 @@ mutable struct Optimizer{Tv} <: MOI.AbstractOptimizer
     var_indices_moi::Vector{MOI.VariableIndex}
     var_indices::Dict{MOI.VariableIndex, Int}
     con_indices_moi::Vector{MOI.ConstraintIndex}
-    con_indices::Dict{MOI.ConstraintIndex{MOI.ScalarAffineFunction{Tv}, <:SCALAR_SETS{Tv}}, Int}
+    con_indices::Dict{MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, <:SCALAR_SETS{T}}, Int}
 
     # Variable and constraint names
     name2var::Dict{String, MOI.VariableIndex}
@@ -104,14 +104,14 @@ mutable struct Optimizer{Tv} <: MOI.AbstractOptimizer
     # Keep track of bound constraints
     var2bndtype::Dict{MOI.VariableIndex, Set{Type{<:MOI.AbstractScalarSet}}}
 
-    function Optimizer{Tv}(;kwargs...) where{Tv}
-        m = new{Tv}(
-            Model{Tv}(), false,
+    function Optimizer{T}(;kwargs...) where{T}
+        m = new{T}(
+            Model{T}(), false,
             # Variable and constraint counters
             0, 0, 
             # Index mapping
             MOI.VariableIndex[], Dict{MOI.VariableIndex, Int}(),
-            MOI.ConstraintIndex[], Dict{MOI.ConstraintIndex{MOI.ScalarAffineFunction, <:SCALAR_SETS{Tv}}, Int}(),
+            MOI.ConstraintIndex[], Dict{MOI.ConstraintIndex{MOI.ScalarAffineFunction, <:SCALAR_SETS{T}}, Int}(),
             # Name -> index mapping
             Dict{String, MOI.VariableIndex}(), Dict{String, MOI.ConstraintIndex}(),
             Dict{MOI.ConstraintIndex, String}(),  # Variable bounds tracking
