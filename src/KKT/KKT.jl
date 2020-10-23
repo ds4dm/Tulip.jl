@@ -108,6 +108,7 @@ include("lapack.jl")
 include("cholmod.jl")
 include("ldlfact.jl")
 include("krylov.jl")
+include("pardiso.jl")
 
 """
     default_options(T)
