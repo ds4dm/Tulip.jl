@@ -23,26 +23,27 @@ mutable struct Point{T, Tv}
     zl::Tv  # Lower-bound dual, zero if `l == -∞`
     zu::Tv  # Upper-bound dual, zero if `u == +∞`
 
-    # HSD variables
-    # Only used with homogeneous form
+    # HSD variables, only used with homogeneous form
+    # Otherwise, one must ensure that (τ, κ) = (1, 0)
+    hflag::Bool  # Is homogeneous embedding used?
     τ::T
     κ::T
 
     # Centrality parameter
     μ::T
 
-    # TODO: constructor
-    Point{T, Tv}(m, n, p) where{T, Tv<:AbstractVector{T}} = new{T, Tv}(
+    # Constructor
+    Point{T, Tv}(m, n, p; hflag::Bool) where{T, Tv<:AbstractVector{T}} = new{T, Tv}(
         m, n, p,
         tzeros(Tv, n), tzeros(Tv, n), tzeros(Tv, n),
         tzeros(Tv, m), tzeros(Tv, n), tzeros(Tv, n),
-        one(T), one(T),
+        hflag, one(T), one(T),
         one(T)
     )
 end
 
 function update_mu!(pt::Point)
-    pt.μ = (dot(pt.xl, pt.zl) + dot(pt.xu, pt.zu) + pt.τ * pt.κ) / (pt.p + 1)
+    pt.μ = (dot(pt.xl, pt.zl) + dot(pt.xu, pt.zu) + pt.hflag * (pt.τ * pt.κ)) / (pt.p + pt.hflag)
     return nothing
 end
 
@@ -90,3 +91,4 @@ Run the interior-point optimizer of `ipm`.
 function ipm_optimize! end
 
 include("HSD/HSD.jl")
+include("MPC/MPC.jl")

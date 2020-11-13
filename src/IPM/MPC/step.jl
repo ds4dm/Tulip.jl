@@ -1,18 +1,18 @@
 """
-    compute_step!(hsd, params)
+    compute_step!(ipm, params)
 
-Compute next IP iterate for the HSD formulation.
+Compute next IP iterate for the MPC formulation.
 
 # Arguments
-- `hsd`: The HSD optimizer model
+- `ipm`: The MPC optimizer model
 - `params`: Optimization parameters
 """
-function compute_step!(hsd::HSD{T, Tv}, params::Parameters{T}) where{T, Tv<:AbstractVector{T}}
+function compute_step!(mpc::MPC{T, Tv}, params::Parameters{T}) where{T, Tv<:AbstractVector{T}}
 
     # Names
-    dat = hsd.dat
-    pt = hsd.pt
-    res = hsd.res
+    dat = mpc.dat
+    pt = mpc.pt
+    res = mpc.res
 
     m, n, p = pt.m, pt.n, pt.p
 
@@ -26,25 +26,23 @@ function compute_step!(hsd::HSD{T, Tv}, params::Parameters{T}) where{T, Tv<:Abst
     θinv = θl .+ θu
 
     # Update regularizations
-    hsd.regP .= max.(params.BarrierPRegMin, hsd.regP ./ 10)
-    hsd.regD .= max.(params.BarrierDRegMin, hsd.regD ./ 10)
-    hsd.regG  = max( params.BarrierPRegMin, hsd.regG  / 10)
+    mpc.regP .= max.(params.BarrierPRegMin, mpc.regP ./ 10)
+    mpc.regD .= max.(params.BarrierDRegMin, mpc.regD ./ 10)
 
     # Update factorization
     nbump = 0
     while nbump <= 3
         try
-            @timeit hsd.timer "Factorization" KKT.update!(hsd.kkt, θinv, hsd.regP, hsd.regD)
+            @timeit mpc.timer "Factorization" KKT.update!(mpc.kkt, θinv, mpc.regP, mpc.regD)
             break
         catch err
             isa(err, PosDefException) || isa(err, ZeroPivotException) || rethrow(err)
 
             # Increase regularization
-            hsd.regD .*= 100
-            hsd.regP .*= 100
-            hsd.regG  *= 100
+            mpc.regD .*= 100
+            mpc.regP .*= 100
             nbump += 1
-            @warn "Increase regularizations to $(hsd.regG)"
+            @warn "Increase regularizations to $(mpc.regG)"
         end
     end
     # TODO: throw a custom error for numerical issues
@@ -52,35 +50,18 @@ function compute_step!(hsd::HSD{T, Tv}, params::Parameters{T}) where{T, Tv<:Abst
 
     # Search directions
     # Predictor
-    Δ  = Point{T, Tv}(m, n, p, hflag=true)
-    Δc = Point{T, Tv}(m, n, p, hflag=true)
-
-    # Compute hx, hy, hz from first augmented system solve
-    hx = tzeros(Tv, n)
-    hy = tzeros(Tv, m)
-    ξ_ = dat.c - ((pt.zl ./ pt.xl) .* dat.l) .* dat.lflag - ((pt.zu ./ pt.xu) .* dat.u) .* dat.uflag
-    KKT.solve!(hx, hy, hsd.kkt, dat.b, ξ_)
-
-    # Recover h0 = ρg + κ / τ - c'hx + b'hy - u'hz
-    # Some of the summands may take large values,
-    # so care must be taken for numerical stability
-    h0 = (
-          dot(dat.l .* dat.lflag, (dat.l .* θl) .* dat.lflag)
-        + dot(dat.u .* dat.uflag, (dat.u .* θu) .* dat.uflag)
-        - dot(c + (θl .* dat.l) .* dat.lflag + (θu .* dat.u) .* dat.uflag, hx)
-        + dot(b, hy)
-        + pt.κ / pt.τ
-        + hsd.regG
-    )
+    Δ  = Point{T, Tv}(m, n, p, hflag=false)
+    Δc = Point{T, Tv}(m, n, p, hflag=false)
 
     # Affine-scaling direction
-    @timeit hsd.timer "Newton" solve_newton_system!(Δ, hsd, hx, hy, h0,
+    @timeit mpc.timer "Newton" solve_newton_system!(Δ, mpc,
         # Right-hand side of Newton system
-        res.rp, res.rl, res.ru, res.rd, res.rg,
+        res.rp, res.rl, res.ru, res.rd,
         -(pt.xl .* pt.zl) .* dat.lflag,
         -(pt.xu .* pt.zu) .* dat.uflag,
-        -pt.τ  * pt.κ
     )
+
+    # TODO: ensure that Δ.τ = Δ.κ = 0
 
     # Step length for affine-scaling direction
     α = max_step_length(pt, Δ)
@@ -88,24 +69,23 @@ function compute_step!(hsd::HSD{T, Tv}, params::Parameters{T}) where{T, Tv<:Abst
     η = one(T) - γ
     
     # Mehrotra corrector
-    @timeit hsd.timer "Newton" solve_newton_system!(Δ, hsd, hx, hy, h0,
+    @timeit mpc.timer "Newton" solve_newton_system!(Δ, mpc,
         # Right-hand side of Newton system
-        η .* res.rp, η .* res.rl, η .* res.ru, η .* res.rd, η * res.rg,
+        res.rp, res.rl, res.ru, res.rd,
         (-pt.xl .* pt.zl .+ γ * pt.μ .- Δ.xl .* Δ.zl) .* dat.lflag,
         (-pt.xu .* pt.zu .+ γ * pt.μ .- Δ.xu .* Δ.zu) .* dat.uflag,
-        -pt.τ  * pt.κ  + γ * pt.μ  - Δ.τ  * Δ.κ
     )
     α = max_step_length(pt, Δ)
 
     # Extra corrections
-    ncor = 0
+    #=ncor = 0
     while ncor < params.BarrierCorrectionLimit && α < T(999 // 1000)
         α_ = α
         ncor += 1
 
         # Compute extra-corrector
         αc = compute_higher_corrector!(Δc, 
-            hsd, γ, 
+            mpc, γ, 
             hx, hy, h0,
             Δ, α_, params.BarrierCentralityOutlierThreshold
         )
@@ -131,7 +111,7 @@ function compute_step!(hsd::HSD{T, Tv}, params::Parameters{T}) where{T, Tv<:Abst
         #     break
         # end
         
-    end
+    end =#
 
     # Update current iterate
     α *= params.BarrierStepDampFactor
@@ -141,8 +121,6 @@ function compute_step!(hsd::HSD{T, Tv}, params::Parameters{T}) where{T, Tv<:Abst
     pt.y  .+= α .* Δ.y
     pt.zl .+= α .* Δ.zl
     pt.zu .+= α .* Δ.zu
-    pt.τ   += α  * Δ.τ
-    pt.κ   += α  * Δ.κ
     update_mu!(pt)
     
     return nothing
@@ -150,7 +128,7 @@ end
 
 
 """
-    solve_newton_system!(Δ, hsd, hx, hy, h0, ξp, ξd, ξu, ξg, ξxs, ξwz, ξtk)
+    solve_newton_system!(Δ, mpc, ξp, ξd, ξu, ξg, ξxs, ξwz, ξtk)
 
 Solve the Newton system
 ```math
@@ -170,9 +148,7 @@ Solve the Newton system
     Δ x_{u}\\\\
     Δ y\\\\
     Δ z_{l} \\\\
-    Δ z_{u} \\\\
-    Δ τ\\\\
-    Δ κ\\\\
+    Δ z_{u}
 \\end{bmatrix}
 =
 \\begin{bmatrix}
@@ -182,82 +158,57 @@ Solve the Newton system
     ξ_d\\\\
     ξ_g\\\\
     ξ_{xz}^{l}\\\\
-    ξ_{xz}^{u}\\\\
-    ξ_tk
+    ξ_{xz}^{u}
 \\end{bmatrix}
 ```
 
 # Arguments
 - `Δ`: Search direction, modified
-- `hsd`: The HSD optimizer
+- `mpc`: The MPC optimizer
 - `hx, hy, hz, h0`: Terms obtained in the preliminary augmented system solve
 - `ξp, ξd, ξu, ξg, ξxs, ξwz, ξtk`: Right-hand side vectors
 """
 function solve_newton_system!(Δ::Point{T, Tv},
-    hsd::HSD{T, Tv},
-    # Information from initial augmented system solve
-    hx::Tv, hy::Tv, h0::T,
+    mpc::MPC{T, Tv},
     # Right-hand side
-    ξp::Tv, ξl::Tv, ξu::Tv, ξd::Tv, ξg::T, ξxzl::Tv, ξxzu::Tv, ξtk::T
+    ξp::Tv, ξl::Tv, ξu::Tv, ξd::Tv, ξxzl::Tv, ξxzu::Tv
 ) where{T, Tv<:AbstractVector{T}}
 
-    pt = hsd.pt
-    dat = hsd.dat
+    pt = mpc.pt
+    dat = mpc.dat
 
     # I. Solve augmented system
-    @timeit hsd.timer "ξd_"  begin
+    @timeit mpc.timer "ξd_"  begin
         ξd_ = copy(ξd)
         @. ξd_ += -((ξxzl + pt.zl .* ξl) ./ pt.xl) .* dat.lflag + ((ξxzu - pt.zu .* ξu) ./ pt.xu) .* dat.uflag
     end
-    @timeit hsd.timer "KKT" KKT.solve!(Δ.x, Δ.y, hsd.kkt, ξp, ξd_)
+    @timeit mpc.timer "KKT" KKT.solve!(Δ.x, Δ.y, mpc.kkt, ξp, ξd_)
 
-    # II. Recover Δτ, Δx, Δy
-    # Compute Δτ
-    @timeit hsd.timer "ξg_" ξg_ = (ξg + ξtk / pt.τ 
-        - dot((ξxzl ./ pt.xl) .* dat.lflag, dat.l .* dat.lflag)            # l'(Xl)^-1 * ξxzl
-        + dot((ξxzu ./ pt.xu) .* dat.uflag, dat.u .* dat.uflag) 
-        - dot(((pt.zl ./ pt.xl) .* ξl) .* dat.lflag, dat.l .* dat.lflag) 
-        - dot(((pt.zu ./ pt.xu) .* ξu) .* dat.uflag, dat.u .* dat.uflag)  # 
-    )
-
-    @timeit hsd.timer "Δτ" Δ.τ = (
-        ξg_
-        + dot(dat.c
-            + ((pt.zl ./ pt.xl) .* dat.l) .* dat.lflag
-            + ((pt.zu ./ pt.xu) .* dat.u) .* dat.uflag
-        , Δ.x)
-        - dot(dat.b, Δ.y)
-    ) / h0
-
-
-    # Compute Δx, Δy
-    @timeit hsd.timer "Δx" Δ.x .+= Δ.τ .* hx
-    @timeit hsd.timer "Δy" Δ.y .+= Δ.τ .* hy
-
-    # III. Recover Δxl, Δxu
-    @timeit hsd.timer "Δxl" begin
-        @. Δ.xl = -ξl + Δ.x - Δ.τ .* (dat.l .* dat.lflag)
+    # II. Recover Δxl, Δxu
+    @timeit mpc.timer "Δxl" begin
+        @. Δ.xl = -ξl + Δ.x
         Δ.xl .*= dat.lflag
     end
-    @timeit hsd.timer "Δxu" begin
-        @. Δ.xu =  ξu - Δ.x + Δ.τ .* (dat.u .* dat.uflag)
+    @timeit mpc.timer "Δxu" begin
+        @. Δ.xu =  ξu - Δ.x
         Δ.xu .*= dat.uflag
     end
 
-    # IV. Recover Δzl, Δzu
-    @timeit hsd.timer "Δzl" @. Δ.zl = ((ξxzl - pt.zl .* Δ.xl) ./ pt.xl) .* dat.lflag
-    @timeit hsd.timer "Δzu" @. Δ.zu = ((ξxzu - pt.zu .* Δ.xu) ./ pt.xu) .* dat.uflag
+    # III. Recover Δzl, Δzu
+    @timeit mpc.timer "Δzl" @. Δ.zl = ((ξxzl - pt.zl .* Δ.xl) ./ pt.xl) .* dat.lflag
+    @timeit mpc.timer "Δzu" @. Δ.zu = ((ξxzu - pt.zu .* Δ.xu) ./ pt.xu) .* dat.uflag
 
-    # V. Recover Δκ
-    Δ.κ = (ξtk - pt.κ * Δ.τ) / pt.τ
+    # IV. Set Δτ, Δκ to zero
+    Δ.τ = zero(T)
+    Δ.κ = zero(T)
 
     # Check Newton residuals
     # @printf "Newton residuals:\n"
-    # @printf "|rp|   = %16.8e\n" norm(dat.A * Δ.x + hsd.regD .* Δ.y - dat.b .* Δ.τ - ξp, Inf)
+    # @printf "|rp|   = %16.8e\n" norm(dat.A * Δ.x + mpc.regD .* Δ.y - dat.b .* Δ.τ - ξp, Inf)
     # @printf "|rl|   = %16.8e\n" norm((Δ.x - Δ.xl - (dat.l .* Δ.τ)) .* dat.lflag - ξl, Inf)
     # @printf "|ru|   = %16.8e\n" norm((Δ.x + Δ.xu - (dat.u .* Δ.τ)) .* dat.uflag - ξu, Inf)
-    # @printf "|rd|   = %16.8e\n" norm(-hsd.regP .* Δ.x + dat.A'Δ.y + Δ.zl - Δ.zu - dat.c .* Δ.τ - ξd, Inf)
-    # @printf "|rg|   = %16.8e\n" norm(-dat.c'Δ.x + dat.b'Δ.y + dot(dat.l .* dat.lflag, Δ.zl) - dot(dat.u .* dat.uflag, Δ.zu) + hsd.regG * Δ.τ - Δ.κ - ξg, Inf)
+    # @printf "|rd|   = %16.8e\n" norm(-mpc.regP .* Δ.x + dat.A'Δ.y + Δ.zl - Δ.zu - dat.c .* Δ.τ - ξd, Inf)
+    # @printf "|rg|   = %16.8e\n" norm(-dat.c'Δ.x + dat.b'Δ.y + dot(dat.l .* dat.lflag, Δ.zl) - dot(dat.u .* dat.uflag, Δ.zu) + mpc.regG * Δ.τ - Δ.κ - ξg, Inf)
     # @printf "|rxzl| = %16.8e\n" norm(pt.zl .* Δ.xl + pt.xl .* Δ.zl - ξxzl, Inf)
     # @printf "|rxzu| = %16.8e\n" norm(pt.zu .* Δ.xu + pt.xu .* Δ.zu - ξxzu, Inf)
     # @printf "|rtk|  = %16.8e\n" norm(pt.κ * Δ.τ + pt.τ * Δ.κ - ξtk, Inf)
@@ -265,7 +216,7 @@ function solve_newton_system!(Δ::Point{T, Tv},
     return nothing
 end
 
-
+#=
 """
     max_step_length(x, dx)
 
@@ -304,10 +255,11 @@ function max_step_length(pt::Point{T, Tv}, δ::Point{T, Tv}) where{T, Tv<:Abstra
 
     return α
 end
+=#
 
 
 """
-    compute_higher_corrector!(Δc, hsd, γ, hx, hy, h0, Δ, α, β)
+    compute_higher_corrector!(Δc, mpc, γ, hx, hy, h0, Δ, α, β)
 
 Compute higher-order corrected direction.
 
@@ -315,7 +267,7 @@ Requires the solution of one Newton system.
 
 # Arguments
 - `Δc`: Corrected search direction, modified in-place
-- `hsd`: The HSD optimizer
+- `mpc`: The MPC optimizer
 - `γ`: 
 - `hx, hy, h0`: Terms obtained from the preliminary augmented system solve
 - `Δ`: Current predictor direction
@@ -323,13 +275,13 @@ Requires the solution of one Newton system.
 - `β`: Relative threshold for centrality outliers
 """
 function compute_higher_corrector!(Δc::Point{T, Tv},
-    hsd::HSD{T, Tv}, γ::T,
+    mpc::MPC{T, Tv}, γ::T,
     hx::Tv, hy::Tv, h0::T,
     Δ::Point{T, Tv}, α::T, β::T,
 ) where{T, Tv<:AbstractVector{T}}
     # TODO: Sanity checks
-    pt = hsd.pt
-    dat = hsd.dat
+    pt = mpc.pt
+    dat = mpc.dat
 
     # Tentative step length
     α_ = min(one(T), T(2)*α)
@@ -377,7 +329,7 @@ function compute_higher_corrector!(Δc::Point{T, Tv},
     vt  -= δ
 
     # Compute corrector
-    @timeit hsd.timer "Newton" solve_newton_system!(Δc, hsd, hx, hy, h0,
+    @timeit mpc.timer "Newton" solve_newton_system!(Δc, mpc, hx, hy, h0,
         # Right-hand sides
         tzeros(Tv, pt.m), tzeros(Tv, pt.n), tzeros(Tv, pt.n), tzeros(Tv, pt.n), zero(T),
         vl,

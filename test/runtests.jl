@@ -17,6 +17,7 @@ const testdir = dirname(@__FILE__)
 @testset "Unit tests" begin
     include("Core/problemData.jl")
     include("IPM/HSD.jl")
+    include("IPM/MPC.jl")
 end
 
 @testset "KKT" begin

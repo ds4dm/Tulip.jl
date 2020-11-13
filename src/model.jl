@@ -126,7 +126,13 @@ function optimize!(model::Model{T}) where{T}
     dat = IPMData(pb_, model.params.MatrixOptions)
 
     # Instantiate the IPM solver
-    model.solver = HSD(dat, model.params)
+    if model.params.BarrierAlgorithm == 1
+        model.solver = HSD(dat, model.params)
+    elseif model.params.BarrierAlgorithm == 2
+        model.solver = MPC(dat, model.params)
+    else
+        error("Unknown options for BarrierAlgorithm: $(model.params.BarrierAlgorithm)")
+    end
 
     # Solve the problem
     # TODO: add a try-catch for error handling
@@ -152,29 +158,29 @@ function optimize!(model::Model{T}) where{T}
 end
 
 function _extract_solution!(sol::Solution{T},
-    pb::ProblemData{T}, hsd::HSD{T}
+    pb::ProblemData{T}, ipm::AbstractIPMOptimizer{T}
 ) where{T}
 
     m, n = pb.ncon, pb.nvar
 
     # Extract column information
     # TODO: check for ray vs vertex
-    sol.primal_status = hsd.primal_status
-    sol.dual_status = hsd.dual_status
+    sol.primal_status = ipm.primal_status
+    sol.dual_status = ipm.dual_status
 
     is_primal_ray = (sol.primal_status == Sln_InfeasibilityCertificate)
     is_dual_ray = (sol.dual_status == Sln_InfeasibilityCertificate)
     sol.is_primal_ray = is_primal_ray
     sol.is_dual_ray = is_dual_ray
-    τ_ = (is_primal_ray || is_dual_ray) ? one(T) : inv(hsd.pt.τ)
+    τ_ = (is_primal_ray || is_dual_ray) ? one(T) : inv(ipm.pt.τ)
     
-    @. sol.x = hsd.pt.x[1:n] * τ_
-    @. sol.s_lower = hsd.pt.zl[1:n] * τ_
-    @. sol.s_upper = hsd.pt.zu[1:n] * τ_
+    @. sol.x = ipm.pt.x[1:n] * τ_
+    @. sol.s_lower = ipm.pt.zl[1:n] * τ_
+    @. sol.s_upper = ipm.pt.zu[1:n] * τ_
 
     # Extract row information
-    @. sol.y_lower = pos_part.(hsd.pt.y) * τ_
-    @. sol.y_upper = neg_part.(hsd.pt.y) * τ_
+    @. sol.y_lower = pos_part.(ipm.pt.y) * τ_
+    @. sol.y_upper = neg_part.(ipm.pt.y) * τ_
 
     # Compute row primal
     for (i, row) in enumerate(pb.arows)
@@ -191,7 +197,7 @@ function _extract_solution!(sol::Solution{T},
         sol.z_primal = -T(Inf)
         sol.z_dual = -T(Inf)
     elseif sol.primal_status == Sln_Optimal || sol.primal_status == Sln_FeasiblePoint
-        sol.z_primal = hsd.primal_bound_scaled
+        sol.z_primal = ipm.primal_objective
     else
         # Unknown solution status
         sol.z_primal = NaN
@@ -203,17 +209,7 @@ function _extract_solution!(sol::Solution{T},
         sol.z_dual = T(Inf)
     elseif sol.dual_status == Sln_Optimal || sol.dual_status == Sln_FeasiblePoint
         # Dual solution is feasible
-        sol.z_dual = hsd.dual_bound_scaled
-
-        # sol.z_dual = pb.obj0
-        # for (yl, yu, l, u) in zip(sol.y_lower, sol.y_upper, pb.lcon, pb.ucon)
-        #     isfinite(l) && (sol.z_dual += yl * l)
-        #     isfinite(u) && (sol.z_dual -= yu * u)
-        # end
-        # for (sl, su, l, u) in zip(sol.s_lower, sol.s_upper, pb.lvar, pb.uvar)
-        #     isfinite(l) && (sol.z_dual += sl * l)
-        #     isfinite(u) && (sol.z_dual -= su * u)
-        # end
+        sol.z_dual = ipm.dual_objective
     else
         # Unknown solution status
         sol.z_dual = NaN

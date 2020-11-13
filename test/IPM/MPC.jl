@@ -1,4 +1,4 @@
-function run_tests_hsd(T::Type)
+function run_tests_mpc(T::Type)
 
     Tv = Vector{T}
 
@@ -6,7 +6,7 @@ function run_tests_hsd(T::Type)
 
     @testset "step length" begin
         m, n, p = 2, 2, 1
-        pt = TLP.Point{T, Tv}(m, n, p, hflag=true)
+        pt = TLP.Point{T, Tv}(m, n, p, hflag=false)
         pt.x  .= one(T)
         pt.xl .= one(T)
         pt.xu .= one(T)
@@ -17,7 +17,7 @@ function run_tests_hsd(T::Type)
         pt.κ   = one(T)
         pt.μ   = one(T)
 
-        d = TLP.Point{T, Tv}(m, n, p, hflag=true)
+        d = TLP.Point{T, Tv}(m, n, p, hflag=false)
         d.x  .= one(T)
         d.xl .= one(T)
         d.xu .= one(T)
@@ -61,40 +61,40 @@ function run_tests_hsd(T::Type)
     u = Vector{T}([2, 2])
     dat = Tulip.IPMData(A, b, true, c, c0, l, u)
 
-    hsd = TLP.HSD(dat, params)
+    ipm = TLP.MPC(dat, params)
 
     # Primal-dual optimal solution
     # x1 = x2 = 0.5; xl = 0.5; xu = 1.5; τ = 1
     # y1 = 0, y2 = 1; zl = zu = 0; κ = 0
-    hsd.pt.x  .= T.([1 // 2, 1 // 2])
-    hsd.pt.xl .= T.([1 // 2, 1 // 2])
-    hsd.pt.xu .= T.([3 // 2, 3 // 2])
-    hsd.pt.y  .= T.([0, 1])
-    hsd.pt.zl .= T.([0, 0])
-    hsd.pt.zu .= T.([0, 0])
+    ipm.pt.x  .= T.([1 // 2, 1 // 2])
+    ipm.pt.xl .= T.([1 // 2, 1 // 2])
+    ipm.pt.xu .= T.([3 // 2, 3 // 2])
+    ipm.pt.y  .= T.([0, 1])
+    ipm.pt.zl .= T.([0, 0])
+    ipm.pt.zu .= T.([0, 0])
     
-    hsd.pt.τ  = 1
-    hsd.pt.κ  = 0
-    hsd.pt.μ  = 0
+    ipm.pt.τ  = 1
+    ipm.pt.κ  = 0
+    ipm.pt.μ  = 0
 
     ϵ = sqrt(eps(T))
 
     @testset "Residuals" begin
-        @inferred TLP.compute_residuals!(hsd)
-        TLP.compute_residuals!(hsd)
+        @inferred TLP.compute_residuals!(ipm)
+        TLP.compute_residuals!(ipm)
         
-        @test isapprox(hsd.res.rp_nrm, zero(T); atol=ϵ, rtol=ϵ)
-        @test isapprox(hsd.res.ru_nrm, zero(T); atol=ϵ, rtol=ϵ)
-        @test isapprox(hsd.res.rd_nrm, zero(T); atol=ϵ, rtol=ϵ)
-        @test isapprox(hsd.res.rg_nrm, zero(T); atol=ϵ, rtol=ϵ)
+        @test isapprox(ipm.res.rp_nrm, zero(T); atol=ϵ, rtol=ϵ)
+        @test isapprox(ipm.res.ru_nrm, zero(T); atol=ϵ, rtol=ϵ)
+        @test isapprox(ipm.res.rd_nrm, zero(T); atol=ϵ, rtol=ϵ)
+        @test isapprox(ipm.res.rg_nrm, zero(T); atol=ϵ, rtol=ϵ)
         
     end
 
     @testset "Convergence" begin
 
-        hsd.solver_status = TLP.Trm_Unknown
-        TLP.update_solver_status!(hsd, ϵ, ϵ, ϵ, ϵ)
-        @test hsd.solver_status == TLP.Trm_Optimal
+    ipm.solver_status = TLP.Trm_Unknown
+        TLP.update_solver_status!(ipm, ϵ, ϵ, ϵ, ϵ)
+        @test ipm.solver_status == TLP.Trm_Optimal
 
         # TODO: dual infeasible
 
@@ -105,8 +105,8 @@ function run_tests_hsd(T::Type)
     end
 end
 
-@testset "HSD" begin
+@testset "MPC" begin
     for T in TvTYPES
-        @testset "$T" begin run_tests_hsd(T) end
+        @testset "$T" begin run_tests_mpc(T) end
     end
 end
