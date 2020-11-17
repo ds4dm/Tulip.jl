@@ -16,7 +16,7 @@ makedocs(
         "Reference" => Any[
             "Julia API" => "reference/API.md",
             "Attributes" => "reference/attributes.md",
-            "Parameters" => "reference/parameters.md",
+            "Options" => "reference/options.md",
             "KKT solvers" => "reference/kkt_solvers.md"
         ],
     ]
