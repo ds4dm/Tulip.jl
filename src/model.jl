@@ -84,7 +84,8 @@ function optimize!(model::Model{T}) where{T}
     pb_ = model.pbdata
     # Presolve
     # TODO: improve the if-else
-    if model.params.Presolve > 0
+    ps_options = model.params.Presolve
+    if ps_options.Level > 0
         model.presolve_data = PresolveData(model.pbdata)
         t_ = @elapsed st = presolve!(model.presolve_data)
         model.status = st
@@ -123,27 +124,22 @@ function optimize!(model::Model{T}) where{T}
     end
 
     # Extract data in IPM form
-    dat = IPMData(pb_, model.params.MatrixOptions)
+    dat = IPMData(pb_, model.params.MatrixFactory)
 
     # Instantiate the IPM solver
-    if model.params.BarrierAlgorithm == 1
-        model.solver = HSD(dat, model.params)
-    elseif model.params.BarrierAlgorithm == 2
-        model.solver = MPC(dat, model.params)
-    else
-        error("Unknown options for BarrierAlgorithm: $(model.params.BarrierAlgorithm)")
-    end
+    model.params.IPM.OutputLevel = model.params.OutputLevel
+    model.solver = instantiate(model.params.IPM.Factory, dat, model.params.KKT)
 
     # Solve the problem
     # TODO: add a try-catch for error handling
-    ipm_optimize!(model.solver, model.params)
+    ipm_optimize!(model.solver, model.params.IPM)
 
     # Recover solution in original space
     sol_inner = Solution{T}(pb_.ncon, pb_.nvar)
     _extract_solution!(sol_inner, pb_, model.solver)
 
     # Post-solve
-    if model.params.Presolve > 0
+    if ps_options.Level > 0
         sol_outer = Solution{T}(model.pbdata.ncon, model.pbdata.nvar)
         postsolve!(sol_outer, sol_inner, model.presolve_data)
         model.solution = sol_outer

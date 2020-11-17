@@ -7,7 +7,7 @@ Compute next IP iterate for the HSD formulation.
 - `hsd`: The HSD optimizer model
 - `params`: Optimization parameters
 """
-function compute_step!(hsd::HSD{T, Tv}, params::Parameters{T}) where{T, Tv<:AbstractVector{T}}
+function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:AbstractVector{T}}
 
     # Names
     dat = hsd.dat

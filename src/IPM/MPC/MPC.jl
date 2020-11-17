@@ -32,7 +32,7 @@ mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
     regD::Tv  # Dual regularization
 
     function MPC(
-        dat::IPMData{T, Tv, Tb, Ta}, params::Parameters{T}
+        dat::IPMData{T, Tv, Tb, Ta}, kkt_options::KKTOptions{T}
     ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
         
         m, n = dat.nrow, dat.ncol
@@ -50,7 +50,7 @@ mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
         regP = tones(Tv, n)
         regD = tones(Tv, m)
 
-        kkt = KKT.setup(params.KKTOptions.Ts, dat.A; params.KKTOptions.options...)
+        kkt = KKT.setup(kkt_options.Factory.T, dat.A; kkt_options.Factory.options...)
         Tk = typeof(kkt)
 
         return new{T, Tv, Tb, Ta, Tk}(dat,
@@ -189,7 +189,7 @@ end
     optimize!
 
 """
-function ipm_optimize!(mpc::MPC{T}, params::Parameters{T}) where{T}
+function ipm_optimize!(mpc::MPC{T}, params::IPMOptions{T}) where{T}
     # TODO: pre-check whether model needs to be re-optimized.
     # This should happen outside of this function
     dat = mpc.dat

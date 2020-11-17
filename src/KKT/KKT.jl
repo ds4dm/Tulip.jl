@@ -2,7 +2,9 @@ module KKT
 
 using LinearAlgebra
 
-export AbstractKKTSolver
+import ..Tulip.Factory
+
+export AbstractKKTSolver, KKTOptions
 
 """
     AbstractKKTSolver{T}
@@ -17,16 +19,14 @@ where `ξd` and `ξp` are given right-hand side.
 abstract type AbstractKKTSolver{T} end
 
 """
-    SolverOptions
+    KKTOptions{T}
 
-Used to pass options and instantiate KKT solvers.
+KKT solver options.
 """
-struct SolverOptions
-    Ts::Type{<:AbstractKKTSolver}
-    options::Base.Iterators.Pairs
-
-    SolverOptions(::Type{Ts}; kwargs...) where{Ts<:AbstractKKTSolver} = new(Ts, kwargs)
+Base.@kwdef mutable struct KKTOptions{T}
+    Factory::Factory{<:AbstractKKTSolver} = default_factory(T)
 end
+
 
 """
     setup(T::Type{<:AbstractKKTSolver}, args...; kwargs...)
@@ -110,15 +110,15 @@ include("ldlfact.jl")
 include("krylov.jl")
 
 """
-    default_options(T)
+    default_factory(T)
 
 Use CHOLMOD for `Float64` and LDLFactorizations otherwise.
 """
-function default_options(::Type{T}) where{T}
+function default_factory(::Type{T}) where{T}
     if T == Float64
-        return SolverOptions(CholmodSolver; normal_equations=false)
+        return Factory(CholmodSolver; normal_equations=false)
     else
-        return SolverOptions(LDLFactSQD)
+        return Factory(LDLFactSQD)
     end
 end
 

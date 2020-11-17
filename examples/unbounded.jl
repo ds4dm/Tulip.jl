@@ -23,7 +23,7 @@ function ex_unbounded(::Type{Tv};
     m.params.OutputLevel = 1
     # Set optional parameters
     for (k, val) in kwargs
-        setfield!(m.params, k, val)
+        TLP.set_parameter(m, String(k), val)
     end
 
     # Read problem from .mps file and solve    

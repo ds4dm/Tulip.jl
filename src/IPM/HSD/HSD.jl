@@ -32,7 +32,7 @@ mutable struct HSD{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
     regG::T   # gap regularization
 
     function HSD(
-        dat::IPMData{T, Tv, Tb, Ta}, params::Parameters{T}
+        dat::IPMData{T, Tv, Tb, Ta}, kkt_options::KKTOptions{T}
     ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
         
         m, n = dat.nrow, dat.ncol
@@ -51,7 +51,7 @@ mutable struct HSD{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
         regD = tones(Tv, m)
         regG = one(T)
 
-        kkt = KKT.setup(params.KKTOptions.Ts, dat.A; params.KKTOptions.options...)
+        kkt = KKT.setup(kkt_options.Factory.T, dat.A; kkt_options.Factory.options...)
         Tk = typeof(kkt)
 
         return new{T, Tv, Tb, Ta, Tk}(dat,
@@ -202,7 +202,7 @@ end
     optimize!
 
 """
-function ipm_optimize!(hsd::HSD{T}, params::Parameters{T}) where{T}
+function ipm_optimize!(hsd::HSD{T}, params::IPMOptions{T}) where{T}
     # TODO: pre-check whether model needs to be re-optimized.
     # This should happen outside of this function
     dat = hsd.dat

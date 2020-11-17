@@ -2,7 +2,8 @@ function run_tests_hsd(T::Type)
 
     Tv = Vector{T}
 
-    params = TLP.Parameters{T}()
+    params = TLP.IPMOptions{T}()
+    kkt_options = TLP.KKTOptions{T}()
 
     @testset "step length" begin
         m, n, p = 2, 2, 1
@@ -61,7 +62,7 @@ function run_tests_hsd(T::Type)
     u = Vector{T}([2, 2])
     dat = Tulip.IPMData(A, b, true, c, c0, l, u)
 
-    hsd = TLP.HSD(dat, params)
+    hsd = TLP.HSD(dat, kkt_options)
 
     # Primal-dual optimal solution
     # x1 = x2 = 0.5; xl = 0.5; xu = 1.5; τ = 1

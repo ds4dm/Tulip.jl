@@ -4,8 +4,8 @@ const examples_dir = joinpath(@__FILE__, "../../examples")
     include(joinpath(examples_dir, "optimal.jl"))
     for T in TvTYPES
         @testset "$T" begin
-            ex_optimal(T; BarrierAlgorithm=1, OutputLevel=0)
-            ex_optimal(T; BarrierAlgorithm=2, OutputLevel=0)
+            ex_optimal(T; OutputLevel=1, IPM_Factory=Tulip.Factory(Tulip.HSD))
+            ex_optimal(T; OutputLevel=1, IPM_Factory=Tulip.Factory(Tulip.MPC))
         end
     end
 end
@@ -13,8 +13,8 @@ end
     include(joinpath(examples_dir, "freevars.jl"))
     for T in TvTYPES
         @testset "$T" begin
-            ex_freevars(T; BarrierAlgorithm=1, OutputLevel=0)
-            ex_freevars(T; BarrierAlgorithm=2, OutputLevel=0)
+            ex_freevars(T; OutputLevel=1, IPM_Factory=Tulip.Factory(Tulip.HSD))
+            ex_freevars(T; OutputLevel=1, IPM_Factory=Tulip.Factory(Tulip.MPC))
         end
     end
 end

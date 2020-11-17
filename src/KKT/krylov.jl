@@ -24,7 +24,7 @@ Suitable methods are CG or CR.
 
 A `KrylovSPD` is selected as follows
 ```julia
-model.params.KKTOptions = Tulip.KKT.SolverOptions(
+model.params.KKT.Factory = Tulip.Factory(
     KrylovSPD, method=Krylov.cg,
     atol=1e-12, rtol=1e-12
 )
@@ -164,7 +164,7 @@ Suitable methods are MINRES or MINRES-QLP.
 
 A `KrylovSID` is selected as follows
 ```julia
-model.params.KKTOptions = Tulip.KKT.SolverOptions(
+model.params.KKT.Factory = Tulip.Factory(
     KrylovSID, method=Krylov.minres,
     atol=1e-12, rtol=1e-12
 )
@@ -313,7 +313,7 @@ Suitable methods are TriCG and TriMR.
 
 A `KrylovSID` is selected as follows
 ```julia
-model.params.KKTOptions = Tulip.KKT.SolverOptions(
+model.params.KKT.Factory = Tulip.Factory(
     KrylovSQD, method=Krylov.trimr,
     atol=1e-12, rtol=1e-12
 )

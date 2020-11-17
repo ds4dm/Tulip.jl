@@ -199,7 +199,17 @@ end
 Set the value of parameter `pname` in model `m` to `val`
 """
 function set_parameter(m::Model, pname::String, val)
-    setfield!(m.params, Symbol(pname), val)
+    if length(pname) > 4 && pname[1:4] == "IPM_"
+        setfield!(m.params.IPM, Symbol(pname[5:end]), val)
+    elseif length(pname) > 4 && pname[1:4] == "KKT_"
+        setfield!(m.params.KKT, Symbol(pname[5:end]), val)
+    elseif length(pname) > 10 && pname[1:9] == "Presolve_"
+        setfield!(m.params.Presolve, Symbol(pname[10:end]), val)
+    elseif hasfield(typeof(m.params), Symbol(pname))
+        setfield!(m.params, Symbol(pname), val)
+    else
+        error("Unknown option: $pname")
+    end
     return nothing
 end
 

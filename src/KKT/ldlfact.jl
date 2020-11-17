@@ -13,7 +13,7 @@ Linear solver for the 2x2 augmented system with ``A`` sparse.
 Uses LDLFactorizations.jl to compute an LDLᵀ factorization of the quasi-definite augmented system.
 
 ```julia
-model.params.KKTOptions = Tulip.KKT.SolverOptions(LDLFactSQD)
+model.params.KKT.Factory = Tulip.Factory(LDLFactSQD)
 ```
 """
 mutable struct LDLFactSQD{T<:Real} <: AbstractKKTSolver{T}

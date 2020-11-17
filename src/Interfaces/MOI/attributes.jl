@@ -46,10 +46,10 @@ end
 #
 #   TimeLimitSec
 #
-MOI.get(m::Optimizer, ::MOI.TimeLimitSec) = m.inner.params.TimeLimit
+MOI.get(m::Optimizer, ::MOI.TimeLimitSec) = m.inner.params.IPM.TimeLimit
 
 function MOI.set(m::Optimizer, ::MOI.TimeLimitSec, t)
-    m.inner.params.TimeLimit = t
+    m.inner.params.IPM.TimeLimit = t
     return nothing
 end
 
