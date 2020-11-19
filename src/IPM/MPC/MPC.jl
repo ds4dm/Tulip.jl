@@ -1,7 +1,7 @@
 """
     MPC
 
-Mehrotra Predictor-Corrector algorithm
+Implements Mehrotra's Predictor-Corrector interior-point algorithm.
 """
 mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
 
@@ -66,7 +66,7 @@ end
 include("step.jl")
 
 """
-    compute_residuals!(::MPC, res, pt, A, b, c, uind, uval)
+    compute_residuals!(::MPC)
 
 In-place computation of primal-dual residuals at point `pt`.
 """
@@ -76,25 +76,25 @@ function compute_residuals!(mpc::MPC{T}) where{T}
     dat = mpc.dat
 
     # Primal residual
-    # rp = t*b - A*x
-    axpby!(pt.τ, dat.b, zero(T), res.rp)
+    # rp = b - A*x
+    res.rp .= dat.b
     mul!(res.rp, dat.A, pt.x, -one(T), one(T))
 
     # Lower-bound residual
-    # rl_j = τ*l_j - (x_j - xl_j)  if l_j ∈ R
-    #      = 0                     if l_j = -∞
-    @. res.rl = - pt.x + pt.xl + pt.τ * dat.l
+    # rl_j = l_j - (x_j - xl_j)  if l_j ∈ R
+    #      = 0                   if l_j = -∞
+    @. res.rl = (dat.l + pt.xl) - pt.x
     res.rl .*= dat.lflag
 
     # Upper-bound residual
-    # ru_j = τ*u_j - (x_j + xu_j)  if u_j ∈ R
-    #      = 0                     if u_j = +∞
-    @. res.ru = - pt.x - pt.xu + pt.τ * dat.u
+    # ru_j = u_j - (x_j + xu_j)  if u_j ∈ R
+    #      = 0                   if u_j = +∞
+    @. res.ru = dat.u - (pt.x + pt.xu)
     res.ru .*= dat.uflag
 
     # Dual residual
-    # rd = t*c - A'y - zl + zu
-    axpby!(pt.τ, dat.c, zero(T), res.rd)
+    # rd = c - (A'y + zl - zu)
+    res.rd .= dat.c
     mul!(res.rd, transpose(dat.A), pt.y, -one(T), one(T))
     @. res.rd += pt.zu .* dat.uflag - pt.zl .* dat.lflag
 
@@ -128,12 +128,12 @@ function update_solver_status!(mpc::MPC{T}, ϵp::T, ϵd::T, ϵg::T, ϵi::T) wher
     dat = mpc.dat
 
     ρp = max(
-        res.rp_nrm / (pt.τ * (one(T) + norm(dat.b, Inf))),
-        res.rl_nrm / (pt.τ * (one(T) + norm(dat.l .* dat.lflag, Inf))),
-        res.ru_nrm / (pt.τ * (one(T) + norm(dat.u .* dat.uflag, Inf)))
+        res.rp_nrm / (one(T) + norm(dat.b, Inf)),
+        res.rl_nrm / (one(T) + norm(dat.l .* dat.lflag, Inf)),
+        res.ru_nrm / (one(T) + norm(dat.u .* dat.uflag, Inf))
     )
-    ρd = res.rd_nrm / (pt.τ * (one(T) + norm(dat.c, Inf)))
-    ρg = pt.μ / (pt.τ + abs(mpc.primal_objective))
+    ρd = res.rd_nrm / (one(T) + norm(dat.c, Inf))
+    ρg = abs(mpc.primal_objective - mpc.dual_objective) / (one(T) + abs(mpc.primal_objective))
 
     # Check for feasibility
     if ρp <= ϵp
@@ -224,18 +224,7 @@ function ipm_optimize!(mpc::MPC{T}, params::IPMOptions{T}) where{T}
     end
 
     # Set starting point
-    mpc.pt.x   .= zero(T)
-    mpc.pt.xl  .= one(T) .* dat.lflag
-    mpc.pt.xu  .= one(T) .* dat.uflag
-
-    mpc.pt.y   .= zero(T)
-    mpc.pt.zl  .= one(T) .* dat.lflag
-    mpc.pt.zu  .= one(T) .* dat.uflag
-    
-    mpc.pt.τ   = one(T)
-    mpc.pt.κ   = zero(T)
-
-    update_mu!(mpc.pt)
+    @timeit mpc.timer "Initial point" compute_starting_point_Mehrotra(mpc)
 
     # Main loop
     # Iteration 0 corresponds to the starting point.
@@ -262,9 +251,9 @@ function ipm_optimize!(mpc::MPC{T}, params::IPMOptions{T}) where{T}
             @printf "  %+14.7e" ϵ * mpc.dual_objective
             
             # Residuals
-            @printf "  %8.2e" max(mpc.res.rp_nrm, mpc.res.ru_nrm)
+            @printf "  %8.2e" max(mpc.res.rp_nrm, mpc.res.rl_nrm, mpc.res.ru_nrm)
             @printf " %8.2e" mpc.res.rd_nrm
-            @printf " %8.2e" mpc.res.rg_nrm
+            @printf " %8s" "--"
 
             # Mu
             @printf "  %7.1e" mpc.pt.μ
@@ -330,10 +319,86 @@ function ipm_optimize!(mpc::MPC{T}, params::IPMOptions{T}) where{T}
         mpc.niter += 1
 
     end
-
+    
     # TODO: print message based on termination status
     params.OutputLevel > 0 && println("Solver exited with status $((mpc.solver_status))")
 
     return nothing
 
+end
+
+function compute_starting_point(mpc::MPC{T}) where{T}
+
+    dat = mpc.dat
+    mpc.pt.x   .= zero(T)
+    mpc.pt.xl  .= one(T) .* dat.lflag
+    mpc.pt.xu  .= one(T) .* dat.uflag
+
+    mpc.pt.y   .= zero(T)
+    mpc.pt.zl  .= one(T) .* dat.lflag
+    mpc.pt.zu  .= one(T) .* dat.uflag
+    
+    mpc.pt.τ   = one(T)
+    mpc.pt.κ   = zero(T)
+
+    update_mu!(mpc.pt)
+end
+
+function compute_starting_point_Mehrotra(mpc::MPC{T}) where{T}
+
+    pt = mpc.pt
+    dat = mpc.dat
+    m, n, p = pt.m, pt.n, pt.p
+
+    KKT.update!(mpc.kkt, zeros(T, n), ones(T, n), T(1e-6) .* ones(T, m))
+
+    # Get initial iterate
+    KKT.solve!(zeros(T, n), pt.y, mpc.kkt, false .* mpc.dat.b, mpc.dat.c)  # For y
+    KKT.solve!(pt.x, zeros(T, m), mpc.kkt, mpc.dat.b, false .* mpc.dat.c)  # For x
+    
+    # I. Recover positive primal-dual coordinates
+    δx = one(T) + max(
+        zero(T),
+        (-3 // 2) * minimum((pt.x - dat.l) .* dat.lflag),
+        (-3 // 2) * minimum((dat.u - pt.x) .* dat.uflag)
+    )
+    pt.xl  .= ((pt.x - dat.l) .+ δx) .* dat.lflag
+    pt.xu  .= ((dat.u - pt.x) .+ δx) .* dat.uflag
+
+    z = dat.c - dat.A' * pt.y
+    #=
+        We set zl, zu such that `z = zl - zu`
+
+         lⱼ |  uⱼ |    zˡⱼ |     zᵘⱼ |
+        ----+-----+--------+---------+
+        yes | yes | ¹/₂ zⱼ | ⁻¹/₂ zⱼ |
+        yes |  no |     zⱼ |      0  |
+         no | yes |     0  |     -zⱼ |
+         no |  no |     0  |      0  |
+        ----+-----+--------+---------+
+    =#
+    pt.zl .= ( z ./ (dat.lflag + dat.uflag)) .* dat.lflag
+    pt.zu .= (-z ./ (dat.lflag + dat.uflag)) .* dat.uflag
+    
+    δz = one(T) + max(zero(T), (-3 // 2) * minimum(pt.zl), (-3 // 2) * minimum(pt.zu))
+    pt.zl[dat.lflag] .+= δz
+    pt.zu[dat.uflag] .+= δz
+    
+    mpc.pt.τ   = one(T)
+    mpc.pt.κ   = zero(T)
+
+    # II. Balance complementarity products
+    μ = dot(pt.xl, pt.zl) + dot(pt.xu, pt.zu)
+    dx = μ / ( 2 * (sum(pt.zl) + sum(pt.zu)))
+    dz = μ / ( 2 * (sum(pt.xl) + sum(pt.xu)))
+
+    pt.xl[dat.lflag] .+= dx
+    pt.xu[dat.uflag] .+= dx
+    pt.zl[dat.lflag] .+= dz
+    pt.zu[dat.uflag] .+= dz
+
+    # Update centrality parameter
+    update_mu!(mpc.pt)
+
+    return nothing
 end

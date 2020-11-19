@@ -26,8 +26,8 @@ function compute_step!(mpc::MPC{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     θinv = θl .+ θu
 
     # Update regularizations
-    mpc.regP .= max.(params.BarrierPRegMin, mpc.regP ./ 10)
-    mpc.regD .= max.(params.BarrierDRegMin, mpc.regD ./ 10)
+    mpc.regP .= clamp(sqrt(pt.μ), sqrt(eps(T)), sqrt(sqrt(eps(T))))
+    mpc.regD .= clamp(sqrt(pt.μ), sqrt(eps(T)), sqrt(sqrt(eps(T))))
 
     # Update factorization
     nbump = 0
@@ -42,7 +42,7 @@ function compute_step!(mpc::MPC{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
             mpc.regD .*= 100
             mpc.regP .*= 100
             nbump += 1
-            @warn "Increase regularizations to $(mpc.regG)"
+            @warn "Increase regularizations to $(mpc.regP[1])"
         end
     end
     # TODO: throw a custom error for numerical issues
@@ -61,19 +61,20 @@ function compute_step!(mpc::MPC{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
         -(pt.xu .* pt.zu) .* dat.uflag,
     )
 
-    # TODO: ensure that Δ.τ = Δ.κ = 0
-
     # Step length for affine-scaling direction
     α = max_step_length(pt, Δ)
-    γ = (one(T) - α)^2 * min(one(T) - α, params.BarrierGammaMin)
-    η = one(T) - γ
+    μₐ = (
+        dot((pt.xl + α .* Δ.xl) .* dat.lflag, pt.zl + α .* Δ.zl)
+        + dot((pt.xu + α .* Δ.xu) .* dat.uflag, pt.zu + α .* Δ.zu)
+    ) / pt.p
+    σ = clamp((μₐ / pt.μ)^3, sqrt(eps(T)), one(T) - sqrt(eps(T)))
     
     # Mehrotra corrector
     @timeit mpc.timer "Newton" solve_newton_system!(Δ, mpc,
         # Right-hand side of Newton system
         res.rp, res.rl, res.ru, res.rd,
-        (-pt.xl .* pt.zl .+ γ * pt.μ .- Δ.xl .* Δ.zl) .* dat.lflag,
-        (-pt.xu .* pt.zu .+ γ * pt.μ .- Δ.xu .* Δ.zu) .* dat.uflag,
+        (-(pt.xl .* pt.zl) .+ σ * pt.μ .- Δ.xl .* Δ.zl) .* dat.lflag,
+        (-(pt.xu .* pt.zu) .+ σ * pt.μ .- Δ.xu .* Δ.zu) .* dat.uflag,
     )
     α = max_step_length(pt, Δ)
 
@@ -133,14 +134,12 @@ end
 Solve the Newton system
 ```math
 \\begin{bmatrix}
-    A & & & R_{d} & & & -b\\\\
-    I & -I & & & & & -l\\\\
-    I & & -I & & & & -u\\\\
-    -R_{p} & & & A^{T} & I & -I & -c\\\\
-    -c^{T} & & & b^{T} & l^{T} & -u^{T} & ρ_{g} & -1\\\\
+    A & & & R_{d} & & \\\\
+    I & -I & & & & \\\\
+    I & & I & & & \\\\
+    -R_{p} & & & A^{T} & I & -I \\\\
     & Z_{l} & & & X_{l}\\\\
     & & Z_{u} & & & X_{u}\\\\
-    &&&&&& κ & τ
 \\end{bmatrix}
 \\begin{bmatrix}
     Δ x\\\\
@@ -156,7 +155,6 @@ Solve the Newton system
     ξ_l\\\\
     ξ_u\\\\
     ξ_d\\\\
-    ξ_g\\\\
     ξ_{xz}^{l}\\\\
     ξ_{xz}^{u}
 \\end{bmatrix}
@@ -204,14 +202,12 @@ function solve_newton_system!(Δ::Point{T, Tv},
 
     # Check Newton residuals
     # @printf "Newton residuals:\n"
-    # @printf "|rp|   = %16.8e\n" norm(dat.A * Δ.x + mpc.regD .* Δ.y - dat.b .* Δ.τ - ξp, Inf)
-    # @printf "|rl|   = %16.8e\n" norm((Δ.x - Δ.xl - (dat.l .* Δ.τ)) .* dat.lflag - ξl, Inf)
-    # @printf "|ru|   = %16.8e\n" norm((Δ.x + Δ.xu - (dat.u .* Δ.τ)) .* dat.uflag - ξu, Inf)
-    # @printf "|rd|   = %16.8e\n" norm(-mpc.regP .* Δ.x + dat.A'Δ.y + Δ.zl - Δ.zu - dat.c .* Δ.τ - ξd, Inf)
-    # @printf "|rg|   = %16.8e\n" norm(-dat.c'Δ.x + dat.b'Δ.y + dot(dat.l .* dat.lflag, Δ.zl) - dot(dat.u .* dat.uflag, Δ.zu) + mpc.regG * Δ.τ - Δ.κ - ξg, Inf)
+    # @printf "|rp|   = %16.8e\n" norm(dat.A * Δ.x + mpc.regD .* Δ.y - ξp, Inf)
+    # @printf "|rl|   = %16.8e\n" norm((Δ.x - Δ.xl) .* dat.lflag - ξl, Inf)
+    # @printf "|ru|   = %16.8e\n" norm((Δ.x + Δ.xu) .* dat.uflag - ξu, Inf)
+    # @printf "|rd|   = %16.8e\n" norm(-mpc.regP .* Δ.x + dat.A'Δ.y + Δ.zl - Δ.zu - ξd, Inf)
     # @printf "|rxzl| = %16.8e\n" norm(pt.zl .* Δ.xl + pt.xl .* Δ.zl - ξxzl, Inf)
     # @printf "|rxzu| = %16.8e\n" norm(pt.zu .* Δ.xu + pt.xu .* Δ.zu - ξxzu, Inf)
-    # @printf "|rtk|  = %16.8e\n" norm(pt.κ * Δ.τ + pt.τ * Δ.κ - ξtk, Inf)
 
     return nothing
 end
@@ -279,6 +275,7 @@ function compute_higher_corrector!(Δc::Point{T, Tv},
     hx::Tv, hy::Tv, h0::T,
     Δ::Point{T, Tv}, α::T, β::T,
 ) where{T, Tv<:AbstractVector{T}}
+    error("Higher corrector not implemented for MPC")
     # TODO: Sanity checks
     pt = mpc.pt
     dat = mpc.dat
