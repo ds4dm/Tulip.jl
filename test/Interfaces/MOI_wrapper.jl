@@ -57,8 +57,12 @@ const MOI_EXCLUDE = [
     end
 end
 
-@testset "MOI Linear tests" begin
-    MOIT.contlineartest(OPTIMIZER, CONFIG, MOI_EXCLUDE)
+# Run the MOI tests with HSD and MPC algorithms
+for ipm in [Tulip.HSD, Tulip.MPC]
+    @testset "MOI Linear tests - $ipm" begin
+        OPTIMIZER.inner.params.IPM.Factory = Tulip.Factory(ipm)
+        MOIT.contlineartest(OPTIMIZER, CONFIG, MOI_EXCLUDE)
+    end
 end
 
 MOI.empty!(OPTIMIZER)
