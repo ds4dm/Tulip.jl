@@ -27,6 +27,16 @@ mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
     =====================#
     pt::Point{T, Tv}       # Current primal-dual iterate
     res::Residuals{T, Tv}  # Residuals at current iterate
+
+    Δ::Point{T, Tv}   # Predictor direction
+    Δc::Point{T, Tv}  # Corrector
+
+    # Step sizes
+    αp::T
+    αd::T
+
+    # Newton system RHS
+
     kkt::Tk
     regP::Tv  # Primal regularization
     regD::Tv  # Dual regularization
@@ -45,6 +55,8 @@ mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
             tzeros(Tv, n), zero(T),
             zero(T), zero(T), zero(T), zero(T), zero(T)
         )
+        Δ  = Point{T, Tv}(m, n, p, hflag=false)
+        Δc = Point{T, Tv}(m, n, p, hflag=false)
 
         # Initial regularizations
         regP = tones(Tv, n)
@@ -57,7 +69,8 @@ mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
             0, Trm_Unknown, Sln_Unknown, Sln_Unknown,
             T(Inf), T(-Inf),
             TimerOutput(),
-            pt, res, kkt, regP, regD
+            pt, res, Δ, Δc, zero(T), zero(T),
+            kkt, regP, regD
         )
     end
 
@@ -224,7 +237,7 @@ function ipm_optimize!(mpc::MPC{T}, params::IPMOptions{T}) where{T}
     end
 
     # Set starting point
-    @timeit mpc.timer "Initial point" compute_starting_point_Mehrotra(mpc)
+    @timeit mpc.timer "Initial point" compute_starting_point(mpc)
 
     # Main loop
     # Iteration 0 corresponds to the starting point.
@@ -328,23 +341,6 @@ function ipm_optimize!(mpc::MPC{T}, params::IPMOptions{T}) where{T}
 end
 
 function compute_starting_point(mpc::MPC{T}) where{T}
-
-    dat = mpc.dat
-    mpc.pt.x   .= zero(T)
-    mpc.pt.xl  .= one(T) .* dat.lflag
-    mpc.pt.xu  .= one(T) .* dat.uflag
-
-    mpc.pt.y   .= zero(T)
-    mpc.pt.zl  .= one(T) .* dat.lflag
-    mpc.pt.zu  .= one(T) .* dat.uflag
-    
-    mpc.pt.τ   = one(T)
-    mpc.pt.κ   = zero(T)
-
-    update_mu!(mpc.pt)
-end
-
-function compute_starting_point_Mehrotra(mpc::MPC{T}) where{T}
 
     pt = mpc.pt
     dat = mpc.dat

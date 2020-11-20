@@ -26,8 +26,13 @@ function compute_step!(mpc::MPC{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     θinv = θl .+ θu
 
     # Update regularizations
-    mpc.regP .= clamp(sqrt(pt.μ), sqrt(eps(T)), sqrt(sqrt(eps(T))))
-    mpc.regD .= clamp(sqrt(pt.μ), sqrt(eps(T)), sqrt(sqrt(eps(T))))
+    # mpc.regP .= clamp(sqrt(pt.μ), sqrt(eps(T)), sqrt(sqrt(eps(T))))
+    # mpc.regD .= clamp(sqrt(pt.μ), sqrt(eps(T)), sqrt(sqrt(eps(T))))
+    
+    mpc.regP ./= 10
+    mpc.regD ./= 10
+    clamp!(mpc.regP, sqrt(eps(T)), one(T))
+    clamp!(mpc.regD, sqrt(eps(T)), one(T))
 
     # Update factorization
     nbump = 0
@@ -48,12 +53,10 @@ function compute_step!(mpc::MPC{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     # TODO: throw a custom error for numerical issues
     nbump < 3 || throw(PosDefException(0))  # factorization could not be saved
 
-    # Search directions
-    # Predictor
-    Δ  = Point{T, Tv}(m, n, p, hflag=false)
-    Δc = Point{T, Tv}(m, n, p, hflag=false)
-
-    # Affine-scaling direction
+    # II. Compute search direction
+    Δ = mpc.Δ
+    
+    # Affine-scaling direction (predictor)
     @timeit mpc.timer "Newton" solve_newton_system!(Δ, mpc,
         # Right-hand side of Newton system
         res.rp, res.rl, res.ru, res.rd,
@@ -62,10 +65,10 @@ function compute_step!(mpc::MPC{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     )
 
     # Step length for affine-scaling direction
-    α = max_step_length(pt, Δ)
+    αp, αd = max_step_length_pd(pt, Δ)
     μₐ = (
-        dot((pt.xl + α .* Δ.xl) .* dat.lflag, pt.zl + α .* Δ.zl)
-        + dot((pt.xu + α .* Δ.xu) .* dat.uflag, pt.zu + α .* Δ.zu)
+        dot((pt.xl + αp .* Δ.xl) .* dat.lflag, pt.zl + αd .* Δ.zl)
+        + dot((pt.xu + αp .* Δ.xu) .* dat.uflag, pt.zu + αd .* Δ.zu)
     ) / pt.p
     σ = clamp((μₐ / pt.μ)^3, sqrt(eps(T)), one(T) - sqrt(eps(T)))
     
@@ -76,7 +79,7 @@ function compute_step!(mpc::MPC{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
         (-(pt.xl .* pt.zl) .+ σ * pt.μ .- Δ.xl .* Δ.zl) .* dat.lflag,
         (-(pt.xu .* pt.zu) .+ σ * pt.μ .- Δ.xu .* Δ.zu) .* dat.uflag,
     )
-    α = max_step_length(pt, Δ)
+    αp, αd = max_step_length_pd(pt, Δ)
 
     # Extra corrections
     #=ncor = 0
@@ -115,13 +118,14 @@ function compute_step!(mpc::MPC{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     end =#
 
     # Update current iterate
-    α *= params.BarrierStepDampFactor
-    pt.x  .+= α .* Δ.x
-    pt.xl .+= α .* Δ.xl
-    pt.xu .+= α .* Δ.xu
-    pt.y  .+= α .* Δ.y
-    pt.zl .+= α .* Δ.zl
-    pt.zu .+= α .* Δ.zu
+    αp *= params.BarrierStepDampFactor
+    αd *= params.BarrierStepDampFactor
+    pt.x  .+= αp .* Δ.x
+    pt.xl .+= αp .* Δ.xl
+    pt.xu .+= αp .* Δ.xu
+    pt.y  .+= αd .* Δ.y
+    pt.zl .+= αd .* Δ.zl
+    pt.zu .+= αd .* Δ.zu
     update_mu!(pt)
     
     return nothing
@@ -232,26 +236,25 @@ function max_step_length(x::Vector{T}, dx::Vector{T}) where{T}
     end
     return a
 end
+=#
 
 """
-    max_step_length(pt, δ)
+    max_step_length_pd(pt, δ)
 
-Compute maximum length of homogeneous step.
+Compute maximum primal-dual step length.
 """
-function max_step_length(pt::Point{T, Tv}, δ::Point{T, Tv}) where{T, Tv<:AbstractVector{T}}
+function max_step_length_pd(pt::Point{T, Tv}, δ::Point{T, Tv}) where{T, Tv<:AbstractVector{T}}
     axl = max_step_length(pt.xl, δ.xl)
     axu = max_step_length(pt.xu, δ.xu)
     azl = max_step_length(pt.zl, δ.zl)
     azu = max_step_length(pt.zu, δ.zu)
 
-    at = δ.τ < zero(T) ? (-pt.τ / δ.τ) : oneunit(T)
-    ak = δ.κ < zero(T) ? (-pt.κ / δ.κ) : oneunit(T)
-    
-    α = min(one(T), axl, axu, azl, azu, at, ak)
+    αp = min(one(T), axl, axu)
+    αd = min(one(T), azl, azu)
 
-    return α
+    return αp, αd
 end
-=#
+
 
 
 """
