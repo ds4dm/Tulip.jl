@@ -2,7 +2,7 @@
 CurrentModule = Tulip
 ```
 
-# Solver options
+# Options reference
 
 Parameters can be queried and set through the [`get_parameter`](@ref) and [`set_parameter`](@ref) functions.
 
