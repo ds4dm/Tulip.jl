@@ -9,7 +9,8 @@ INSTANCE_DIR = joinpath(@__DIR__, "dat")
 
 function ex_freevars(::Type{Tv};
     atol::Tv = 100 * sqrt(eps(Tv)),
-    rtol::Tv = 100 * sqrt(eps(Tv))
+    rtol::Tv = 100 * sqrt(eps(Tv)),
+    kwargs...
 ) where{Tv}
     #=
     Example with free variables
@@ -21,6 +22,10 @@ function ex_freevars(::Type{Tv};
     =#
     m = TLP.Model{Tv}()
     m.params.OutputLevel = 1
+    # Set optional parameters
+    for (k, val) in kwargs
+        TLP.set_parameter(m, String(k), val)
+    end
 
     # Read problem and solve
     TLP.load_problem!(m, joinpath(INSTANCE_DIR, "lpex_freevars.mps"))

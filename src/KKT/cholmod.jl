@@ -9,13 +9,13 @@ Uses CHOLMOD's factorization routines to solve the augmented system.
 To use an LDLᵀ factorization of the augmented system
 (see [`CholmodSQD`](@ref))
 ```julia
-model.params.KKTOptions = Tulip.KKT.SolverOptions(CholmodSolver, normal_equations=false)
+model.params.KKT.Factory = Tulip.Factory(CholmodSolver, normal_equations=false)
 ```
 
 To use a Cholesky factorization of the normal equations system
 (see [`CholmodSPD`](@ref))
 ```julia
-model.params.KKTOptions = Tulip.KKT.SolverOptions(CholmodSolver, normal_equations=true)
+model.params.KKT.Factory = Tulip.Factory(CholmodSolver, normal_equations=true)
 ```
 
 !!! warning

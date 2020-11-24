@@ -12,7 +12,7 @@ Uses a Cholesky factorization of the normal equations system. Not recommended
 
 ```julia
 model = Tulip.Model{Float64}()
-model.params.KKTOptions = Tulip.KKT.SolverOptions(Tulip.KKT.DenseSPD)
+model.params.KKT.Factory = Tulip.Factory(Tulip.KKT.DenseSPD)
 ```
 
 !!! info

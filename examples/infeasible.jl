@@ -9,7 +9,8 @@ INSTANCE_DIR = joinpath(@__DIR__, "dat")
 
 function ex_infeasible(::Type{Tv};
     atol::Tv = 100 * sqrt(eps(Tv)),
-    rtol::Tv = 100 * sqrt(eps(Tv))
+    rtol::Tv = 100 * sqrt(eps(Tv)),
+    kwargs...
 ) where{Tv}
     #=
     Infeasible example
@@ -22,6 +23,10 @@ function ex_infeasible(::Type{Tv};
     =#
     m = TLP.Model{Tv}()
     m.params.OutputLevel = 1
+    # Set optional parameters
+    for (k, val) in kwargs
+        TLP.set_parameter(m, String(k), val)
+    end
 
     # Read problem from .mps file and solve    
     TLP.load_problem!(m, joinpath(INSTANCE_DIR, "lpex_inf.mps"))

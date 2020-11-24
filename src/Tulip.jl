@@ -7,6 +7,8 @@ using SparseArrays
 
 using TimerOutputs
 
+include("utils.jl")
+
 # Linear algebra
 include("LinearAlgebra/LinearAlgebra.jl")
 import .TLPLinearAlgebra.construct_matrix
@@ -18,10 +20,9 @@ using .KKT
 
 # Commons data structures
 # TODO: put this in a module
-include("utils.jl")
+
 include("status.jl")    # Termination and solution statuses
 include("problemData.jl")
-include("parameters.jl")
 include("solution.jl")
 include("attributes.jl")
 
@@ -30,6 +31,9 @@ include("Presolve/Presolve.jl")
 
 # IPM solvers
 include("./IPM/IPM.jl")
+
+
+include("parameters.jl")
 
 # Model
 include("model.jl")

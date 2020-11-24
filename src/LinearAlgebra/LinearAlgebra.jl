@@ -1,28 +1,10 @@
 module TLPLinearAlgebra
 
 using LinearAlgebra
-
 using SparseArrays
-
 export construct_matrix
 
-"""
-    MatrixOptions
-
-Used to pass options for setting-up the matrix.
-
-```julia
-julia> model = Tulip.Model{Float64}()
-julia> model.params.MatrixOptions = Tulip.TLA.MatrixOptions(SparseMatrixCSC)
-```
-"""
-struct MatrixOptions
-    Ta::Type{<:AbstractMatrix}
-    options::Base.Iterators.Pairs
-
-    MatrixOptions(::Type{Ts}; kwargs...) where{Ts<:AbstractMatrix} = new(Ts, kwargs)
-end
-
+import ..Tulip.Factory
 
 """
     construct_matrix(Ta, m, n, aI, aJ, aV)

@@ -46,10 +46,10 @@ end
 #
 #   TimeLimitSec
 #
-MOI.get(m::Optimizer, ::MOI.TimeLimitSec) = m.inner.params.TimeLimit
+MOI.get(m::Optimizer, ::MOI.TimeLimitSec) = m.inner.params.IPM.TimeLimit
 
 function MOI.set(m::Optimizer, ::MOI.TimeLimitSec, t)
-    m.inner.params.TimeLimit = t
+    m.inner.params.IPM.TimeLimit = t
     return nothing
 end
 
@@ -163,8 +163,8 @@ MOI.get(m::Optimizer, ::MOI.RawSolver) = m.inner
 #
 function MOI.get(m::Optimizer{T}, ::MOI.RelativeGap) where{T}
     # TODO: dispatch a function call on m.inner
-    zp = m.inner.solver.primal_bound_scaled
-    zd = m.inner.solver.dual_bound_scaled
+    zp = m.inner.solver.primal_objective
+    zd = m.inner.solver.dual_objective
     return (abs(zp - zd) / (T(1 // 10^6)) + abs(zd))
 end
 

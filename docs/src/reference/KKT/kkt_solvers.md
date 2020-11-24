@@ -26,19 +26,7 @@ solve!
 ### Choosing between linear solvers
 
 ```@docs
-SolverOptions
-```
-
-```@meta
-CurrentModule = Tulip
-```
-
-```@docs
-TLA.MatrixOptions
-```
-
-```@meta
-CurrentModule = Tulip.KKT
+KKTOptions
 ```
 
 ## Dense/LAPACK

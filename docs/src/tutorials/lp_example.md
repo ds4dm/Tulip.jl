@@ -45,7 +45,7 @@ lp = Model(Tulip.Optimizer)
 
 # Set some parameters
 set_optimizer_attribute(lp, "OutputLevel", 0)  # disable output
-set_optimizer_attribute(lp, "Presolve", 0)     # disable presolve
+set_optimizer_attribute(lp, "Presolve_Level", 0)     # disable presolve
 
 # Solve the problem
 optimize!(lp)
@@ -114,7 +114,7 @@ MOI.set(lp, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 
 # Set some parameters
 MOI.set(lp, MOI.Silent(), true)               # disable output
-MOI.set(lp, MOI.RawParameter("Presolve"), 0)  # disable presolve
+MOI.set(lp, MOI.RawParameter("Presolve_Level"), 0)  # disable presolve
 
 # Solve the problem
 MOI.optimize!(lp)
@@ -169,7 +169,7 @@ row3 = Tulip.add_constraint!(pb, [x, y], [1.0,  2.0], -Inf, 7.0, "row3")
 
 # Set some parameters
 Tulip.set_parameter(lp, "OutputLevel", 0)  # disable output
-Tulip.set_parameter(lp, "Presolve", 0)     # disable presolve
+Tulip.set_parameter(lp, "Presolve_Level", 0)     # disable presolve
 
 # Solve the problem
 Tulip.optimize!(lp)

@@ -61,7 +61,7 @@ end
 
 Extract problem data to standard form.
 """
-function IPMData(pb::ProblemData{T}, options::TLA.MatrixOptions) where{T}
+function IPMData(pb::ProblemData{T}, mfact::Factory) where{T}
 
     # Problem size
     m, n = pb.ncon, pb.nvar
@@ -163,7 +163,7 @@ function IPMData(pb::ProblemData{T}, options::TLA.MatrixOptions) where{T}
     # do not match each other
     nz_ == (nzA + nslack) || error("Found $(nz_) non-zero coeffs (expected $(nzA + nslack))")
 
-    A = construct_matrix(options.Ta, m, n + nslack, aI, aJ, aV, options.options...)
+    A = construct_matrix(mfact.T, m, n + nslack, aI, aJ, aV, mfact.options...)
 
     # Variable bounds
     l = [pb.lvar; lslack]

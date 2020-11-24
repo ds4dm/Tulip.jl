@@ -1,3 +1,7 @@
+Base.@kwdef mutable struct PresolveOptions{T}
+    Level::Int = 1  # Presolve level
+end
+
 """
     PresolveTransformation{T}
 
