@@ -79,8 +79,8 @@ function compute_step!(mpc::MPC{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     αp, αd = max_step_length_pd(pt, Δ)
 
     # Update current iterate
-    αp *= params.BarrierStepDampFactor
-    αd *= params.BarrierStepDampFactor
+    αp *= params.StepDampFactor
+    αd *= params.StepDampFactor
     pt.x  .+= αp .* Δ.x
     pt.xl .+= αp .* Δ.xl
     pt.xu .+= αp .* Δ.xu

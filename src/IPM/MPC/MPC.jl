@@ -283,10 +283,10 @@ function ipm_optimize!(mpc::MPC{T}, params::IPMOptions{T}) where{T}
         # In particular, user limits should be checked last (if an optimal solution is found,
         # we want to report optimal, not user limits)
         @timeit mpc.timer "update status" update_solver_status!(mpc,
-            params.BarrierTolerancePFeas,
-            params.BarrierToleranceDFeas,
-            params.BarrierToleranceRGap,
-            params.BarrierToleranceIFeas
+            params.TolerancePFeas,
+            params.ToleranceDFeas,
+            params.ToleranceRGap,
+            params.ToleranceIFeas
         )
 
         if (
@@ -295,7 +295,7 @@ function ipm_optimize!(mpc::MPC{T}, params::IPMOptions{T}) where{T}
             || mpc.solver_status == Trm_DualInfeasible
         )
             break
-        elseif mpc.niter >= params.BarrierIterationsLimit 
+        elseif mpc.niter >= params.IterationsLimit 
             mpc.solver_status = Trm_IterationLimit
             break
         elseif ttot >= params.TimeLimit

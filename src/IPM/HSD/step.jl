@@ -26,9 +26,9 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     θinv = θl .+ θu
 
     # Update regularizations
-    hsd.regP .= max.(params.BarrierPRegMin, hsd.regP ./ 10)
-    hsd.regD .= max.(params.BarrierDRegMin, hsd.regD ./ 10)
-    hsd.regG  = max( params.BarrierPRegMin, hsd.regG  / 10)
+    hsd.regP .= max.(params.PRegMin, hsd.regP ./ 10)
+    hsd.regD .= max.(params.DRegMin, hsd.regD ./ 10)
+    hsd.regG  = max( params.PRegMin, hsd.regG  / 10)
 
     # Update factorization
     nbump = 0
@@ -84,7 +84,7 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
 
     # Step length for affine-scaling direction
     α = max_step_length(pt, Δ)
-    γ = (one(T) - α)^2 * min(one(T) - α, params.BarrierGammaMin)
+    γ = (one(T) - α)^2 * min(one(T) - α, params.GammaMin)
     η = one(T) - γ
     
     # Mehrotra corrector
@@ -99,7 +99,7 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
 
     # Extra corrections
     ncor = 0
-    while ncor < params.BarrierCorrectionLimit && α < T(999 // 1000)
+    while ncor < params.CorrectionLimit && α < T(999 // 1000)
         α_ = α
         ncor += 1
 
@@ -107,7 +107,7 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
         αc = compute_higher_corrector!(Δc, 
             hsd, γ, 
             hx, hy, h0,
-            Δ, α_, params.BarrierCentralityOutlierThreshold
+            Δ, α_, params.CentralityOutlierThreshold
         )
         if αc > α_
             # Use corrector
@@ -134,7 +134,7 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     end
 
     # Update current iterate
-    α *= params.BarrierStepDampFactor
+    α *= params.StepDampFactor
     pt.x  .+= α .* Δ.x
     pt.xl .+= α .* Δ.xl
     pt.xu .+= α .* Δ.xu

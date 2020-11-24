@@ -294,10 +294,10 @@ function ipm_optimize!(hsd::HSD{T}, params::IPMOptions{T}) where{T}
         # In particular, user limits should be checked last (if an optimal solution is found,
         # we want to report optimal, not user limits)
         @timeit hsd.timer "update status" update_solver_status!(hsd,
-            params.BarrierTolerancePFeas,
-            params.BarrierToleranceDFeas,
-            params.BarrierToleranceRGap,
-            params.BarrierToleranceIFeas
+            params.TolerancePFeas,
+            params.ToleranceDFeas,
+            params.ToleranceRGap,
+            params.ToleranceIFeas
         )
 
         if (
@@ -306,7 +306,7 @@ function ipm_optimize!(hsd::HSD{T}, params::IPMOptions{T}) where{T}
             || hsd.solver_status == Trm_DualInfeasible
         )
             break
-        elseif hsd.niter >= params.BarrierIterationsLimit 
+        elseif hsd.niter >= params.IterationsLimit 
             hsd.solver_status = Trm_IterationLimit
             break
         elseif ttot >= params.TimeLimit

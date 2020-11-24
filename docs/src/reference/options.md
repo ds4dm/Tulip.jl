@@ -42,28 +42,28 @@ Numerical tolerances for the interior-point algorithm.
 
 | Parameter | Description | Default |
 |:----------|:------------|:--------|
-| `BarrierTolerancePFeas` | Primal feasibility tolerance | ``\sqrt{\epsilon}``
-| `BarrierToleranceDFeas` | Dual feasibility tolerance | ``\sqrt{\epsilon}``
-| `BarrierToleranceRGap`  | Relative optimality gap tolerance | ``\sqrt{\epsilon}``
-| `BarrierToleranceIFeas` | Infeasibility tolerance | ``\sqrt{\epsilon}``
+| `TolerancePFeas` | Primal feasibility tolerance | ``\sqrt{\epsilon}``
+| `ToleranceDFeas` | Dual feasibility tolerance | ``\sqrt{\epsilon}``
+| `ToleranceRGap`  | Relative optimality gap tolerance | ``\sqrt{\epsilon}``
+| `ToleranceIFeas` | Infeasibility tolerance | ``\sqrt{\epsilon}``
 
 ### Algorithmic parameters
 
 | Parameter | Description | Default |
 |:----------|:------------|:--------|
 | `BarrierAlgorithm` | Interior-point algorithm | `1` |
-| `BarrierCorrectionLimit` | Maximum number of additional centrality corrections | `5` |
-| `BarrierStepDampFactor` | Step | `0.9995` |
-| `BarrierGammaMin` | Minimum value of ``\gamma`` for computing correctors | `0.1`
-| `BarrierCentralityOutlierThreshold` | Relative threshold for computing extra centrality corrections | `0.1`
-| `BarrierPRegMin` | Minimum value of primal regularization | ``\sqrt{\epsilon}`` |
-| `BarrierDregMin` | Minimum value of dual regularization | ``\sqrt{\epsilon}``
+| `CorrectionLimit` | Maximum number of additional centrality corrections | `5` |
+| `StepDampFactor` | Step | `0.9995` |
+| `GammaMin` | Minimum value of ``\gamma`` for computing correctors | `0.1`
+| `CentralityOutlierThreshold` | Relative threshold for computing extra centrality corrections | `0.1`
+| `PRegMin` | Minimum value of primal regularization | ``\sqrt{\epsilon}`` |
+| `DRegMin` | Minimum value of dual regularization | ``\sqrt{\epsilon}``
 
 ### Stopping criterion
 
 | Parameter | Description | Default |
 |:----------|:------------|:--------|
-| `BarrierIterationsLimit` | Maximum number of barrier iterations | `100` |
+| `IterationsLimit` | Maximum number of barrier iterations | `100` |
 | `TimeLimit` | Time limit, in seconds | `Inf` |
 
 ## Others
