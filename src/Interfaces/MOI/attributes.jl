@@ -110,9 +110,15 @@ MOI.get(m::Optimizer, ::MOI.NumberOfVariables) = m.inner.pbdata.nvar
 #
 #   ObjectiveFunctionType
 #
-MOI.get(
+function MOI.get(
     m::Optimizer{T}, ::MOI.ObjectiveFunctionType
-) where{T} = MOI.ScalarAffineFunction{T}
+) where{T}
+    if m._obj_type == _SINGLE_VARIABLE
+        return MOI.SingleVariable
+    else
+        return MOI.ScalarAffineFunction{T}
+    end
+end
 
 #
 #   ObjectiveSense

@@ -67,12 +67,12 @@ function IPMData(pb::ProblemData{T}, mfact::Factory) where{T}
     m, n = pb.ncon, pb.nvar
 
     # Extract right-hand side and slack variables
-    nzA = 0             # Number of non-zeros in A
-    b = zeros(T, m)     # RHS
-    sind = Int[]        # Slack row index
-    sval = Float64[]    # Slack coefficient
-    lslack = Float64[]  # Slack lower bound
-    uslack = Float64[]  # Slack upper bound
+    nzA = 0          # Number of non-zeros in A
+    b = zeros(T, m)  # RHS
+    sind = Int[]     # Slack row index
+    sval = T[]       # Slack coefficient
+    lslack = T[]     # Slack lower bound
+    uslack = T[]     # Slack upper bound
 
     for (i, (lb, ub)) in enumerate(zip(pb.lcon, pb.ucon))
         if lb == ub
