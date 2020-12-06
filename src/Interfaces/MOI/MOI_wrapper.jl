@@ -65,6 +65,7 @@ const SCALAR_SETS{T} = Union{
     MOI.Interval{T}
 } where{T}
 
+@enum(ObjType, _SINGLE_VARIABLE, _SCALAR_AFFINE)
 
 
 # ==============================================================================
@@ -84,6 +85,7 @@ mutable struct Optimizer{T} <: MOI.AbstractOptimizer
     inner::Model{T}
 
     is_feas::Bool  # Model is feasibility problem if true
+    _obj_type::ObjType
 
     # Map MOI Variable/Constraint indices to internal indices
     var_counter::Int  # Should never be reset
@@ -106,7 +108,7 @@ mutable struct Optimizer{T} <: MOI.AbstractOptimizer
 
     function Optimizer{T}(;kwargs...) where{T}
         m = new{T}(
-            Model{T}(), false,
+            Model{T}(), false, _SCALAR_AFFINE,
             # Variable and constraint counters
             0, 0, 
             # Index mapping

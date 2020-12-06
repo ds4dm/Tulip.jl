@@ -15,12 +15,11 @@ const MOI_EXCLUDE = [
     "update_dimension_nonnegative_variables",
     "delete_soc_variables",
     "solve_func_vectoraffine_nonneg",       # Requires `VectorAffineFunction` and `Nonnegatives`
-    # Require SingleVariable objective function
-    "get_objective_function",
-    "solve_result_index",
-    "solve_singlevariable_obj",
-    "solve_single_variable_dual_max",
-    "solve_single_variable_dual_min",
+    "get_objective_function",               # Require ScalarQuadratic objective
+    # "solve_result_index",
+    # "solve_singlevariable_obj",
+    # "solve_single_variable_dual_max",
+    # "solve_single_variable_dual_min",
     "solve_integer_edge_cases",             # Requires integer variables
     "solve_qcp_edge_cases",                 # Requires quadratic constraints
     "solve_qp_edge_cases",                  # Requires quadratic objective
@@ -71,7 +70,7 @@ MOI.set(BRIDGED, MOI.Silent(), true)
 
 @testset "Bridged tests" begin
     MOIT.unittest(BRIDGED, CONFIG, [
-        "get_objective_function",               # Requires SingleVariable objective
+        "get_objective_function",               # Requires ScalarQuadratic objective
         "delete_soc_variables",                 # Requires SOC constraints
         "solve_integer_edge_cases",             # Requires integer variables
         "solve_qcp_edge_cases",                 # Requires quadratic constraints
