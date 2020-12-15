@@ -4,7 +4,7 @@
 
  **Documentation** | **Build Status** | **Coverage** |
 |:-----------------:|:----------------:|:------------:|
-| [![Docs][docs-stable-img]][docs-stable-url] [![Docs-dev][docs-dev-img]][docs-dev-url] | [![Build][build-img]][build-url] [![Build-nightly][build-nightly-img]][build-nightly-url] | [![Codecov][codecov-img]][codecov-url] |
+| [![Docs][docs-stable-img]][docs-stable-url] [![Docs-dev][docs-dev-img]][docs-dev-url] | [![Build][build-img]][build-url]  | [![Codecov][codecov-img]][codecov-url] |
 
 [docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
 [docs-dev-img]: https://img.shields.io/badge/docs-dev-purple.svg
@@ -13,8 +13,6 @@
 
 [build-img]: https://github.com/ds4dm/Tulip.jl/workflows/CI/badge.svg?branch=master
 [build-url]: https://github.com/ds4dm/Tulip.jl/actions?query=workflow%3ACI
-[build-nightly-img]: https://github.com/ds4dm/Tulip.jl/workflows/CI-nightly/badge.svg?branch=master
-[build-nightly-url]: https://github.com/ds4dm/Tulip.jl/actions?query=workflow%3A🌙
 [codecov-img]: https://codecov.io/github/ds4dm/Tulip.jl/coverage.svg?branch=master
 [codecov-url]: https://codecov.io/github/ds4dm/Tulip.jl?branch=master
 
