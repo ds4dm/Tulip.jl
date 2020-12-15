@@ -13,7 +13,7 @@ Base.@kwdef mutable struct IPMOptions{T}
     ToleranceIFeas::T = sqrt(eps(T))  # infeasibility
 
     # Algorithmic parameters
-    CorrectionLimit::Int = 5  # Maximum number of centrality corrections
+    CorrectionLimit::Int = 3  # Maximum number of centrality corrections
     StepDampFactor::T = T(9_995 // 10_000)  # Damp step size by this much
     GammaMin::T = T(1 // 10)
     CentralityOutlierThreshold::T = T(1 // 10)  # Relative threshold for centrality outliers
