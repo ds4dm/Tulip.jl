@@ -1,4 +1,4 @@
-name: CI-nightly
+name: 🌙
 on:
   push:
     branches:
