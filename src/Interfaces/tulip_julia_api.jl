@@ -18,7 +18,9 @@ function load_problem!(m::Model{T}, fname::String) where{T}
     Base.empty!(m)
 
     dat = with_logger(Logging.NullLogger()) do
-        readqps(fname, mpsformat=:free)
+        _open(fname) do io
+            readqps(io, mpsformat=:free)
+        end
     end
 
     # TODO: avoid allocations when T is Float64

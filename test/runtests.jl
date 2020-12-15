@@ -33,6 +33,10 @@ end
 end
 
 @testset "Interfaces" begin
+    include("Interfaces/julia_api.jl")
+end
+
+@testset "MOI" begin
     include("Interfaces/MOI_wrapper.jl")
 end
 

@@ -1,3 +1,24 @@
+using CodecBzip2
+using CodecZlib
+
+"""
+    _open(f, fname)
+
+Open a file with decompression stream as required.
+"""
+function _open(f::Function, fname::String)
+
+    ext = Symbol(split(fname, ".")[end])
+
+    if ext == :gz
+        return Base.open(f, CodecZlib.GzipDecompressorStream, fname, "r")
+    elseif ext == :bz2
+        return Base.open(f, CodecBzip2.Bzip2DecompressorStream, fname, "r")
+    else
+        return Base.open(f, fname, "r")
+    end
+end
+
 # Positive and negative part of a number
 pos_part(x::T) where{T} = x >= zero(T) ? x : zero(T)
 neg_part(x::T) where{T} = x >= zero(T) ? zero(T) : -x
