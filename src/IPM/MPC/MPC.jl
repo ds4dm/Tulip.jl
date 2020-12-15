@@ -28,7 +28,7 @@ mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
     pt::Point{T, Tv}       # Current primal-dual iterate
     res::Residuals{T, Tv}  # Residuals at current iterate
 
-    Δ::Point{T, Tv}   # Predictor direction
+    Δ::Point{T, Tv}   # Predictor
     Δc::Point{T, Tv}  # Corrector
 
     # Step sizes
@@ -36,7 +36,14 @@ mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
     αd::T
 
     # Newton system RHS
+    ξp::Tv
+    ξl::Tv
+    ξu::Tv
+    ξd::Tv
+    ξxzl::Tv
+    ξxzu::Tv
 
+    # KKT solver
     kkt::Tk
     regP::Tv  # Primal regularization
     regD::Tv  # Dual regularization
@@ -44,11 +51,11 @@ mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
     function MPC(
         dat::IPMData{T, Tv, Tb, Ta}, kkt_options::KKTOptions{T}
     ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
-        
+
         m, n = dat.nrow, dat.ncol
         p = sum(dat.lflag) + sum(dat.uflag)
 
-        # Allocate some memory
+        # Working memory
         pt  = Point{T, Tv}(m, n, p, hflag=false)
         res = Residuals(
             tzeros(Tv, m), tzeros(Tv, n), tzeros(Tv, n),
@@ -57,6 +64,14 @@ mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
         )
         Δ  = Point{T, Tv}(m, n, p, hflag=false)
         Δc = Point{T, Tv}(m, n, p, hflag=false)
+
+        # Newton RHS
+        ξp = tzeros(Tv, m)
+        ξl = tzeros(Tv, n)
+        ξu = tzeros(Tv, n)
+        ξd = tzeros(Tv, n)
+        ξxzl = tzeros(Tv, n)
+        ξxzu = tzeros(Tv, n)
 
         # Initial regularizations
         regP = tones(Tv, n)
@@ -70,6 +85,7 @@ mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
             T(Inf), T(-Inf),
             TimerOutput(),
             pt, res, Δ, Δc, zero(T), zero(T),
+            ξp, ξl, ξu, ξd, ξxzl, ξxzu,
             kkt, regP, regD
         )
     end

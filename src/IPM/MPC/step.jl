@@ -51,44 +51,30 @@ function compute_step!(mpc::MPC{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     nbump < 3 || throw(PosDefException(0))  # factorization could not be saved
 
     # II. Compute search direction
-    Δ = mpc.Δ
-    
-    # Affine-scaling direction (predictor)
-    @timeit mpc.timer "Newton" solve_newton_system!(Δ, mpc,
-        # Right-hand side of Newton system
-        res.rp, res.rl, res.ru, res.rd,
-        -(pt.xl .* pt.zl) .* dat.lflag,
-        -(pt.xu .* pt.zu) .* dat.uflag,
-    )
+    Δ  = mpc.Δ
+    Δc = mpc.Δc
 
-    # Step length for affine-scaling direction
-    αp, αd = max_step_length_pd(pt, Δ)
-    μₐ = (
-        dot((pt.xl + αp .* Δ.xl) .* dat.lflag, pt.zl + αd .* Δ.zl)
-        + dot((pt.xu + αp .* Δ.xu) .* dat.uflag, pt.zu + αd .* Δ.zu)
-    ) / pt.p
-    σ = clamp((μₐ / pt.μ)^3, sqrt(eps(T)), one(T) - sqrt(eps(T)))
-    
-    # Mehrotra corrector
-    @timeit mpc.timer "Newton" solve_newton_system!(Δ, mpc,
-        # Right-hand side of Newton system
-        res.rp, res.rl, res.ru, res.rd,
-        (-(pt.xl .* pt.zl) .+ σ * pt.μ .- Δ.xl .* Δ.zl) .* dat.lflag,
-        (-(pt.xu .* pt.zu) .+ σ * pt.μ .- Δ.xu .* Δ.zu) .* dat.uflag,
-    )
-    αp, αd = max_step_length_pd(pt, Δ)
+    # Affine-scaling direction and associated step size
+    @timeit mpc.timer "Predictor" compute_predictor!(mpc::MPC)
+    mpc.αp, mpc.αd = max_step_length_pd(mpc.pt, mpc.Δ)
+
+    # TODO: if step size is large enough, skip corrector
+
+    # Corrector
+    @timeit mpc.timer "Corrector" compute_corrector!(mpc::MPC)
+    mpc.αp, mpc.αd = max_step_length_pd(mpc.pt, mpc.Δc)
 
     # Update current iterate
-    αp *= params.StepDampFactor
-    αd *= params.StepDampFactor
-    pt.x  .+= αp .* Δ.x
-    pt.xl .+= αp .* Δ.xl
-    pt.xu .+= αp .* Δ.xu
-    pt.y  .+= αd .* Δ.y
-    pt.zl .+= αd .* Δ.zl
-    pt.zu .+= αd .* Δ.zu
+    mpc.αp *= params.StepDampFactor
+    mpc.αd *= params.StepDampFactor
+    pt.x  .+= mpc.αp .* Δc.x
+    pt.xl .+= mpc.αp .* Δc.xl
+    pt.xu .+= mpc.αp .* Δc.xu
+    pt.y  .+= mpc.αd .* Δc.y
+    pt.zl .+= mpc.αd .* Δc.zl
+    pt.zu .+= mpc.αd .* Δc.zu
     update_mu!(pt)
-    
+
     return nothing
 end
 
@@ -167,10 +153,10 @@ function solve_newton_system!(Δ::Point{T, Tv},
 
     # Check Newton residuals
     # @printf "Newton residuals:\n"
-    # @printf "|rp|   = %16.8e\n" norm(dat.A * Δ.x + mpc.regD .* Δ.y - ξp, Inf)
+    # @printf "|rp|   = %16.8e\n" norm(dat.A * Δ.x - ξp, Inf)
     # @printf "|rl|   = %16.8e\n" norm((Δ.x - Δ.xl) .* dat.lflag - ξl, Inf)
     # @printf "|ru|   = %16.8e\n" norm((Δ.x + Δ.xu) .* dat.uflag - ξu, Inf)
-    # @printf "|rd|   = %16.8e\n" norm(-mpc.regP .* Δ.x + dat.A'Δ.y + Δ.zl - Δ.zu - ξd, Inf)
+    # @printf "|rd|   = %16.8e\n" norm(dat.A'Δ.y + Δ.zl - Δ.zu - ξd, Inf)
     # @printf "|rxzl| = %16.8e\n" norm(pt.zl .* Δ.xl + pt.xl .* Δ.zl - ξxzl, Inf)
     # @printf "|rxzu| = %16.8e\n" norm(pt.zu .* Δ.xu + pt.xu .* Δ.zu - ξxzu, Inf)
 
@@ -192,4 +178,61 @@ function max_step_length_pd(pt::Point{T, Tv}, δ::Point{T, Tv}) where{T, Tv<:Abs
     αd = min(one(T), azl, azu)
 
     return αp, αd
+end
+
+
+"""
+    compute_predictor!(mpc::MPC) -> Nothing
+"""
+function compute_predictor!(mpc::MPC)
+
+    # Newton RHS
+    copyto!(mpc.ξp, mpc.res.rp)
+    copyto!(mpc.ξl, mpc.res.rl)
+    copyto!(mpc.ξu, mpc.res.ru)
+    copyto!(mpc.ξd, mpc.res.rd)
+    @. mpc.ξxzl = -(mpc.pt.xl .* mpc.pt.zl) .* mpc.dat.lflag
+    @. mpc.ξxzu = -(mpc.pt.xu .* mpc.pt.zu) .* mpc.dat.uflag
+
+    # Compute affine-scaling direction
+    @timeit mpc.timer "Newton" solve_newton_system!(mpc.Δ, mpc,
+        mpc.ξp, mpc.ξl, mpc.ξu, mpc.ξd, mpc.ξxzl, mpc.ξxzu
+    )
+
+    # TODO: check Newton system residuals, perform iterative refinement if needed
+    return nothing
+end
+
+"""
+    compute_corrector!(mpc::MPC) -> Nothing
+"""
+function compute_corrector!(mpc::MPC{T, Tv}) where{T, Tv<:AbstractVector{T}}
+    dat = mpc.dat
+    pt = mpc.pt
+    Δ = mpc.Δ
+    Δc = mpc.Δc
+
+    # Step length for affine-scaling direction
+    αp_aff, αd_aff = mpc.αp, mpc.αd
+    μₐ = (
+        dot((pt.xl + αp_aff .* Δ.xl) .* dat.lflag, pt.zl + αd_aff .* Δ.zl)
+        + dot((pt.xu + αp_aff .* Δ.xu) .* dat.uflag, pt.zu + αd_aff .* Δ.zu)
+    ) / pt.p
+    σ = clamp((μₐ / pt.μ)^3, sqrt(eps(T)), one(T) - sqrt(eps(T)))
+
+    # Newton RHS
+    # rmul!(mpc.ξp, zero(T))
+    # rmul!(mpc.ξl, zero(T))
+    # rmul!(mpc.ξu, zero(T))
+    # rmul!(mpc.ξd, zero(T))
+    @. mpc.ξxzl = (σ * pt.μ .- Δ.xl .* Δ.zl .- pt.xl .* pt.zl) .* dat.lflag
+    @. mpc.ξxzu = (σ * pt.μ .- Δ.xu .* Δ.zu .- pt.xu .* pt.zu) .* dat.uflag
+
+    # Compute corrector
+    @timeit mpc.timer "Newton" solve_newton_system!(mpc.Δc, mpc,
+        mpc.ξp, mpc.ξl, mpc.ξu, mpc.ξd, mpc.ξxzl, mpc.ξxzu
+    )
+
+    # TODO: check Newton system residuals, perform iterative refinement if needed
+    return nothing
 end
