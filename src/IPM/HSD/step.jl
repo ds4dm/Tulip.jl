@@ -86,7 +86,7 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     α = max_step_length(pt, Δ)
     γ = (one(T) - α)^2 * min(one(T) - α, params.GammaMin)
     η = one(T) - γ
-    
+
     # Mehrotra corrector
     @timeit hsd.timer "Newton" solve_newton_system!(Δ, hsd, hx, hy, h0,
         # Right-hand side of Newton system
@@ -104,8 +104,8 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
         ncor += 1
 
         # Compute extra-corrector
-        αc = compute_higher_corrector!(Δc, 
-            hsd, γ, 
+        αc = compute_higher_corrector!(Δc,
+            hsd, γ,
             hx, hy, h0,
             Δ, α_, params.CentralityOutlierThreshold
         )
@@ -121,7 +121,7 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
             Δ.κ   = Δc.κ
             α = αc
         end
-        
+
         if αc < T(11 // 10) * α_
             break
         end
@@ -130,7 +130,7 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
         #     # not enough improvement, step correcting
         #     break
         # end
-        
+
     end
 
     # Update current iterate
@@ -144,7 +144,7 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     pt.τ   += α  * Δ.τ
     pt.κ   += α  * Δ.κ
     update_mu!(pt)
-    
+
     return nothing
 end
 
@@ -213,11 +213,11 @@ function solve_newton_system!(Δ::Point{T, Tv},
 
     # II. Recover Δτ, Δx, Δy
     # Compute Δτ
-    @timeit hsd.timer "ξg_" ξg_ = (ξg + ξtk / pt.τ 
+    @timeit hsd.timer "ξg_" ξg_ = (ξg + ξtk / pt.τ
         - dot((ξxzl ./ pt.xl) .* dat.lflag, dat.l .* dat.lflag)            # l'(Xl)^-1 * ξxzl
-        + dot((ξxzu ./ pt.xu) .* dat.uflag, dat.u .* dat.uflag) 
-        - dot(((pt.zl ./ pt.xl) .* ξl) .* dat.lflag, dat.l .* dat.lflag) 
-        - dot(((pt.zu ./ pt.xu) .* ξu) .* dat.uflag, dat.u .* dat.uflag)  # 
+        + dot((ξxzu ./ pt.xu) .* dat.uflag, dat.u .* dat.uflag)
+        - dot(((pt.zl ./ pt.xl) .* ξl) .* dat.lflag, dat.l .* dat.lflag)
+        - dot(((pt.zu ./ pt.xu) .* ξu) .* dat.uflag, dat.u .* dat.uflag)  #
     )
 
     @timeit hsd.timer "Δτ" Δ.τ = (
@@ -276,7 +276,7 @@ function max_step_length(x::Vector{T}, dx::Vector{T}) where{T}
     n == size(dx, 1) || throw(DimensionMismatch())
     a = T(Inf)
 
-    #=@inbounds=# for i in Base.OneTo(n)
+    @inbounds for i in 1:n
         if dx[i] < zero(T)
             if (-x[i] / dx[i]) < a
                 a = (-x[i] / dx[i])
@@ -299,7 +299,7 @@ function max_step_length(pt::Point{T, Tv}, δ::Point{T, Tv}) where{T, Tv<:Abstra
 
     at = δ.τ < zero(T) ? (-pt.τ / δ.τ) : oneunit(T)
     ak = δ.κ < zero(T) ? (-pt.κ / δ.κ) : oneunit(T)
-    
+
     α = min(one(T), axl, axu, azl, azu, at, ak)
 
     return α
@@ -316,7 +316,7 @@ Requires the solution of one Newton system.
 # Arguments
 - `Δc`: Corrected search direction, modified in-place
 - `hsd`: The HSD optimizer
-- `γ`: 
+- `γ`:
 - `hx, hy, h0`: Terms obtained from the preliminary augmented system solve
 - `Δ`: Current predictor direction
 - `α`: Maximum step length in predictor direction
