@@ -8,7 +8,7 @@ TLP = Tulip
 
 import Convex
 
-const TvTYPES = [Float64, BigFloat]
+const TvTYPES = [Float32, Float64, BigFloat]
 
 # write your own tests here
 const testdir = dirname(@__FILE__)

@@ -32,5 +32,5 @@ end
 end
 
 @testset "Optimal Float32" begin
-    include(joinpath(examples_dir, "examples/optimal_other_type.jl"))
+    include(joinpath(examples_dir, "optimal_other_type.jl"))
 end
