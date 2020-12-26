@@ -60,7 +60,7 @@ function run_tests_mpc(T::Type)
     c0 = zero(T)
     l = Vector{T}([0, 0])
     u = Vector{T}([2, 2])
-    dat = Tulip.IPMData(A, b, true, c, c0, l, u)
+    dat = Tulip.LPData(A, b, true, c, c0, l, u)
 
     ipm = TLP.MPC(dat, kkt_options)
 
@@ -73,7 +73,7 @@ function run_tests_mpc(T::Type)
     ipm.pt.y  .= T.([0, 1])
     ipm.pt.zl .= T.([0, 0])
     ipm.pt.zu .= T.([0, 0])
-    
+
     ipm.pt.τ  = 1
     ipm.pt.κ  = 0
     ipm.pt.μ  = 0
@@ -83,12 +83,12 @@ function run_tests_mpc(T::Type)
     @testset "Residuals" begin
         @inferred TLP.compute_residuals!(ipm)
         TLP.compute_residuals!(ipm)
-        
+
         @test isapprox(ipm.res.rp_nrm, zero(T); atol=ϵ, rtol=ϵ)
         @test isapprox(ipm.res.ru_nrm, zero(T); atol=ϵ, rtol=ϵ)
         @test isapprox(ipm.res.rd_nrm, zero(T); atol=ϵ, rtol=ϵ)
         @test isapprox(ipm.res.rg_nrm, zero(T); atol=ϵ, rtol=ϵ)
-        
+
     end
 
     @testset "Convergence" begin

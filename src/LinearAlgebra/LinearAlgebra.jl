@@ -3,6 +3,7 @@ module TLPLinearAlgebra
 using LinearAlgebra
 using SparseArrays
 export construct_matrix
+export ZeroMatrix
 
 import ..Tulip.Factory
 
@@ -30,5 +31,7 @@ construct_matrix(
     ::Type{SparseMatrixCSC}, m::Int, n::Int,
     aI::Vector{Int}, aJ::Vector{Int}, aV::Vector{T}
 ) where{T} = sparse(aI, aJ, aV, m, n)
+
+include("zero.jl")
 
 end  # module

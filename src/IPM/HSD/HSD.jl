@@ -6,7 +6,7 @@ Solver for the homogeneous self-dual algorithm.
 mutable struct HSD{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
 
     # Problem data, in standard form
-    dat::IPMData{T, Tv, Tb, Ta}
+    dat::LPData{T, Tv, Tb, Ta}
 
     # =================
     #   Book-keeping
@@ -32,9 +32,9 @@ mutable struct HSD{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
     regG::T   # gap regularization
 
     function HSD(
-        dat::IPMData{T, Tv, Tb, Ta}, kkt_options::KKTOptions{T}
+        dat::LPData{T, Tv, Tb, Ta}, kkt_options::KKTOptions{T}
     ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
-        
+
         m, n = dat.nrow, dat.ncol
         p = sum(dat.lflag) + sum(dat.uflag)
 
@@ -161,7 +161,7 @@ function update_solver_status!(hsd::HSD{T}, ϵp::T, ϵd::T, ϵg::T, ϵi::T) wher
     else
         hsd.dual_status = Sln_Unknown
     end
-    
+
     # Check for optimal solution
     if ρp <= ϵp && ρd <= ϵd && ρg <= ϵg
         hsd.primal_status = Sln_Optimal
@@ -169,7 +169,7 @@ function update_solver_status!(hsd::HSD{T}, ϵp::T, ϵd::T, ϵg::T, ϵi::T) wher
         hsd.solver_status = Trm_Optimal
         return nothing
     end
-    
+
     # Check for infeasibility certificates
     if max(
         norm(dat.A * pt.x, Inf),
@@ -244,7 +244,7 @@ function ipm_optimize!(hsd::HSD{T}, params::IPMOptions{T}) where{T}
     hsd.pt.y   .= zero(T)
     hsd.pt.zl  .= one(T) .* dat.lflag
     hsd.pt.zu  .= one(T) .* dat.uflag
-    
+
     hsd.pt.τ   = one(T)
     hsd.pt.κ   = one(T)
 
@@ -268,12 +268,12 @@ function ipm_optimize!(hsd::HSD{T}, params::IPMOptions{T}) where{T}
         if params.OutputLevel > 0
             # Display log
             @printf "%4d" hsd.niter
-            
+
             # Objectives
             ϵ = dat.objsense ? one(T) : -one(T)
             @printf "  %+14.7e" ϵ * hsd.primal_objective
             @printf "  %+14.7e" ϵ * hsd.dual_objective
-            
+
             # Residuals
             @printf "  %8.2e" max(hsd.res.rp_nrm, hsd.res.ru_nrm)
             @printf " %8.2e" hsd.res.rd_nrm
@@ -306,14 +306,14 @@ function ipm_optimize!(hsd::HSD{T}, params::IPMOptions{T}) where{T}
             || hsd.solver_status == Trm_DualInfeasible
         )
             break
-        elseif hsd.niter >= params.IterationsLimit 
+        elseif hsd.niter >= params.IterationsLimit
             hsd.solver_status = Trm_IterationLimit
             break
         elseif ttot >= params.TimeLimit
             hsd.solver_status = Trm_TimeLimit
             break
         end
-        
+
 
         # TODO: step
         # For now, include the factorization in the step function
@@ -325,7 +325,7 @@ function ipm_optimize!(hsd::HSD{T}, params::IPMOptions{T}) where{T}
             if isa(err, PosDefException) || isa(err, SingularException)
                 # Numerical trouble while computing the factorization
                 hsd.solver_status = Trm_NumericalProblem
-    
+
             elseif isa(err, OutOfMemoryError)
                 # Out of memory
                 hsd.solver_status = Trm_MemoryLimit
