@@ -42,7 +42,7 @@ mutable struct LDLFactSQD{T<:Real} <: AbstractKKTSolver{T}
 
         S = [
             spdiagm(0 => -θ)  A';
-            spzeros(T, m, n) spdiagm(0 => ones(m))
+            spzeros(T, m, n) spdiagm(0 => ones(T, m))
         ]
 
         # TODO: PSD-ness checks
