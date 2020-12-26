@@ -30,3 +30,7 @@ end
         @testset "$T" begin ex_unbounded(T, OutputLevel=0) end
     end
 end
+
+@testset "Optimal Float32" begin
+    include(joinpath(examples_dir, "optimal_other_type.jl"))
+end
