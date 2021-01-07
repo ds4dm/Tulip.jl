@@ -70,19 +70,19 @@ end
 import Base.empty!
 
 function Base.empty!(pb::ProblemData{T}) where{T}
-    
+
     pb.name = ""
-    
+
     pb.ncon = 0
     pb.nvar = 0
-    
+
     pb.objsense = true
     pb.obj = T[]
     pb.obj0 = zero(T)
-    
+
     pb.arows = Row{T}[]
     pb.acols = Col{T}[]
-    
+
     pb.lcon = T[]
     pb.ucon = T[]
     pb.lvar = T[]
@@ -90,7 +90,7 @@ function Base.empty!(pb::ProblemData{T}) where{T}
 
     pb.con_names = String[]
     pb.var_names = String[]
-    
+
     return pb
 end
 
@@ -146,40 +146,43 @@ function add_constraint!(pb::ProblemData{T},
         "Cannot add a row with $nz indices but $(length(rval)) non-zeros"
     ))
 
+    # Go through through rval to check all coeffs are finite and remove zeros.
+    _rind = Vector{Int}(undef, nz)
+    _rval = Vector{T}(undef, nz)
+    _nz = 0
+    for (j, aij) in zip(rind, rval)
+        if !iszero(aij)
+            isfinite(aij) || error("Invalid row coefficient: $(aij)")
+            _nz += 1
+            _rind[_nz] = j
+            _rval[_nz] = aij
+        end
+    end
+    resize!(_rind, _nz)
+    resize!(_rval, _nz)
+
+    # TODO: combine dupplicate indices
+
     # Increment row counter
     pb.ncon += 1
-    push!(pb.con_names, name)
     push!(pb.lcon, l)
     push!(pb.ucon, u)
+    push!(pb.con_names, name)
 
-    if nz == 0
-        # emtpy row
-        push!(pb.arows, Row{T}(Int[], T[]))
-        return pb.ncon
-    end
-
-    # TODO: check coefficients values, e.g.
-    #   * all coefficients are finite
-    #   * remove hard zeros
-    #   * combine dupplicate indices
-    #   * check if indices are already issorted
-    
     # Create new row
     if issorted
-        row = Row{T}(copy(rind), copy(rval))
+        row = Row{T}(_rind, _rval)
     else
         # Sort indices first
-        p = sortperm(rind)
-        row = Row{T}(rind[p], rval[p])
+        p = sortperm(_rind)
+        row = Row{T}(_rind[p], _rval[p])
     end
     push!(pb.arows, row)
 
     # Update column coefficients
-    for (j, v) in zip(rind, rval)
-        if !iszero(v)
-            push!(pb.acols[j].nzind, pb.ncon)
-            push!(pb.acols[j].nzval, v)
-        end
+    for (j, aij) in zip(_rind, _rval)
+        push!(pb.acols[j].nzind, pb.ncon)
+        push!(pb.acols[j].nzval, aij)
     end
 
     # Done
@@ -213,36 +216,44 @@ function add_variable!(pb::ProblemData{T},
         "Cannot add a column with $nz indices but $(length(cval)) non-zeros"
     ))
 
+    # Go through through cval to check all coeffs are finite and remove zeros.
+    _cind = Vector{Int}(undef, nz)
+    _cval = Vector{T}(undef, nz)
+    _nz = 0
+    for (j, aij) in zip(cind, cval)
+        if !iszero(aij)
+            isfinite(aij) || error("Invalid column coefficient: $(aij)")
+            _nz += 1
+            _cind[_nz] = j
+            _cval[_nz] = aij
+        end
+    end
+    resize!(_cind, _nz)
+    resize!(_cval, _nz)
+
     # Increment column counter
     pb.nvar += 1
-    push!(pb.var_names, name)
     push!(pb.lvar, l)
     push!(pb.uvar, u)
     push!(pb.obj, obj)
+    push!(pb.var_names, name)
 
-    if nz == 0
-        push!(pb.acols, Col{T}(Int[], T[]))
-        return pb.nvar  # empty column
-    end
-
-    # TODO: check coefficients
+    # TODO: combine dupplicate indices
 
     # Create a new column
     if issorted
-        col = Col{T}(copy(cind), copy(cval))
+        col = Col{T}(_cind, _cval)
     else
         # Sort indices
-        p = sortperm(cind)
-        col = Col{T}(cind[p], cind[p])
+        p = sortperm(_cind)
+        col = Col{T}(_cind[p], _cval[p])
     end
     push!(pb.acols, col)
 
     # Update row coefficients
-    for (i, v) in zip(cind, cval)
-        if !iszero(v)
-            push!(pb.arows[i].nzind, pb.nvar)
-            push!(pb.arows[i].nzval, v)
-        end
+    for (i, aij) in zip(_cind, _cval)
+        push!(pb.arows[i].nzind, pb.nvar)
+        push!(pb.arows[i].nzval, aij)
     end
 
     # Done
@@ -322,7 +333,7 @@ function delete_constraint!(pb::ProblemData{T}, rind::Int) where{T}
     deleteat!(pb.con_names, rind)
     deleteat!(pb.lcon, rind)
     deleteat!(pb.ucon, rind)
-    
+
     # Update columns
     for (j, col) in enumerate(pb.acols)
         # Search for row in that column
@@ -340,7 +351,7 @@ function delete_constraint!(pb::ProblemData{T}, rind::Int) where{T}
             # Decrement subsequent row indices
             col.nzind[rg.start:end] .-= 1
         end
-    end 
+    end
 
     # Delete row
     deleteat!(pb.arows, rind)
@@ -360,7 +371,7 @@ Delete rows in collection `rind` from problem `pb`.
 * `rinds`: collection of row indices to be removed
 """
 function delete_constraints!(pb::ProblemData{T}, rinds) where{T}
-    # TODO: don't use fallback 
+    # TODO: don't use fallback
     for i in rinds
         delete_constraint!(pb, i)
     end
@@ -381,7 +392,7 @@ function delete_variable!(pb::ProblemData{T}, cind::Int) where{T}
     deleteat!(pb.obj,  cind)
     deleteat!(pb.lvar, cind)
     deleteat!(pb.uvar, cind)
-    
+
     # Update rows
     for (i, row) in enumerate(pb.arows)
         # Search for column in that row
@@ -419,7 +430,7 @@ Delete a collection of columns from problem `pb`.
 * `cinds`: collection of row indices to be removed
 """
 function delete_variables!(pb::ProblemData{T}, cinds) where{T}
-    # TODO: don't use fallback 
+    # TODO: don't use fallback
     for j in cinds
         delete_variable!(pb, j)
     end
