@@ -1,4 +1,4 @@
-function run_tests_pbdata(T::Type)
+function run_tests_pbdata(::Type{T}) where{T}
 
     @testset "Creation" begin
         pb = TLP.ProblemData{T}("test")
@@ -17,7 +17,7 @@ function run_tests_pbdata(T::Type)
         =#
         TLP.add_variable!(pb, Int[], T[],     one(T), zero(T), T(Inf), "x1")
         TLP.add_variable!(pb, Int[], T[], 2 * one(T),  one(T), T(Inf), "x2")
-        
+
         check_problem_size(pb, 0, 2)
         col1, col2 = pb.acols[1], pb.acols[2]
         @test pb.obj == [one(T), 2*one(T)]
@@ -37,7 +37,7 @@ function run_tests_pbdata(T::Type)
         =#
         TLP.add_constraint!(pb, [1, 2], T.([-1, 1]), T(-Inf), one(T), "row1")
         TLP.add_constraint!(pb, [1, 2], T.([2, -2]), -one(T), zero(T), "row2")
-        
+
         # Check dimensions
         check_problem_size(pb, 2, 2)
 
@@ -140,8 +140,62 @@ function check_problem_size(pb::TLP.ProblemData, ncon::Int, nvar::Int)
     return nothing
 end
 
+function test_pbdata_checkcoeff(::Type{T}) where{T}
+
+    @testset "Zero in row" begin
+        pb = TLP.ProblemData{T}("test")
+
+        Tulip.add_variable!(pb, Int[], T[], T(1), zero(T), one(T), "x1")
+        Tulip.add_variable!(pb, Int[], T[], T(2), zero(T), one(T), "x2")
+        Tulip.add_variable!(pb, Int[], T[], T(3), zero(T), one(T), "x3")
+        Tulip.add_constraint!(pb, [1, 2, 3], T[1, 0, 0], zero(T), one(T), "c1")
+        Tulip.add_constraint!(pb, [1, 2, 3], T[0, 1, 2], zero(T), one(T), "c2")
+
+        @test length(pb.arows) == 2
+        @test pb.arows[1].nzind == [1]
+        @test pb.arows[1].nzval == T[1]
+        @test pb.arows[2].nzind == [2, 3]
+        @test pb.arows[2].nzval == T[1, 2]
+
+        @test length(pb.acols) == 3
+        @test pb.acols[1].nzind == [1]
+        @test pb.acols[1].nzval == T[1]
+        @test pb.acols[2].nzind == [2]
+        @test pb.acols[2].nzval == T[1]
+        @test pb.acols[3].nzind == [2]
+        @test pb.acols[3].nzval == T[2]
+    end
+
+    @testset "Zero in col" begin
+        pb = TLP.ProblemData{T}("test")
+
+        Tulip.add_constraint!(pb, Int[], T[], zero(T), one(T), "c1")
+        Tulip.add_constraint!(pb, Int[], T[], zero(T), one(T), "c2")
+        Tulip.add_variable!(pb, [1, 2], T[1, 0], T(1), zero(T), one(T), "x1")
+        Tulip.add_variable!(pb, [1, 2], T[0, 1], T(2), zero(T), one(T), "x2")
+        Tulip.add_variable!(pb, [1, 2], T[0, 2], T(3), zero(T), one(T), "x3")
+
+        @test length(pb.arows) == 2
+        @test pb.arows[1].nzind == [1]
+        @test pb.arows[1].nzval == T[1]
+        @test pb.arows[2].nzind == [2, 3]
+        @test pb.arows[2].nzval == T[1, 2]
+
+        @test length(pb.acols) == 3
+        @test pb.acols[1].nzind == [1]
+        @test pb.acols[1].nzval == T[1]
+        @test pb.acols[2].nzind == [2]
+        @test pb.acols[2].nzval == T[1]
+        @test pb.acols[3].nzind == [2]
+        @test pb.acols[3].nzval == T[2]
+    end
+end
+
 @testset "ProblemData" begin
     for T in TvTYPES
-        @testset "$T" begin run_tests_pbdata(T) end
+        @testset "$T" begin
+            run_tests_pbdata(T)
+            test_pbdata_checkcoeff(T)
+        end
     end
 end
