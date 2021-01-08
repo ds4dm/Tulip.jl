@@ -1,5 +1,5 @@
-import Krylov
-const LO = Krylov.LinearOperators
+import LinearOperators
+const LO = LinearOperators
 
 """
     AbstractKrylovSolver{T}
@@ -119,7 +119,7 @@ function solve!(
     # Setup
     d = one(T) ./ (kkt.θ .+ kkt.regP)
     D = Diagonal(d)
-    
+
     # Set-up right-hand side
     ξ_ = ξp .+ kkt.A * (D * ξd)
 
@@ -298,7 +298,7 @@ end
 
 
 # ==============================================================================
-#   KrylovSQD: 
+#   KrylovSQD:
 # ==============================================================================
 
 """
@@ -333,7 +333,7 @@ i.e., ``N = (Θ^{-1} + R_{p})^{-1}`` and ``M = R_{d}^{-1}``.
 mutable struct KrylovSQD{T, F, Tv, Ta} <: AbstractKrylovSolver{T}
     m::Int
     n::Int
-    
+
     f::F     # Krylov function
     atol::T  # absolute tolerance
     rtol::T  # relative tolerance
