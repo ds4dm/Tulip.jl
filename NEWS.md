@@ -1,8 +1,25 @@
 # Tulip release notes
 
+# v0.7.1 (January 8, 2021)
+
+## Bug fixes
+* Fix a bug in `add_variable!` and the handling of zero coefficients(#77, #79)
+* Fix some type instabilities (#71, #76)
+* Fix docs URL in README (#70)
+
+## New features
+* Tulip's version is exposed via `Tulip.version()` (#81)
+* Multiple centrality corrections in MPC algorithm (#75)
+* Support reading `.gz` and `.bz2` files (#72)
+
+## Others
+* Move CI to GitHub actions (#73)
+* Use new convention for test-specific dependencies (#80)
+* Bump deps (#71,#74)
+
 # v0.5.1 (August 15, 2020)
 * Fix URLs following migration to jump.dev (#51)
-* Fix bug in constraint/variable deletion (#52,#53)
+* Fix bug in constraint/variable deletion (#52, #53)
 
 # v0.5.0
 * Support the MOI attribute `Name` (#47)
