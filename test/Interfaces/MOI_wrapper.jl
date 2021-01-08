@@ -1,4 +1,4 @@
-using Test, MathOptInterface
+import MathOptInterface
 const MOI = MathOptInterface
 const MOIT = MOI.Test
 const MOIU = MOI.Utilities
