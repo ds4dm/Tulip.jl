@@ -121,7 +121,7 @@ Set the lower bound of constraint `i` in model `m` to `lb`.
 """
 function set_attribute(m::Model{T}, ::ConstraintLowerBound, i::Int, lb::T) where{T}
     # sanity checks
-    1 <= i <= m.pbdata.nvar || error("Invalid constraint index $i")
+    1 <= i <= m.pbdata.ncon || error("Invalid constraint index $i")
 
     # Update bound
     m.pbdata.lcon[i] = lb
@@ -135,7 +135,7 @@ Set the upper bound of constraint `i` in model `m` to `ub`.
 """
 function set_attribute(m::Model{T}, ::ConstraintUpperBound, i::Int, ub::T) where{T}
     # sanity checks
-    1 <= i <= m.pbdata.nvar || error("Invalid constraint index $i")
+    1 <= i <= m.pbdata.ncon || error("Invalid constraint index $i")
 
     # Update bound
     m.pbdata.ucon[i] = ub
