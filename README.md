@@ -99,16 +99,19 @@ See the [documentation](https://ds4dm.github.io/Tulip.jl/stable/reference/option
 
 ## Citing `Tulip.jl`
 
-If you use Tulip in your work, we kindly ask that you cite the following reference.
-The PDF is freely available [here](https://www.gerad.ca/fr/papers/G-2019-36/view), and serves as a user manual for advanced users.
+If you use Tulip in your work, we kindly ask that you cite the following [reference](https://doi.org/10.1007/s12532-020-00200-8) (preprint available [here](https://arxiv.org/abs/2006.08814)).
 
 ```
-@TechReport{Tulip.jl,
-    title = {{Tulip}.jl: an open-source interior-point linear optimization
-    solver with abstract linear algebra},
-    url = {https://www.gerad.ca/fr/papers/G-2019-36},
-    Journal = {Les Cahiers du Gerad},
-    Author = {Anjos, Miguel F. and Lodi, Andrea and Tanneau, Mathieu},
-    year = {2019}
+@Article{Tulip.jl,
+  author   = {Tanneau, Mathieu and Anjos, Miguel F. and Lodi, Andrea},
+  journal  = {Mathematical Programming Computation},
+  title    = {Design and implementation of a modular interior-point solver for linear optimization},
+  year     = {2021},
+  issn     = {1867-2957},
+  month    = feb,
+  doi      = {10.1007/s12532-020-00200-8},
+  language = {en},
+  url      = {https://doi.org/10.1007/s12532-020-00200-8},
+  urldate  = {2021-03-07},
 }
 ```
