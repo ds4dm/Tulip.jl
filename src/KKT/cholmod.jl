@@ -55,21 +55,21 @@ mutable struct CholmodSQD <: CholmodSolver
     #   and add flag (default to false) to know whether user ordering should be used
 
     # Problem data
-    Q::SparseMatrixCSC{Float64}
+    Q::SparseMatrixCSC{Float64,Int}
     dQ::Vector{Float64}  # diagonal of Q
-    A::SparseMatrixCSC{Float64}
+    A::SparseMatrixCSC{Float64,Int}
     θ::Vector{Float64}
     regP::Vector{Float64}  # primal-dual regularization
     regD::Vector{Float64}  # dual regularization
 
     # Left-hand side matrix
-    S::SparseMatrixCSC{Float64, Int}  # TODO: use `CHOLMOD.Sparse` instead
+    S::SparseMatrixCSC{Float64,Int}  # TODO: use `CHOLMOD.Sparse` instead
 
     # Factorization
     F::CHOLMOD.Factor{Float64}
 
     # TODO: constructor with initial memory allocation
-    function CholmodSQD(A::AbstractMatrix{Float64})
+    function CholmodSQD(A::SparseMatrixCSC{Float64,Int})
         m, n = size(A)
         θ = ones(Float64, n)
 
@@ -85,8 +85,7 @@ mutable struct CholmodSQD <: CholmodSolver
 
         return new(m, n, spzeros(Float64, n, n), dQ, A, θ, ones(Float64, n), ones(Float64, m), S, F)
     end
-
-    function CholmodSQD(A::AbstractMatrix{Float64}, Q::SparseMatrixCSC{Float64})
+    function CholmodSQD(A::SparseMatrixCSC{Float64,Int}, Q::SparseMatrixCSC{Float64,Int})
         m, n = size(A)
         θ = ones(Float64, n)
 
@@ -104,8 +103,8 @@ mutable struct CholmodSQD <: CholmodSolver
 
         return new(m, n, Q, dQ, A, θ, ones(Float64, n), ones(Float64, m), S, F)
     end
-
-    CholmodSQD(A::AbstractMatrix{Float64}, ::ZeroMatrix{Float64}) = CholmodSQD(A, spzeros(Float64, size(A, 2), size(A, 2)))
+    CholmodSQD(A, ::ZeroMatrix) = CholmodSQD(A)
+    CholmodSQD(A) = CholmodSQD(sparse(A))
 
 end
 

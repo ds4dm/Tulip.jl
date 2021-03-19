@@ -24,7 +24,9 @@ mutable struct LDLFactSQD{T<:Real} <: AbstractKKTSolver{T}
     #   and add flag (default to false) to know whether user ordering should be used
 
     # Problem data
-    A::SparseMatrixCSC{T, Int}
+    Q::SparseMatrixCSC{T,Int}
+    dQ::Vector{T}  # diagonal of Q
+    A::SparseMatrixCSC{T,Int}
     θ::Vector{T}
     regP::Vector{T}  # primal regularization
     regD::Vector{T}  # dual regularization
@@ -35,11 +37,11 @@ mutable struct LDLFactSQD{T<:Real} <: AbstractKKTSolver{T}
     # Factorization
     F::LDLF.LDLFactorization{T}
 
-    # TODO: constructor with initial memory allocation
-    function LDLFactSQD(A::AbstractMatrix{T}) where{T<:Real}
+    function LDLFactSQD(A::SparseMatrixCSC{T,Int}) where{T<:Real}
         m, n = size(A)
         θ = ones(T, n)
 
+        dQ = zeros(T, n)
         S = [
             spdiagm(0 => -θ)  A';
             spzeros(T, m, n) spdiagm(0 => ones(T, m))
@@ -49,9 +51,26 @@ mutable struct LDLFactSQD{T<:Real} <: AbstractKKTSolver{T}
         # TODO: symbolic factorization only
         F = LDLF.ldl_analyze(Symmetric(S))
 
-        return new{T}(m, n, A, θ, ones(T, n), ones(T, m), S, F)
+        return new{T}(m, n, spzeros(T, n, n), dQ, A, θ, ones(T, n), ones(T, m), S, F)
     end
+    function LDLFactSQD(A::SparseMatrixCSC{T,Int}, Q::SparseMatrixCSC{T,Int}) where{T<:Real}
+        m, n = size(A)
+        θ = ones(T, n)
 
+        dQ = Vector(diag(Q, 0))
+
+        U = sparse(UpperTriangular(Q))
+        S = [
+            -U - spdiagm(0 => -θ)  A';
+            spzeros(T, m, n) spdiagm(0 => ones(T, m))
+        ]
+
+        F = LDLF.ldl_analyze(Symmetric(S))
+
+        return new{T}(m, n, Q, dQ, A, θ, ones(T, n), ones(T, m), S, F)
+    end
+    LDLFactSQD(A) = LDLFactSQD(sparse(A))
+    LDLFactSQD(A, ::ZeroMatrix) = LDLFactSQD(A)
 end
 
 setup(::Type{LDLFactSQD}, A) = LDLFactSQD(A)
@@ -95,14 +114,13 @@ function update!(
     # S is stored as upper-triangular and only its diagonal changes.
     @inbounds for j in 1:kkt.n
         k = kkt.S.colptr[1+j] - 1
-        kkt.S.nzval[k] = -kkt.θ[j] - regP[j]
+        kkt.S.nzval[k] = -kkt.dQ[j] -kkt.θ[j] - regP[j]
     end
     @inbounds for i in 1:kkt.m
         k = kkt.S.colptr[1+kkt.n+i] - 1
         kkt.S.nzval[k] = regD[i]
     end
 
-    # TODO: PSD-ness checks
     try
         LDLF.ldl_factorize!(Symmetric(kkt.S), kkt.F)
     catch err
@@ -124,7 +142,7 @@ function solve!(
     ξp::Vector{T}, ξd::Vector{T}
 ) where{T<:Real}
     m, n = kkt.m, kkt.n
-    
+
     # Set-up right-hand side
     ξ = [ξd; ξp]
 
