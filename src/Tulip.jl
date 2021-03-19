@@ -13,7 +13,7 @@ include("utils.jl")
 
 # Linear algebra
 include("LinearAlgebra/LinearAlgebra.jl")
-import .TLPLinearAlgebra.construct_matrix
+using .TLPLinearAlgebra
 const TLA = TLPLinearAlgebra
 
 # KKT solvers

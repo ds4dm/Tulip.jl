@@ -24,14 +24,14 @@ model.params.KKT.Factory = Tulip.Factory(CholmodSolver, normal_equations=true)
 abstract type CholmodSolver <: AbstractKKTSolver{Float64} end
 
 function CholmodSolver(
-    A::AbstractMatrix{Float64};
+    args...;
     normal_equations::Bool=false,
     kwargs...
 )
     if normal_equations
-        return CholmodSPD(A; kwargs...)
+        return CholmodSPD(args...; kwargs...)
     else
-        return CholmodSQD(A; kwargs...)
+        return CholmodSQD(args...; kwargs...)
     end
 end
 
@@ -55,32 +55,56 @@ mutable struct CholmodSQD <: CholmodSolver
     #   and add flag (default to false) to know whether user ordering should be used
 
     # Problem data
-    A::SparseMatrixCSC{Float64}
+    Q::SparseMatrixCSC{Float64,Int}
+    dQ::Vector{Float64}  # diagonal of Q
+    A::SparseMatrixCSC{Float64,Int}
     θ::Vector{Float64}
     regP::Vector{Float64}  # primal-dual regularization
     regD::Vector{Float64}  # dual regularization
 
     # Left-hand side matrix
-    S::SparseMatrixCSC{Float64, Int}  # TODO: use `CHOLMOD.Sparse` instead
+    S::SparseMatrixCSC{Float64,Int}  # TODO: use `CHOLMOD.Sparse` instead
 
     # Factorization
     F::CHOLMOD.Factor{Float64}
 
     # TODO: constructor with initial memory allocation
-    function CholmodSQD(A::AbstractMatrix{Float64})
+    function CholmodSQD(A::SparseMatrixCSC{Float64,Int})
         m, n = size(A)
         θ = ones(Float64, n)
 
+        dQ = zeros(Float64, n)
+
         S = [
-            spdiagm(0 => -θ)  A';
+            -spdiagm(0 => θ)  A';
             spzeros(Float64, m, n) spdiagm(0 => ones(m))
         ]
 
         # TODO: Symbolic factorization only
         F = ldlt(Symmetric(S))
 
-        return new(m, n, A, θ, ones(Float64, n), ones(Float64, m), S, F)
+        return new(m, n, spzeros(Float64, n, n), dQ, A, θ, ones(Float64, n), ones(Float64, m), S, F)
     end
+    function CholmodSQD(A::SparseMatrixCSC{Float64,Int}, Q::SparseMatrixCSC{Float64,Int})
+        m, n = size(A)
+        θ = ones(Float64, n)
+
+        dQ = Vector(diag(Q, 0))
+
+        # TODO: improve this
+        U = sparse(UpperTriangular(Q))
+        S = [
+            -U - spdiagm(0 => θ)  A';
+            spzeros(Float64, m, n) spdiagm(0 => ones(m))
+        ]
+
+        # TODO: Symbolic factorization only
+        F = ldlt(Symmetric(S))
+
+        return new(m, n, Q, dQ, A, θ, ones(Float64, n), ones(Float64, m), S, F)
+    end
+    CholmodSQD(A, ::ZeroMatrix) = CholmodSQD(A)
+    CholmodSQD(A) = CholmodSQD(sparse(A))
 
 end
 
@@ -122,7 +146,7 @@ function update!(
     # Update S. S is stored as upper-triangular and only its diagonal changes.
     @inbounds for j in 1:kkt.n
         k = kkt.S.colptr[1+j] - 1
-        kkt.S.nzval[k] = -kkt.θ[j] - regP[j]
+        kkt.S.nzval[k] = -kkt.dQ[j] - kkt.θ[j] - regP[j]
     end
     @inbounds for i in 1:kkt.m
         k = kkt.S.colptr[1+kkt.n+i] - 1
@@ -147,7 +171,7 @@ function solve!(
     ξp::Vector{Float64}, ξd::Vector{Float64}
 )
     m, n = kkt.m, kkt.n
-    
+
     # Set-up right-hand side
     ξ = [ξd; ξp]
 
@@ -244,7 +268,7 @@ function update!(
     regP::AbstractVector{Float64},
     regD::AbstractVector{Float64}
 )
-    
+
     # Sanity checks
     length(θ) == kkt.n || throw(DimensionMismatch(
         "θ has length $(length(θ)) but linear solver is for n=$(kkt.n)."
@@ -287,7 +311,7 @@ function solve!(
 
     d = one(Float64) ./ (kkt.θ .+ kkt.regP)
     D = Diagonal(d)
-    
+
     # Set-up right-hand side
     ξ_ = ξp .+ kkt.A * (D * ξd)
 
@@ -305,6 +329,6 @@ function solve!(
     # resD = - D \ dx + kkt.A' * dy - ξd
     # println("\n|resP| = $(norm(resP, Inf))\n|resD| = $(norm(resD, Inf))")
 
-    
+
     return nothing
 end

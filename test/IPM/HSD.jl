@@ -60,7 +60,7 @@ function run_tests_hsd(T::Type)
     c0 = zero(T)
     l = Vector{T}([0, 0])
     u = Vector{T}([2, 2])
-    dat = Tulip.IPMData(A, b, true, c, c0, l, u)
+    dat = Tulip.LPData(A, b, true, c, c0, l, u)
 
     hsd = TLP.HSD(dat, kkt_options)
 
@@ -73,7 +73,7 @@ function run_tests_hsd(T::Type)
     hsd.pt.y  .= T.([0, 1])
     hsd.pt.zl .= T.([0, 0])
     hsd.pt.zu .= T.([0, 0])
-    
+
     hsd.pt.τ  = 1
     hsd.pt.κ  = 0
     hsd.pt.μ  = 0
@@ -83,12 +83,12 @@ function run_tests_hsd(T::Type)
     @testset "Residuals" begin
         @inferred TLP.compute_residuals!(hsd)
         TLP.compute_residuals!(hsd)
-        
+
         @test isapprox(hsd.res.rp_nrm, zero(T); atol=ϵ, rtol=ϵ)
         @test isapprox(hsd.res.ru_nrm, zero(T); atol=ϵ, rtol=ϵ)
         @test isapprox(hsd.res.rd_nrm, zero(T); atol=ϵ, rtol=ϵ)
         @test isapprox(hsd.res.rg_nrm, zero(T); atol=ϵ, rtol=ϵ)
-        
+
     end
 
     @testset "Convergence" begin

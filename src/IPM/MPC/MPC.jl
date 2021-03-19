@@ -3,10 +3,10 @@
 
 Implements Mehrotra's Predictor-Corrector interior-point algorithm.
 """
-mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
+mutable struct MPC{T, Tv, Tb, Ta, Tq, Tk} <: AbstractIPMOptimizer{T}
 
     # Problem data, in standard form
-    dat::IPMData{T, Tv, Tb, Ta}
+    dat::IPMData{T, Tv, Tb, Ta, Tq}
 
     # =================
     #   Book-keeping
@@ -48,8 +48,8 @@ mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
     regD::Tv  # Dual regularization
 
     function MPC(
-        dat::IPMData{T, Tv, Tb, Ta}, kkt_options::KKTOptions{T}
-    ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}}
+        dat::IPMData{T, Tv, Tb, Ta, Tq}, kkt_options::KKTOptions{T}
+    ) where{T, Tv<:AbstractVector{T}, Tb<:AbstractVector{Bool}, Ta<:AbstractMatrix{T}, Tq<:AbstractMatrix{T}}
 
         m, n = dat.nrow, dat.ncol
         p = sum(dat.lflag) + sum(dat.uflag)
@@ -76,10 +76,10 @@ mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
         regP = tones(Tv, n)
         regD = tones(Tv, m)
 
-        kkt = KKT.setup(kkt_options.Factory.T, dat.A; kkt_options.Factory.options...)
+        kkt = KKT.setup(kkt_options.Factory.T, dat.A, dat.Q; kkt_options.Factory.options...)
         Tk = typeof(kkt)
 
-        return new{T, Tv, Tb, Ta, Tk}(dat,
+        return new{T, Tv, Tb, Ta, Tq, Tk}(dat,
             0, Trm_Unknown, Sln_Unknown, Sln_Unknown,
             T(Inf), T(-Inf),
             TimerOutput(),
@@ -103,6 +103,10 @@ function compute_residuals!(mpc::MPC{T}) where{T}
     pt, res = mpc.pt, mpc.res
     dat = mpc.dat
 
+
+    Qx = zeros(T, pt.n)
+    mul!(Qx, dat.Q, pt.x, true, true)
+
     # Primal residual
     # rp = b - A*x
     res.rp .= dat.b
@@ -123,6 +127,7 @@ function compute_residuals!(mpc::MPC{T}) where{T}
     # Dual residual
     # rd = c - (A'y + zl - zu)
     res.rd .= dat.c
+    axpy!(one(T), Qx, res.rd)
     mul!(res.rd, transpose(dat.A), pt.y, -one(T), one(T))
     @. res.rd += pt.zu .* dat.uflag - pt.zl .* dat.lflag
 
@@ -133,9 +138,11 @@ function compute_residuals!(mpc::MPC{T}) where{T}
     res.rd_nrm = norm(res.rd, Inf)
 
     # Compute primal and dual bounds
-    mpc.primal_objective = dot(dat.c, pt.x) + dat.c0
+    xᵗQx = dot(pt.x, Qx) / 2
+    mpc.primal_objective = xᵗQx + dot(dat.c, pt.x) + dat.c0
     mpc.dual_objective   = (
-        dot(dat.b, pt.y)
+        - xᵗQx
+        + dot(dat.b, pt.y)
         + dot(dat.l .* dat.lflag, pt.zl)
         - dot(dat.u .* dat.uflag, pt.zu)
     ) + dat.c0
@@ -232,7 +239,7 @@ function ipm_optimize!(mpc::MPC{T}, params::IPMOptions{T}) where{T}
         @printf "\nOptimizer info (MPC)\n"
         @printf "Constraints  : %d\n" dat.nrow
         @printf "Variables    : %d\n" dat.ncol
-        bmin, bmax = extrema(dat.b)
+        bmin, bmax = length(dat.b) == 0 ? (zero(T), zero(T)) : extrema(dat.b)
         @printf "RHS          : [%+.2e, %+.2e]\n" bmin bmax
         lmin, lmax = extrema(dat.l .* dat.lflag)
         @printf "Lower bounds : [%+.2e, %+.2e]\n" lmin lmax

@@ -3,6 +3,7 @@ module KKT
 using LinearAlgebra
 
 import ..Tulip.Factory
+using ..TLPLinearAlgebra
 
 export AbstractKKTSolver, KKTOptions
 
@@ -37,9 +38,9 @@ function setup(Ts::Type{<:AbstractKKTSolver}, args...; kwargs...)
     return Ts(args...; kwargs...)
 end
 
-# 
+#
 # Specialized implementations should extend the functions below
-# 
+#
 
 """
     update!(kkt, θinv, regP, regD)

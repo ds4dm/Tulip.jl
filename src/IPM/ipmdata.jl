@@ -1,17 +1,17 @@
 """
-    IPMData{T, Tv, Ta}
+    IPMData{T, Tv, Tb, Ta, Tq}
 
 Holds data about an interior point method.
 
 The problem is represented as
 ```
-min   c'x + c0
+min   ¹/₂ x'Qx + c'x + c0
 s.t.  A x = b
       l ≤ x ≤ u
 ```
 where `l`, `u` may take infinite values.
 """
-struct IPMData{T, Tv, Tb, Ta}
+struct IPMData{T, Tv, Tb, Ta, Tq}
 
     # Problem size
     nrow::Int
@@ -19,13 +19,12 @@ struct IPMData{T, Tv, Tb, Ta}
 
     # Objective
     objsense::Bool  # min (true) or max (false)
-    c0::T
+    Q::Tq
     c::Tv
+    c0::T
 
-    # Constraint matrix
+    # Linear constraints
     A::Ta
-
-    # RHS
     b::Tv
 
     # Variable bounds (may contain infinite values)
@@ -39,20 +38,28 @@ struct IPMData{T, Tv, Tb, Ta}
     uflag::Tb
 
     function IPMData(
-        A::Ta, b::Tv, objsense::Bool, c::Tv, c0::T, l::Tv, u::Tv
-    ) where{T, Tv<:AbstractVector{T}, Ta<:AbstractMatrix{T}}
+        A::Ta, b::Tv, objsense::Bool, Q::Tq, c::Tv, c0::T, l::Tv, u::Tv
+    ) where{T, Tv<:AbstractVector{T}, Ta<:AbstractMatrix{T}, Tq<:AbstractMatrix{T}}
         nrow, ncol = size(A)
 
         lflag = isfinite.(l)
         uflag = isfinite.(u)
         Tb = typeof(lflag)
 
-        return new{T, Tv, Tb, Ta}(
+        return new{T, Tv, Tb, Ta, Tq}(
             nrow, ncol,
-            objsense, c0, c,
+            objsense, Q, c, c0,
             A, b, l, u, lflag, uflag
         )
     end
+end
+
+const LPData{T, Tv, Tb, Ta} = IPMData{T, Tv, Tb, Ta, ZeroMatrix{T}}
+
+function LPData(A, b, objsense, c, c0, l, u)
+    m, n = size(A)
+    Q = ZeroMatrix{eltype(A)}(n, n)
+    return IPMData(A, b, objsense, Q, c, c0, l, u)
 end
 
 # TODO: extract IPM data from presolved problem
@@ -107,7 +114,7 @@ function IPMData(pb::ProblemData{T}, mfact::Factory) where{T}
             # lb <= a'x <= ub
             # Two options:
             # --> a'x + s = ub, 0 <= s <= ub - lb
-            # --> a'x - s = lb, 0 <= s <= ub - lb 
+            # --> a'x - s = lb, 0 <= s <= ub - lb
             push!(sind, i)
             push!(sval, one(T))
             push!(lslack, zero(T))
@@ -168,6 +175,6 @@ function IPMData(pb::ProblemData{T}, mfact::Factory) where{T}
     # Variable bounds
     l = [pb.lvar; lslack]
     u = [pb.uvar; uslack]
-    
-    return IPMData(A, b, pb.objsense, c, c0, l, u)
+
+    return LPData(A, b, pb.objsense, c, c0, l, u)
 end
