@@ -25,9 +25,10 @@ mutable struct LDLFactSQD{T<:Real} <: AbstractKKTSolver{T}
 
     # Problem data
     A::SparseMatrixCSC{T, Int}
-    θ::Vector{T}
+    θ::Vector{T}     # diagonal scaling
     regP::Vector{T}  # primal regularization
     regD::Vector{T}  # dual regularization
+    ξ::Vector{T}     # right-hand side of the augmented system
 
     # Left-hand side matrix
     S::SparseMatrixCSC{T, Int}
@@ -39,6 +40,9 @@ mutable struct LDLFactSQD{T<:Real} <: AbstractKKTSolver{T}
     function LDLFactSQD(A::AbstractMatrix{T}) where{T<:Real}
         m, n = size(A)
         θ = ones(T, n)
+        regP = ones(T, n)
+        regD = ones(T, m)
+        ξ = zeros(T, n+m)
 
         S = [
             spdiagm(0 => -θ)  A';
@@ -49,7 +53,7 @@ mutable struct LDLFactSQD{T<:Real} <: AbstractKKTSolver{T}
         # TODO: symbolic factorization only
         F = LDLF.ldl_analyze(Symmetric(S))
 
-        return new{T}(m, n, A, θ, ones(T, n), ones(T, m), S, F)
+        return new{T}(m, n, A, θ, regP, regD, ξ, S, F)
     end
 
 end
@@ -124,16 +128,25 @@ function solve!(
     ξp::Vector{T}, ξd::Vector{T}
 ) where{T<:Real}
     m, n = kkt.m, kkt.n
-    
-    # Set-up right-hand side
-    ξ = [ξd; ξp]
 
-    # Solve augmented system
-    d = kkt.F \ ξ
+    # Set-up the right-hand side
+    @inbounds for i in 1:n
+        kkt.ξ[i] = ξd[i]
+    end
+    @inbounds for i in 1:m
+        kkt.ξ[i+n] = ξp[i]
+    end
+
+    # Solve the augmented system
+    LDLF.ldiv!(kkt.F, kkt.ξ)
 
     # Recover dx, dy
-    @views dx .= d[1:n]
-    @views dy .= d[(n+1):(m+n)]
+    @inbounds for i in 1:n
+        dx[i] = kkt.ξ[i]
+    end
+    @inbounds for i in 1:m
+        dy[i] = kkt.ξ[i+n]
+    end
 
     # TODO: Iterative refinement
     return nothing
