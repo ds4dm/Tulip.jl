@@ -56,9 +56,10 @@ mutable struct CholmodSQD <: CholmodSolver
 
     # Problem data
     A::SparseMatrixCSC{Float64}
-    θ::Vector{Float64}
+    θ::Vector{Float64}     # diagonal scaling
     regP::Vector{Float64}  # primal-dual regularization
     regD::Vector{Float64}  # dual regularization
+    ξ::Vector{Float64}     # right-hand side of the augmented system
 
     # Left-hand side matrix
     S::SparseMatrixCSC{Float64, Int}  # TODO: use `CHOLMOD.Sparse` instead
@@ -70,6 +71,9 @@ mutable struct CholmodSQD <: CholmodSolver
     function CholmodSQD(A::AbstractMatrix{Float64})
         m, n = size(A)
         θ = ones(Float64, n)
+        regP = ones(Float64, n)
+        regD = ones(Float64, m)
+        ξ = zeros(Float64, n+m)
 
         S = [
             spdiagm(0 => -θ)  A';
@@ -79,7 +83,7 @@ mutable struct CholmodSQD <: CholmodSolver
         # TODO: Symbolic factorization only
         F = ldlt(Symmetric(S))
 
-        return new(m, n, A, θ, ones(Float64, n), ones(Float64, m), S, F)
+        return new(m, n, A, θ, regP, regD, ξ, S, F)
     end
 
 end
@@ -148,15 +152,24 @@ function solve!(
 )
     m, n = kkt.m, kkt.n
     
-    # Set-up right-hand side
-    ξ = [ξd; ξp]
+    # Set-up the right-hand side
+    @inbounds for i in 1:n
+        kkt.ξ[i] = ξd[i]
+    end
+    @inbounds for i in 1:m
+        kkt.ξ[i+n] = ξp[i]
+    end
 
     # Solve augmented system
-    d = kkt.F \ ξ
+    d = kkt.F \ kkt.ξ
 
     # Recover dx, dy
-    @views dx .= d[1:n]
-    @views dy .= d[(n+1):(m+n)]
+    @inbounds for i in 1:n
+        dx[i] = d[i]
+    end
+    @inbounds for i in 1:m
+        dy[i] = d[i+n]
+    end
 
     # Iterative refinement
     # TODO:
@@ -186,15 +199,15 @@ end
 
 Linear solver for the 2x2 augmented system
 ```
-    [-(Θ⁻¹ + Rp)   Aᵀ] [dx] = [xi_d]
-    [   A          Rd] [dy]   [xi_p]
+    [-(Θ⁻¹ + Rp)   Aᵀ] [dx] = [ξd]
+    [   A          Rd] [dy]   [ξp]
 ```
 with ``A`` sparse.
 
 Uses a Cholesky factorization of the positive definite normal equations system
 ```
-(A * ((Θ⁻¹ + Rp)⁻¹ * Aᵀ + Rd) dy = xi_p + A * (θ⁻¹ + Rp)⁻¹ * xi_d
-                              dx = (Θ⁻¹ + Rp)⁻¹ * (Aᵀ * dy - xi_d)
+(A * ((Θ⁻¹ + Rp)⁻¹ * Aᵀ + Rd) dy = ξp + A * (θ⁻¹ + Rp)⁻¹ * ξd
+                              dx = (Θ⁻¹ + Rp)⁻¹ * (Aᵀ * dy - ξd)
 ```
 """
 mutable struct CholmodSPD <: CholmodSolver
