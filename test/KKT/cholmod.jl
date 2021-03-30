@@ -11,7 +11,12 @@
     end
     
     @testset "Cholesky" begin
-        kkt = KKT.CholmodSolver(A, normal_equations=true)
+        kkt = KKT.CholmodSolver(A, normal_equations=true, variant=false)
+        KKT.run_ls_tests(A, kkt)
+    end
+
+    @testset "Cholesky" begin
+        kkt = KKT.CholmodSolver(A, normal_equations=true, variant=true)
         KKT.run_ls_tests(A, kkt)
     end
 
