@@ -35,7 +35,7 @@ function remove_empty_row!(ps::PresolveData{T}, i::Int) where{T}
         ps.solution.is_dual_ray = true
         ps.solution.z_primal = ps.solution.z_dual = T(Inf)
         i_ = ps.new_con_idx[i]
-        ps.solution.y_upper[i] = one(T)
+        ps.solution.y_upper[i_] = one(T)
         return
     elseif lb > zero(T)
         @debug "Row $i is primal infeasible"
