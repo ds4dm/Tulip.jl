@@ -124,15 +124,14 @@ function solve!(
     ξ_ = ξp .+ kkt.A * (D * ξd)
 
     # Form linear operator S = A * D * A' + Rd
-    # Here we pre-allocate the intermediary and final vectors
+    # Here we pre-allocate the intermediary vector
     v1 = zeros(T, n)
-    v2 = zeros(T, m)
     opS = LO.LinearOperator(T, m, m, true, true,
-        w -> begin
+        (v2, w, α, β) -> begin
             mul!(v1, kkt.A', w)
             v1 .*= d
-            mul!(v2, kkt.A, v1)
-            v2 .+= kkt.regD .* w
+            mul!(v2, kkt.A, v1, α, β)
+            v2 .+= α * kkt.regD .* w
             v2
         end
     )
@@ -264,24 +263,21 @@ function solve!(
     ξ = [ξd; ξp]
 
     # Form linear operator K = [-(Θ⁻¹ + Rp) Aᵀ; A Rd]
-    # Here we pre-allocate the final vector
-    z = zeros(T, m+n)
     opK = LO.LinearOperator(T, n+m, n+m, true, false,
-        w -> begin
+        (z, w, α, β) -> begin
             @views z1 = z[1:n]
             @views z2 = z[n+1:n+m]
 
             @views w1 = w[1:n]
             @views w2 = w[n+1:n+m]
 
-            # z1 = -(Θ⁻¹ + Rp) w1 + A'w2
-            mul!(z1, D, w1, one(T), zero(T))  # z1 = -(Θ⁻¹ + Rp) w1
-            mul!(z1, A', w2, one(T), one(T))  # z1 += A'w2
+            # z1 = -α(Θ⁻¹ + Rp) w1 + αA'w2 + βz1
+            mul!(z1, D, w1, α, β)  # z1 = -α(Θ⁻¹ + Rp) w1 + β z1
+            mul!(z1, A', w2, α, one(T))  # z1 += α A' w2
 
             # z2 = A w1 + Rd w2
-            mul!(z2, A, w1, one(T), zero(T))   # z2 = A w1
-            mul!(z2, Diagonal(kkt.regD), w2, one(T), one(T))  # z2 += Rd * w2
-
+            mul!(z2, A, w1, α, β)   # z2 = α A w1 + β z2
+            mul!(z2, Diagonal(kkt.regD), w2, α, one(T))  # z2 += α * Rd * w2
             z
         end
     )
