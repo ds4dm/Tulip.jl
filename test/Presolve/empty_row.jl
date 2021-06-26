@@ -57,9 +57,6 @@ function empty_row_tests(T::Type)
     #   (current problem only has 1 row)
     @test sol.y_lower[1] >  zero(T)
 
-    test_empty_row_1(T)
-    test_empty_row_2(T)
-
     return
 end
 
@@ -95,7 +92,7 @@ function test_empty_row_1(T::Type)
     sol = ps.solution
     @test sol.dual_status == Tulip.Sln_InfeasibilityCertificate
     @test sol.z_primal == sol.z_dual == T(Inf)
-    
+
     # Check Farkas ray
     #   (current problem only has 1 row)
     @test sol.y_lower[1] >  zero(T)
@@ -134,7 +131,7 @@ function test_empty_row_2(T::Type)
     sol = ps.solution
     @test sol.dual_status == Tulip.Sln_InfeasibilityCertificate
     @test sol.z_primal == sol.z_dual == T(Inf)
-    
+
     # Check Farkas ray
     #   (current problem only has 1 row)
     @test sol.y_upper[1] >  zero(T)
@@ -142,8 +139,62 @@ function test_empty_row_2(T::Type)
     return nothing
 end
 
+function test_empty_row_tolerances(T::Type)
+    # Adapted from https://github.com/ds4dm/Tulip.jl/issues/98
+    #=
+        min     x + y + z
+        s.t.    x + y + z == 1
+                x == ¹/₃
+                y == ¹/₃
+                z == ¹/₃
+                x, y, z, ≥ 0
+
+        In the absence of numerical tolerances, x, y, and z get eliminated,
+        but rouding errors cause the first constraint to be 0 == ϵ ≈ 1e-16,
+        thereby rendering the problem infeasible.
+    =#
+    pb = Tulip.ProblemData{T}()
+
+    m, n = 4, 3
+    A = sparse(
+        [1, 1, 1, 2, 3, 4],
+        [1, 2, 3, 1, 2, 3],
+        T[1, 1, 1, 1, 1, 1],
+        m, n
+    )
+    c = ones(T, n)
+
+    Tulip.load_problem!(pb, "test",
+        true, c, zero(T),
+        A, T[1, 1//3, 1//3, 1//3], T[1, 1//3, 1//3, 1//3],
+        zeros(T, n), fill(T(Inf), n),
+        ["row1", "row2", "row3", "row4"], ["x", "y", "z"]
+    )
+
+    ps = Tulip.PresolveData(pb)
+    Tulip.presolve!(ps)
+
+    @test ps.status == Tulip.Trm_Optimal
+    @test ps.nrow == 0
+    @test ps.ncol == 0
+
+    # Check solution status & objective value
+    sol = ps.solution
+    @test sol.primal_status == Tulip.Sln_Optimal
+    @test sol.dual_status == Tulip.Sln_Optimal
+    @test sol.z_primal ≈ 1
+    @test sol.z_dual   ≈ 1
+
+    return nothing
+end
+
 @testset "Empty row" begin
     for T in TvTYPES
-        @testset "$T" begin empty_row_tests(T) end
+        @testset "$T" begin
+            empty_row_tests(T)
+            test_empty_row_1(T)
+            test_empty_row_2(T)
+            test_empty_row_tolerances(T)
+        end
     end
 end

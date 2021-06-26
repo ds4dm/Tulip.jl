@@ -12,8 +12,9 @@ function remove_empty_row!(ps::PresolveData{T}, i::Int) where{T}
 
     # Check bounds
     lb, ub = ps.lrow[i], ps.urow[i]
+    ϵ = ps.options.TolerancePFeas
 
-    if ub < zero(T)
+    if ub < -ϵ
         # Infeasible
         @debug "Row $i is primal infeasible"
         ps.status = Trm_PrimalInfeasible
@@ -37,7 +38,7 @@ function remove_empty_row!(ps::PresolveData{T}, i::Int) where{T}
         i_ = ps.new_con_idx[i]
         ps.solution.y_upper[i_] = one(T)
         return
-    elseif lb > zero(T)
+    elseif lb > ϵ
         @debug "Row $i is primal infeasible"
         ps.status = Trm_PrimalInfeasible
         ps.updated = true
@@ -50,7 +51,7 @@ function remove_empty_row!(ps::PresolveData{T}, i::Int) where{T}
         ps.solution.y_upper .= zero(T)
         ps.solution.s_lower .= zero(T)
         ps.solution.s_upper .= zero(T)
-        
+
         # Farkas ray: y⁺_i = 1 (any > 0 value works)
         ps.solution.primal_status = Sln_Unknown
         ps.solution.dual_status = Sln_InfeasibilityCertificate

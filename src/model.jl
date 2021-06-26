@@ -55,7 +55,7 @@ function Base.empty!(m::Model{T}) where{T}
     m.presolve_data = nothing
     m.solver = nothing
     m.solution = nothing
-    
+
     return nothing
 end
 
@@ -71,7 +71,7 @@ function optimize!(model::Model{T}) where{T}
         "Number of threads must be > 0 (is $(model.params.Threads))"
     )
     BLAS.set_num_threads(model.params.Threads)
-    
+
     # Print initial stats
     if model.params.OutputLevel > 0
         @printf "\nProblem info\n"
@@ -80,13 +80,13 @@ function optimize!(model::Model{T}) where{T}
         @printf "  Variables   : %d\n" model.pbdata.nvar
         @printf "  Non-zeros   : %d\n" sum(length.([col.nzind for col in model.pbdata.acols]))
     end
-    
+
     pb_ = model.pbdata
     # Presolve
     # TODO: improve the if-else
     ps_options = model.params.Presolve
     if ps_options.Level > 0
-        model.presolve_data = PresolveData(model.pbdata)
+        model.presolve_data = PresolveData(model.pbdata, ps_options)
         t_ = @elapsed st = presolve!(model.presolve_data)
         model.status = st
 
@@ -104,7 +104,7 @@ function optimize!(model::Model{T}) where{T}
         # Check presolve status
         if st == Trm_Optimal || st == Trm_PrimalInfeasible || st == Trm_DualInfeasible || st == Trm_PrimalDualInfeasible
             model.params.OutputLevel > 0 && println("Presolve solved the problem.")
-            
+
             # Perform post-solve
             sol0 = Solution{T}(model.pbdata.ncon, model.pbdata.nvar)
             postsolve!(sol0, model.presolve_data.solution, model.presolve_data)
@@ -169,7 +169,7 @@ function _extract_solution!(sol::Solution{T},
     sol.is_primal_ray = is_primal_ray
     sol.is_dual_ray = is_dual_ray
     τ_ = (is_primal_ray || is_dual_ray) ? one(T) : inv(ipm.pt.τ)
-    
+
     @. sol.x = ipm.pt.x[1:n] * τ_
     @. sol.s_lower = ipm.pt.zl[1:n] * τ_
     @. sol.s_upper = ipm.pt.zu[1:n] * τ_

@@ -1,5 +1,8 @@
 Base.@kwdef mutable struct PresolveOptions{T}
     Level::Int = 1  # Presolve level
+
+    TolerancePFeas::T = sqrt(eps(T))  # Primal feasibility tolerance
+    ToleranceDFeas::T = sqrt(eps(T))  # Dual   feasibility tolerance
 end
 
 """
@@ -28,6 +31,7 @@ whose dual writes
 mutable struct PresolveData{T}
     updated::Bool
     status::TerminationStatus
+    options::PresolveOptions{T}
 
     # Original problem
     pb0::ProblemData{T}
@@ -86,11 +90,15 @@ mutable struct PresolveData{T}
     # TODO: set of transformations for pre-post crush
     ops::Vector{PresolveTransformation{T}}
 
-    function PresolveData(pb::ProblemData{T}) where{T}
+    function PresolveData(
+        pb::ProblemData{T},
+        options::PresolveOptions{T}=PresolveOptions{T}()
+    ) where{T}
         ps = new{T}()
 
         ps.updated = false
         ps.status = Trm_Unknown
+        ps.options = options
 
         ps.pb0 = pb
         ps.pb_red = nothing
@@ -167,7 +175,7 @@ end
 
 # Extract pre-solved problem data, to be passed to the IPM solver
 function extract_reduced_problem!(ps::PresolveData{T}) where{T}
-    
+
     pb = ProblemData{T}()
 
     pb.ncon = sum(ps.rowflag)
@@ -193,7 +201,7 @@ function extract_reduced_problem!(ps::PresolveData{T}) where{T}
     inew = 0
     for (iold, row) in enumerate(ps.pb0.arows)
         ps.rowflag[iold] || continue
-        
+
         inew += 1
         # Compute new row
         rind = Vector{Int}(undef, ps.nzrow[iold])
@@ -219,11 +227,11 @@ function extract_reduced_problem!(ps::PresolveData{T}) where{T}
     jnew = 0
     for (jold, col) in enumerate(ps.pb0.acols)
         ps.colflag[jold] || continue
-        
+
         jnew += 1
         # Compute new row
         cind = Vector{Int}(undef, ps.nzcol[jold])
-        cval = Vector{T}(undef, ps.nzcol[jold]) 
+        cval = Vector{T}(undef, ps.nzcol[jold])
 
         k = 0
         for (iold, aij) in zip(col.nzind, col.nzval)
@@ -379,7 +387,7 @@ function presolve!(ps::PresolveData{T}) where{T}
 
     # Identify row singletons
     ps.row_singletons = [i for (i, nz) in enumerate(ps.nzrow) if ps.rowflag[i] && nz == 1]
-    
+
     # II. Passes
     ps.updated = true
     npasses = 0  # TODO: maximum number of passes
@@ -392,7 +400,7 @@ function presolve!(ps::PresolveData{T}) where{T}
         ps.status == Trm_Unknown || return ps.status
         remove_empty_columns!(ps)
         ps.status == Trm_Unknown || return ps.status
-        
+
 
         # Remove all fixed variables
         # TODO: remove empty variables as well
@@ -444,7 +452,7 @@ function presolve!(ps::PresolveData{T}) where{T}
         ps.solution.z_primal = ps.obj0
         ps.solution.z_dual = ps.obj0
     end
-    
+
     # Old <-> new index mapping
     compute_index_mapping!(ps)
 
@@ -500,7 +508,7 @@ function bounds_consistency_checks!(ps::PresolveData{T}) where{T}
             ps.status = Trm_PrimalInfeasible
             ps.updated = true
 
-            # Resize problem            
+            # Resize problem
             compute_index_mapping!(ps)
             resize!(ps.solution, ps.nrow, ps.ncol)
             ps.solution.x .= zero(T)
@@ -518,7 +526,7 @@ function bounds_consistency_checks!(ps::PresolveData{T}) where{T}
             i_ = ps.new_con_idx[i]
             ps.solution.y_lower[i_] = one(T)
             ps.solution.y_upper[i_] = one(T)
-            
+
             return
         end
     end
@@ -529,7 +537,7 @@ function bounds_consistency_checks!(ps::PresolveData{T}) where{T}
             ps.status = Trm_PrimalInfeasible
             ps.updated = true
 
-            # Resize problem            
+            # Resize problem
             compute_index_mapping!(ps)
             resize!(ps.solution, ps.nrow, ps.ncol)
             ps.solution.x .= zero(T)
@@ -547,7 +555,7 @@ function bounds_consistency_checks!(ps::PresolveData{T}) where{T}
             j_ = ps.new_var_idx[j]
             ps.solution.s_lower[j_] = one(T)
             ps.solution.s_upper[j_] = one(T)
-            
+
             return
         end
     end
@@ -677,7 +685,7 @@ function remove_dominated_columns!(ps::PresolveData{T}) where{T}
                 @debug "Col $j forces y$i >= $y_"
                 ps.ly[i] = max(ps.ly[i],  y_)
             end
-        
+
         elseif !isfinite(l) && isfinite(u)
             # Upper-bounded variable: `aij * yi ≥ cj`
             if aij > zero(T)
