@@ -7,7 +7,7 @@ using SparseArrays
 
 using TimerOutputs
 
-version() = v"0.7.4"
+version() = v"0.7.5"
 
 include("utils.jl")
 
