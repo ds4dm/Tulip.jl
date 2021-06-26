@@ -10,9 +10,9 @@ import Convex
 
 const TvTYPES = [Float32, Float64, BigFloat]
 
-# Check That Tulip.version() matches what's in the Project.toml
 @testset "Tulip" begin
 
+# Check That Tulip.version() matches what's in the Project.toml
 tlp_ver = Tulip.version()
 toml_ver = TOML.parsefile("../Project.toml")["version"]
 @test tlp_ver == VersionNumber(toml_ver)

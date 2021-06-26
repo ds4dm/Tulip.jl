@@ -13,7 +13,9 @@ function remove_empty_column!(ps::PresolveData{T}, j::Int) where{T}
     cj = ps.obj[j]
     @debug "Removing empty column $j" cj lb ub
 
-    if cj > zero(T)
+    ϵ = ps.options.ToleranceDFeas
+
+    if cj > ϵ
         if isfinite(lb)
             # Set variable to lower bound
             # Update objective constant
@@ -45,7 +47,7 @@ function remove_empty_column!(ps::PresolveData{T}, j::Int) where{T}
 
             return nothing
         end
-    elseif cj < zero(T)
+    elseif cj < -ϵ
         if isfinite(ub)
             # Set variable to upper bound
             # Update objective constant
@@ -74,7 +76,7 @@ function remove_empty_column!(ps::PresolveData{T}, j::Int) where{T}
             ps.solution.z_primal = ps.solution.z_dual = -T(Inf)
             j_ = ps.new_var_idx[j]
             ps.solution.x[j_] = one(T)
-            
+
             return
         end
     else
@@ -87,7 +89,6 @@ function remove_empty_column!(ps::PresolveData{T}, j::Int) where{T}
             # Free variable with zero coefficient and empty column
             push!(ps.ops, EmptyColumn(j, zero(T), zero(T)))
         end
-
     end
 
     # Book=keeping
