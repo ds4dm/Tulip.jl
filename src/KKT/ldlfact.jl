@@ -1,114 +1,84 @@
-import LDLFactorizations
+using LDLFactorizations
 const LDLF = LDLFactorizations
 
-# ==============================================================================
-#   LDLFactSQD
-# ==============================================================================
-
 """
-    LDLFactSQD{T}
+    LDLFactBackend
 
-Linear solver for the 2x2 augmented system with ``A`` sparse.
-
-Uses LDLFactorizations.jl to compute an LDLᵀ factorization of the quasi-definite augmented system.
-
-```julia
-model.params.KKT.Factory = Tulip.Factory(LDLFactSQD)
-```
+LDLFactorizations backend for solving linear systems.
 """
-mutable struct LDLFactSQD{T<:Real} <: AbstractKKTSolver{T}
-    m::Int  # Number of rows
-    n::Int  # Number of columns
+struct LDLFactBackend <: AbstractKKTBackend end
 
-    # TODO: allow for user-provided ordering,
-    #   and add flag (default to false) to know whether user ordering should be used
-
+mutable struct LDLFactSolver{T,S} <: AbstractKKTSolver{T}
     # Problem data
-    A::SparseMatrixCSC{T, Int}
-    θ::Vector{T}     # diagonal scaling
-    regP::Vector{T}  # primal regularization
-    regD::Vector{T}  # dual regularization
-    ξ::Vector{T}     # right-hand side of the augmented system
+    m::Int
+    n::Int
+    A::SparseMatrixCSC{T,Int}
 
-    # Left-hand side matrix
-    S::SparseMatrixCSC{T, Int}
-
-    # Factorization
-    F::LDLF.LDLFactorization{T}
-
-    # TODO: constructor with initial memory allocation
-    function LDLFactSQD(A::AbstractMatrix{T}) where{T<:Real}
-        m, n = size(A)
-        θ = ones(T, n)
-        regP = ones(T, n)
-        regD = ones(T, m)
-        ξ = zeros(T, n+m)
-
-        S = [
-            spdiagm(0 => -θ)  A';
-            spzeros(T, m, n) spdiagm(0 => ones(T, m))
-        ]
-
-        # TODO: PSD-ness checks
-        # TODO: symbolic factorization only
-        F = LDLF.ldl_analyze(Symmetric(S))
-
-        return new{T}(m, n, A, θ, regP, regD, ξ, S, F)
-    end
-
+    # Workspace
+    θ::Vector{T}                 # Diagonal scaling
+    regP::Vector{T}              # Primal regularization
+    regD::Vector{T}              # Dual regularization
+    K::SparseMatrixCSC{T,Int}    # KKT matrix
+    F::LDLF.LDLFactorization{T}  # Factorization
+    ξ::Vector{T}                 # RHS of KKT system
 end
 
-setup(::Type{LDLFactSQD}, A) = LDLFactSQD(A)
+backend(::LDLFactSolver) = "LDLFactorizations"
+linear_system(::LDLFactSolver) = "Augmented system (K2)"
 
-backend(::LDLFactSQD) = "LDLFactorizations.jl"
-linear_system(::LDLFactSQD) = "Augmented system"
+setup(A, system, backend::LDLFactBackend) = setup(sparse(A), system, backend)
 
-"""
-    update!(kkt, θ, regP, regD)
+function setup(A::SparseMatrixCSC{T,Int}, ::K2, ::LDLFactBackend) where{T}
+    m, n = size(A)
 
-Update LDLᵀ factorization of the augmented system.
+    θ = ones(T, n)
+    regP = ones(T, n)
+    regD = ones(T, m)
+    ξ = zeros(T, m+n)
 
-Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
-    the factorization.
-Throws a `PosDefException` if matrix is not quasi-definite.
-"""
-function update!(
-    kkt::LDLFactSQD{T},
-    θ::AbstractVector{T},
-    regP::AbstractVector{T},
-    regD::AbstractVector{T}
-) where{T<:Real}
+    K = [
+        spdiagm(0 => -θ)  A';
+        spzeros(T, m, n) spdiagm(0 => ones(T, m))
+    ]
+
+    # TODO: Symbolic factorization only
+    F = LDLF.ldl_analyze(Symmetric(K))
+
+    return LDLFactSolver{T,K2}(m, n, A, θ, regP, regD, K, F, ξ)
+end
+
+function update!(kkt::LDLFactSolver{T,K2}, θ, regP, regD) where{T}
+    m, n = kkt.m, kkt.n
+
     # Sanity checks
-    length(θ)  == kkt.n || throw(DimensionMismatch(
-        "θ has length $(length(θ)) but linear solver is for n=$(kkt.n)."
+    length(θ)  == n || throw(DimensionMismatch(
+        "length(θ)=$(length(θ)) but KKT solver has n=$n."
     ))
-    length(regP) == kkt.n || throw(DimensionMismatch(
-        "regP has length $(length(regP)) but linear solver has n=$(kkt.n)"
+    length(regP) == n || throw(DimensionMismatch(
+        "length(regP)=$(length(regP)) but KKT solver has n=$n"
     ))
-    length(regD) == kkt.m || throw(DimensionMismatch(
-        "regD has length $(length(regD)) but linear solver has m=$(kkt.m)"
+    length(regD) == m || throw(DimensionMismatch(
+        "length(regD)=$(length(regD)) but KKT solver has m=$m"
     ))
 
-    # Update diagonal scaling
-    kkt.θ .= θ
-    # Update regularizers
-    kkt.regP .= regP
-    kkt.regD .= regD
+    copyto!(kkt.θ, θ)
+    copyto!(kkt.regP, regP)
+    copyto!(kkt.regD, regD)
 
-    # Update S.
-    # S is stored as upper-triangular and only its diagonal changes.
+    # Update KKT matrix
+    # K is stored as upper-triangular, and only its diagonal is changed
     @inbounds for j in 1:kkt.n
-        k = kkt.S.colptr[1+j] - 1
-        kkt.S.nzval[k] = -kkt.θ[j] - regP[j]
+        k = kkt.K.colptr[1+j] - 1
+        kkt.K.nzval[k] = -kkt.θ[j] - regP[j]
     end
     @inbounds for i in 1:kkt.m
-        k = kkt.S.colptr[1+kkt.n+i] - 1
-        kkt.S.nzval[k] = regD[i]
+        k = kkt.K.colptr[1+kkt.n+i] - 1
+        kkt.K.nzval[k] = regD[i]
     end
 
-    # TODO: PSD-ness checks
+    # Update factorization
     try
-        LDLF.ldl_factorize!(Symmetric(kkt.S), kkt.F)
+        LDLF.ldl_factorize!(Symmetric(kkt.K), kkt.F)
     catch err
         isa(err, LDLF.SQDException) && throw(PosDefException(-1))
         rethrow(err)
@@ -117,37 +87,21 @@ function update!(
     return nothing
 end
 
-"""
-    solve!(dx, dy, kkt, ξp, ξd)
-
-Solve the augmented system, overwriting `dx, dy` with the result.
-"""
-function solve!(
-    dx::Vector{T}, dy::Vector{T},
-    kkt::LDLFactSQD{T},
-    ξp::Vector{T}, ξd::Vector{T}
-) where{T<:Real}
+function solve!(dx, dy, kkt::LDLFactSolver{T,K2}, ξp, ξd) where{T}
     m, n = kkt.m, kkt.n
 
-    # Set-up the right-hand side
-    @inbounds for i in 1:n
-        kkt.ξ[i] = ξd[i]
-    end
-    @inbounds for i in 1:m
-        kkt.ξ[i+n] = ξp[i]
-    end
+    # Setup right-hand side
+    @views copyto!(kkt.ξ[1:n], ξd)
+    @views copyto!(kkt.ξ[(n+1):end], ξp)
 
-    # Solve the augmented system
+    # Solve augmented system
+    # CHOLMOD doesn't have in-place solve, so this line will allocate
     LDLF.ldiv!(kkt.F, kkt.ξ)
 
     # Recover dx, dy
-    @inbounds for i in 1:n
-        dx[i] = kkt.ξ[i]
-    end
-    @inbounds for i in 1:m
-        dy[i] = kkt.ξ[i+n]
-    end
+    @views copyto!(dx, kkt.ξ[1:n])
+    @views copyto!(dy, kkt.ξ[(n+1):end])
 
-    # TODO: Iterative refinement
+    # TODO: iterative refinement
     return nothing
 end

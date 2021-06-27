@@ -1,20 +1,43 @@
 module KKT
 
 using LinearAlgebra
+using SparseArrays
 
-import ..Tulip.Factory
+using LinearOperators
 
-export AbstractKKTSolver, KKTOptions
+export AbstractKKTSystem, AbstractKKTBackend, AbstractKKTSolver
+export KKTOptions
+
+"""
+    AbstractKKTSystem
+
+Abstract type for KKT systems
+"""
+abstract type AbstractKKTSystem end
+
+include("systems.jl")
+
+"""
+    AbstractKKTBackend
+
+Abstract type for KKT backend, i.e., the actual linear solver.
+"""
+abstract type AbstractKKTBackend end
+
+"""
+    DefaultKKTBackend
+
+Default setting for KKT backend.
+
+Currently defaults to [`CholmodBackend`](@ref) for `Float64` arithmetic,
+    and [`LDLFactBackend`](@ref) otherwise.
+"""
+struct DefaultKKTBackend <: AbstractKKTBackend end
 
 """
     AbstractKKTSolver{T}
 
-Abstract container for solving an augmented system
-```
-    [-(Θ⁻¹ + Rp)   Aᵀ] [dx] = [ξd]
-    [   A          Rd] [dy]   [ξp]
-```
-where `ξd` and `ξp` are given right-hand side.
+Abstract container for solving KKT systems in arithmetic `T`.
 """
 abstract type AbstractKKTSolver{T} end
 
@@ -24,22 +47,20 @@ abstract type AbstractKKTSolver{T} end
 KKT solver options.
 """
 Base.@kwdef mutable struct KKTOptions{T}
-    Factory::Factory{<:AbstractKKTSolver} = default_factory(T)
+    Backend::AbstractKKTBackend = DefaultKKTBackend()
+    System::AbstractKKTSystem = DefaultKKTSystem()
 end
 
-
 """
-    setup(T::Type{<:AbstractKKTSolver}, args...; kwargs...)
+    setup(A, system, backend; kwargs...)
 
 Instantiate a KKT solver object.
 """
-function setup(Ts::Type{<:AbstractKKTSolver}, args...; kwargs...)
-    return Ts(args...; kwargs...)
-end
+function setup end
 
-# 
+#
 # Specialized implementations should extend the functions below
-# 
+#
 
 """
     update!(kkt, θinv, regP, regD)
@@ -84,7 +105,7 @@ function solve! end
 
 Return the arithmetic used by the solver.
 """
-arithmetic(kkt::AbstractKKTSolver{T}) where T = T
+arithmetic(::AbstractKKTSolver{T}) where T = T
 
 """
     backend(kkt)
@@ -109,16 +130,13 @@ include("cholmod.jl")
 include("ldlfact.jl")
 include("krylov.jl")
 
-"""
-    default_factory(T)
-
-Use CHOLMOD for `Float64` and LDLFactorizations otherwise.
-"""
-function default_factory(::Type{T}) where{T}
+# Current defaults
+function setup(A, ::DefaultKKTSystem, ::DefaultKKTBackend)
+    T = eltype(A)
     if T == Float64
-        return Factory(CholmodSolver; normal_equations=false)
+        return setup(A, K2(), CholmodBackend())
     else
-        return Factory(LDLFactSQD)
+        return setup(A, K2(), LDLFactBackend())
     end
 end
 

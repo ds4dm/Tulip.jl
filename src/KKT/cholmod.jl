@@ -1,323 +1,185 @@
-using SparseArrays
 using SuiteSparse.CHOLMOD
 
 """
-    CholmodSolver
+    CholmodBackend
 
-Uses CHOLMOD's factorization routines to solve the augmented system.
-
-To use an LDLᵀ factorization of the augmented system
-(see [`CholmodSQD`](@ref))
-```julia
-model.params.KKT.Factory = Tulip.Factory(CholmodSolver, normal_equations=false)
-```
-
-To use a Cholesky factorization of the normal equations system
-(see [`CholmodSPD`](@ref))
-```julia
-model.params.KKT.Factory = Tulip.Factory(CholmodSolver, normal_equations=true)
-```
-
-!!! warning
-    CHOLMOD can only be used with `Float64` arithmetic.
+CHOLMOD backend for solving linear systems.
 """
-abstract type CholmodSolver <: AbstractKKTSolver{Float64} end
-
-function CholmodSolver(
-    A::AbstractMatrix{Float64};
-    normal_equations::Bool=false,
-    kwargs...
-)
-    if normal_equations
-        return CholmodSPD(A; kwargs...)
-    else
-        return CholmodSQD(A; kwargs...)
-    end
-end
-
-
-# ==============================================================================
-#   CholmodSQD
-# ==============================================================================
+struct CholmodBackend <: AbstractKKTBackend end
 
 """
-    CholmodSQD
+    CholmodSolver{T,S}
 
-Linear solver for the 2x2 augmented system with ``A`` sparse.
+CHOLMOD-based KKT solver for system `S` and arithmetic `T`.
 
-Uses an LDLᵀ factorization of the quasi-definite augmented system.
+Instantiated by using [`CholmodBackend`](@ref).
+
+# Supported arithmetics
+* `Float64`
+
+# Supported systems
+* [`K2`](@ref) via ``L×D×Lᵀ`` factorization
+* [`K1`](@ref) via Cholesky (``L×Lᵀ``) factorization
 """
-mutable struct CholmodSQD <: CholmodSolver
-    m::Int  # Number of rows
-    n::Int  # Number of columns
-
-    # TODO: allow for user-provided ordering,
-    #   and add flag (default to false) to know whether user ordering should be used
-
+mutable struct CholmodSolver{T,S} <: AbstractKKTSolver{T}
     # Problem data
-    A::SparseMatrixCSC{Float64}
-    θ::Vector{Float64}     # diagonal scaling
-    regP::Vector{Float64}  # primal-dual regularization
-    regD::Vector{Float64}  # dual regularization
-    ξ::Vector{Float64}     # right-hand side of the augmented system
+    m::Int
+    n::Int
+    A::SparseMatrixCSC{T,Int}
 
-    # Left-hand side matrix
-    S::SparseMatrixCSC{Float64, Int}  # TODO: use `CHOLMOD.Sparse` instead
-
-    # Factorization
-    F::CHOLMOD.Factor{Float64}
-
-    # TODO: constructor with initial memory allocation
-    function CholmodSQD(A::AbstractMatrix{Float64})
-        m, n = size(A)
-        θ = ones(Float64, n)
-        regP = ones(Float64, n)
-        regD = ones(Float64, m)
-        ξ = zeros(Float64, n+m)
-
-        S = [
-            spdiagm(0 => -θ)  A';
-            spzeros(Float64, m, n) spdiagm(0 => ones(m))
-        ]
-
-        # TODO: Symbolic factorization only
-        F = ldlt(Symmetric(S))
-
-        return new(m, n, A, θ, regP, regD, ξ, S, F)
-    end
-
+    # Workspace
+    # TODO: store K as CHOLMOD.Sparse instead of SparseMatrixCSC
+    θ::Vector{T}               # Diagonal scaling
+    regP::Vector{T}            # Primal regularization
+    regD::Vector{T}            # Dual regularization
+    K::SparseMatrixCSC{T,Int}  # KKT matrix
+    F::CHOLMOD.Factor{T}       # Factorization
+    ξ::Vector{T}               # RHS of KKT system
 end
 
-backend(::CholmodSQD) = "CHOLMOD"
-linear_system(::CholmodSQD) = "Augmented system"
+const CholmodSQD = CholmodSolver{Float64,K2}
+const CholmodSPD = CholmodSolver{Float64,K1}
 
-"""
-    update!(kkt, θ, regP, regD)
+backend(::CholmodSolver) = "CHOLMOD"
+linear_system(::CholmodSQD) = "Augmented system (K2)"
+linear_system(::CholmodSPD) = "Normal equations (K1)"
 
-Update LDLᵀ factorization of the augmented system.
+setup(A, s, b::CholmodBackend) = setup(sparse(A), s, b)
 
-Update diagonal scaling ``\\theta``, primal-dual regularizations, and re-compute
-    the factorization.
-Throws a `PosDefException` if matrix is not quasi-definite.
-"""
-function update!(
-    kkt::CholmodSQD,
-    θ::AbstractVector{Float64},
-    regP::AbstractVector{Float64},
-    regD::AbstractVector{Float64}
-)
+function setup(A::SparseMatrixCSC{Float64}, ::K2, ::CholmodBackend)
+    m, n = size(A)
+
+    θ = ones(Float64, n)
+    regP = ones(Float64, n)
+    regD = ones(Float64, m)
+    ξ = zeros(Float64, m+n)
+
+    K = [
+        spdiagm(0 => -θ)  A';
+        spzeros(Float64, m, n) spdiagm(0 => ones(m))
+    ]
+
+    # TODO: Symbolic factorization only
+    F = ldlt(Symmetric(K))
+
+    return CholmodSolver{Float64,K2}(m, n, A, θ, regP, regD, K, F, ξ)
+end
+
+function setup(A::SparseMatrixCSC{Float64}, ::K1, ::CholmodBackend)
+    m, n = size(A)
+
+    θ = ones(Float64, n)
+    regP = ones(Float64, n)
+    regD = ones(Float64, m)
+    ξ = zeros(Float64, m)
+
+    # TODO: analyze + in-place A*D*A' product
+    K = sparse(A * A') + spdiagm(0 => regD)
+
+    # TODO: PSD-ness checks
+    F = cholesky(Symmetric(K))
+
+    return CholmodSolver{Float64,K1}(m, n, A, θ, regP, regD, K, F, ξ)
+end
+
+function update!(kkt::CholmodSQD, θ, regP, regD)
+    m, n = kkt.m, kkt.n
+
     # Sanity checks
-    length(θ)  == kkt.n || throw(DimensionMismatch(
-        "θ has length $(length(θ)) but linear solver is for n=$(kkt.n)."
+    length(θ)  == n || throw(DimensionMismatch(
+        "length(θ)=$(length(θ)) but KKT solver has n=$n."
     ))
-    length(regP) == kkt.n || throw(DimensionMismatch(
-        "regP has length $(length(regP)) but linear solver has n=$(kkt.n)"
+    length(regP) == n || throw(DimensionMismatch(
+        "length(regP)=$(length(regP)) but KKT solver has n=$n"
     ))
-    length(regD) == kkt.m || throw(DimensionMismatch(
-        "regD has length $(length(regD)) but linear solver has m=$(kkt.m)"
+    length(regD) == m || throw(DimensionMismatch(
+        "length(regD)=$(length(regD)) but KKT solver has m=$m"
     ))
 
-    # Update diagonal scaling
-    kkt.θ .= θ
-    # Update regularizers
-    kkt.regP .= regP
-    kkt.regD .= regD
+    copyto!(kkt.θ, θ)
+    copyto!(kkt.regP, regP)
+    copyto!(kkt.regD, regD)
 
-    # Update S. S is stored as upper-triangular and only its diagonal changes.
+    # Update KKT matrix
+    # K is stored as upper-triangular, and only its diagonal is changed
     @inbounds for j in 1:kkt.n
-        k = kkt.S.colptr[1+j] - 1
-        kkt.S.nzval[k] = -kkt.θ[j] - regP[j]
+        k = kkt.K.colptr[1+j] - 1
+        kkt.K.nzval[k] = -kkt.θ[j] - regP[j]
     end
     @inbounds for i in 1:kkt.m
-        k = kkt.S.colptr[1+kkt.n+i] - 1
-        kkt.S.nzval[k] = regD[i]
+        k = kkt.K.colptr[1+kkt.n+i] - 1
+        kkt.K.nzval[k] = regD[i]
     end
 
-    # `S` is first converted into CHOLMOD's internal data structure,
-    # so this line allocates.
-    ldlt!(kkt.F, Symmetric(kkt.S))
-
+    ldlt!(kkt.F, Symmetric(kkt.K))
     return nothing
 end
 
-"""
-    solve!(dx, dy, kkt, ξp, ξd)
-
-Solve the augmented system, overwriting `dx, dy` with the result.
-"""
-function solve!(
-    dx::Vector{Float64}, dy::Vector{Float64},
-    kkt::CholmodSQD,
-    ξp::Vector{Float64}, ξd::Vector{Float64}
-)
+function update!(kkt::CholmodSPD, θ, regP, regD)
     m, n = kkt.m, kkt.n
-    
-    # Set-up the right-hand side
-    @inbounds for i in 1:n
-        kkt.ξ[i] = ξd[i]
-    end
-    @inbounds for i in 1:m
-        kkt.ξ[i+n] = ξp[i]
-    end
 
-    # Solve augmented system
-    d = kkt.F \ kkt.ξ
-
-    # Recover dx, dy
-    @inbounds for i in 1:n
-        dx[i] = d[i]
-    end
-    @inbounds for i in 1:m
-        dy[i] = d[i+n]
-    end
-
-    # Iterative refinement
-    # TODO:
-    # * Max number of refine steps
-    # * Check for residuals before refining
-    # * Check whether residuals did improve
-    # resP = kkt.A*dx + kkt.regD .* dy - ξp
-    # resD = - dx .* (kkt.θ + kkt.regP) + kkt.A' * dy - ξd
-    # println("\n|resP| = $(norm(resP, Inf))\n|resD| = $(norm(resD, Inf))")
-
-    # ξ1 = [resD; resP]
-    # d1 = kkt.F \ ξ1
-
-    # # Update search direction
-    # @views dx .-= d1[1:n]
-    # @views dy .-= d1[(n+1):(m+n)]
-
-    return nothing
-end
-
-# ==============================================================================
-#   CholmodSPD
-# ==============================================================================
-
-"""
-    CholmodSPD
-
-Linear solver for the 2x2 augmented system
-```
-    [-(Θ⁻¹ + Rp)   Aᵀ] [dx] = [ξd]
-    [   A          Rd] [dy]   [ξp]
-```
-with ``A`` sparse.
-
-Uses a Cholesky factorization of the positive definite normal equations system
-```
-(A * ((Θ⁻¹ + Rp)⁻¹ * Aᵀ + Rd) dy = ξp + A * (θ⁻¹ + Rp)⁻¹ * ξd
-                              dx = (Θ⁻¹ + Rp)⁻¹ * (Aᵀ * dy - ξd)
-```
-"""
-mutable struct CholmodSPD <: CholmodSolver
-    m::Int  # Number of rows
-    n::Int  # Number of columns
-
-    # TODO: allow for user-provided ordering,
-    #   and add flag (default to false) to know whether user ordering should be used
-
-    # Problem data
-    A::SparseMatrixCSC{Float64, Int}
-    θ::Vector{Float64}   # Diagonal scaling
-    # Regularization
-    regP::Vector{Float64}  # primal
-    regD::Vector{Float64}  # dual
-
-    # Factorization
-    F::CHOLMOD.Factor{Float64}
-
-    # Constructor and initial memory allocation
-    # TODO: symbolic only + allocation
-    function CholmodSPD(A::AbstractMatrix{Float64})
-        m, n = size(A)
-        θ = ones(Float64, n)
-
-        S = sparse(A * A') + spdiagm(0 => ones(m))
-
-        # TODO: PSD-ness checks
-        F = cholesky(Symmetric(S))
-
-        return new(m, n, A, θ, zeros(Float64, n), ones(Float64, m), F)
-    end
-
-end
-
-backend(::CholmodSPD) = "CHOLMOD - Cholesky"
-linear_system(::CholmodSPD) = "Normal equations"
-
-"""
-    update!(kkt, θ, regP, regD)
-
-Compute normal equation system matrix, and update the factorization.
-"""
-function update!(
-    kkt::CholmodSPD,
-    θ::AbstractVector{Float64},
-    regP::AbstractVector{Float64},
-    regD::AbstractVector{Float64}
-)
-    
     # Sanity checks
-    length(θ) == kkt.n || throw(DimensionMismatch(
-        "θ has length $(length(θ)) but linear solver is for n=$(kkt.n)."
+    length(θ)  == n || throw(DimensionMismatch(
+        "length(θ)=$(length(θ)) but KKT solver has n=$n."
     ))
-    length(regP) == kkt.n || throw(DimensionMismatch(
-        "regP has length $(length(regP)) but linear solver has n=$(kkt.n)"
+    length(regP) == n || throw(DimensionMismatch(
+        "length(regP)=$(length(regP)) but KKT solver has n=$n"
     ))
-    length(regD) == kkt.m || throw(DimensionMismatch(
-        "regD has length $(length(regD)) but linear solver has m=$(kkt.m)"
+    length(regD) == m || throw(DimensionMismatch(
+        "length(regD)=$(length(regD)) but KKT solver has m=$m"
     ))
 
-    kkt.θ .= θ
-    kkt.regP .= regP  # Primal regularization is disabled for normal equations
-    kkt.regD .= regD
+    copyto!(kkt.θ, θ)
+    copyto!(kkt.regP, regP)
+    copyto!(kkt.regD, regD)
 
-    # Re-compute factorization
-    # D = (Θ^{-1} + Rp)^{-1}
-    D = Diagonal(one(Float64) ./ (kkt.θ .+ kkt.regP))
-    Rd = spdiagm(0 => kkt.regD)
-    S = kkt.A * D * kkt.A' + Rd
+    # Form normal equations matrix
+    # TODO: use in-place update of S
+    D = inv(Diagonal(kkt.θ .+ kkt.regP))
+    kkt.K = (kkt.A * D * kkt.A') + spdiagm(0 => kkt.regD)
 
     # Update factorization
-    cholesky!(kkt.F, Symmetric(S), check=false)
+    cholesky!(kkt.F, Symmetric(kkt.K), check=false)
     issuccess(kkt.F) || throw(PosDefException(0))
 
     return nothing
 end
 
-"""
-    solve!(dx, dy, kkt, ξp, ξd)
-
-Solve the augmented system, overwriting `dx, dy` with the result.
-"""
-function solve!(
-    dx::Vector{Float64}, dy::Vector{Float64},
-    kkt::CholmodSPD,
-    ξp::Vector{Float64}, ξd::Vector{Float64}
-)
+function solve!(dx, dy, kkt::CholmodSQD, ξp, ξd)
     m, n = kkt.m, kkt.n
 
-    d = one(Float64) ./ (kkt.θ .+ kkt.regP)
-    D = Diagonal(d)
-    
-    # Set-up right-hand side
-    ξ_ = ξp .+ kkt.A * (D * ξd)
+    # Setup right-hand side
+    @views copyto!(kkt.ξ[1:n], ξd)
+    @views copyto!(kkt.ξ[(n+1):end], ξp)
 
     # Solve augmented system
-    dy .= (kkt.F \ ξ_)
+    # CHOLMOD doesn't have in-place solve, so this line will allocate
+    δ = kkt.F \ kkt.ξ
+
+    # Recover dx, dy
+    @views copyto!(dx, δ[1:n])
+    @views copyto!(dy, δ[(n+1):end])
+
+    # TODO: iterative refinement
+    return nothing
+end
+
+function solve!(dx, dy, kkt::CholmodSPD, ξp, ξd)
+    m, n = kkt.m, kkt.n
+
+    D = inv(Diagonal(kkt.θ .+ kkt.regP))
+    copyto!(kkt.ξ, ξp)
+    mul!(kkt.ξ, kkt.A, D * ξd, true, true)
+
+    # Solve normal equations
+    # CHOLMOD doesn't have in-place solve, so this line will allocate
+    dy .= kkt.F \ kkt.ξ
 
     # Recover dx
-    dx .= D * (kkt.A' * dy - ξd)
+    copyto!(dx, ξd)
+    mul!(dx, kkt.A', dy, 1.0, -1.0)
+    lmul!(D, dx)
 
-    # TODO: Iterative refinement
-    # * Max number of refine steps
-    # * Check for residuals before refining
-    # * Check whether residuals did improve
-    # resP = kkt.A * dx + kkt.regD .* dy - ξp
-    # resD = - D \ dx + kkt.A' * dy - ξd
-    # println("\n|resP| = $(norm(resP, Inf))\n|resD| = $(norm(resD, Inf))")
-
-    
+    # TODO: iterative refinement
     return nothing
 end

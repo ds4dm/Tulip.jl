@@ -76,7 +76,7 @@ mutable struct MPC{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
         regP = tones(Tv, n)
         regD = tones(Tv, m)
 
-        kkt = KKT.setup(kkt_options.Factory.T, dat.A; kkt_options.Factory.options...)
+        kkt = KKT.setup(dat.A, kkt_options.System, kkt_options.Backend)
         Tk = typeof(kkt)
 
         return new{T, Tv, Tb, Ta, Tk}(dat,
