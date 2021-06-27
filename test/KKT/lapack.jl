@@ -5,7 +5,7 @@
                 1 0 1 0;
                 0 1 0 1
             ])
-            kkt = KKT.DenseSPD(A)
+            kkt = KKT.setup(A, KKT.K1(), KKT.DenseBackend())
             KKT.run_ls_tests(A, kkt)
         end
     end
