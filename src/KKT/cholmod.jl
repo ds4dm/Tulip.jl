@@ -44,9 +44,10 @@ backend(::CholmodSolver) = "CHOLMOD"
 linear_system(::CholmodSQD) = "Augmented system (K2)"
 linear_system(::CholmodSPD) = "Normal equations (K1)"
 
-setup(A, s, b::CholmodBackend) = setup(sparse(A), s, b)
+# Convert to sparse matrix if other type is used
+setup(A, system, backend::CholmodBackend) = setup(convert(SparseMatrixCSC, A), system, backend)
 
-function setup(A::SparseMatrixCSC{Float64}, ::K2, ::CholmodBackend)
+function setup(A::SparseMatrixCSC{Float64,Int}, ::K2, ::CholmodBackend)
     m, n = size(A)
 
     θ = ones(Float64, n)

@@ -26,7 +26,8 @@ end
 backend(::LDLFactSolver) = "LDLFactorizations"
 linear_system(::LDLFactSolver) = "Augmented system (K2)"
 
-setup(A, system, backend::LDLFactBackend) = setup(sparse(A), system, backend)
+# Convert A to sparse matrix if needed
+setup(A, system, backend::LDLFactBackend) = setup(convert(SparseMatrixCSC, A), system, backend)
 
 function setup(A::SparseMatrixCSC{T,Int}, ::K2, ::LDLFactBackend) where{T}
     m, n = size(A)
