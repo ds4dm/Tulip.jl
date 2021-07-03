@@ -128,7 +128,7 @@ include("Dense/lapack.jl")
 include("Cholmod/cholmod.jl")
 include("LDLFactorizations/ldlfact.jl")
 const TlpLDLFact = TlpLDLFactorizations
-include("krylov.jl")
+include("Krylov/krylov.jl")
 
 # Default backend and system choices
 function setup(A, ::DefaultKKTSystem, ::DefaultKKTBackend)
