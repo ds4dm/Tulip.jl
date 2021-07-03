@@ -1,18 +1,25 @@
+module TlpDense
+
+using LinearAlgebra
 using LinearAlgebra:BlasReal
 
+using ..KKT: AbstractKKTBackend, AbstractKKTSolver
+using ..KKT: AbstractKKTSystem, K1, K2
+import ..KKT: setup, update!, solve!, backend, linear_system
+
 """
-    DenseBackend
+    Backend
 
 Dense linear algebra backend for solving linear systems.
 """
-struct DenseBackend <: AbstractKKTBackend end
+struct Backend <: AbstractKKTBackend end
 
 """
     DenseSolver{T,S}
 
 Dense linear algebra-based KKT solver.
 
-Instantiated through [`DenseBackend`](@ref).
+Instantiated through [`Backend`](@ref).
 
 # Supported arithmetics
 
@@ -41,7 +48,7 @@ backend(::DenseSolver) = "Julia.LinearAlgebra"
 backend(::DenseSolver{<:BlasReal}) = "LAPACK $(LinearAlgebra.BLAS.vendor())"
 linear_system(::DenseSolver) = "Normal equations (K1)"
 
-function setup(A::Matrix{T}, ::K1, ::DenseBackend) where{T}
+function setup(A::Matrix{T}, ::K1, ::Backend) where{T}
     m, n = size(A)
 
     _A = Matrix{T}(undef, m, n)
@@ -109,3 +116,5 @@ function solve!(dx, dy, kkt::DenseSolver{T}, ξp, ξd) where{T}
     # TODO: Iterative refinement
     return nothing
 end
+
+end  # module

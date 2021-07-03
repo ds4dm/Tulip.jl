@@ -82,7 +82,6 @@ for given right-hand sides `ξd` and `ξp`.
 """
 function update! end
 
-
 """
     solve!(dx, dy, kkt, ξp, ξd)
 
@@ -122,21 +121,22 @@ Return which system is solved by the kkt solver.
 linear_system(::AbstractKKTSolver) = "Unkown"
 
 # Generic tests
-include("test.jl")
+include("Test/test.jl")
 
 # Custom linear solvers
-include("lapack.jl")
-include("cholmod.jl")
-include("ldlfact.jl")
+include("Dense/lapack.jl")
+include("Cholmod/cholmod.jl")
+include("LDLFactorizations/ldlfact.jl")
+const TlpLDLFact = TlpLDLFactorizations
 include("krylov.jl")
 
-# Current defaults
+# Default backend and system choices
 function setup(A, ::DefaultKKTSystem, ::DefaultKKTBackend)
     T = eltype(A)
     if T == Float64
-        return setup(A, K2(), CholmodBackend())
+        return setup(A, K2(), TlpCholmod.Backend())
     else
-        return setup(A, K2(), LDLFactBackend())
+        return setup(A, K2(), TlpLDLFact.Backend())
     end
 end
 

@@ -1,12 +1,22 @@
+module TlpLDLFactorizations
+
+using LinearAlgebra
+using SparseArrays
+
 using LDLFactorizations
 const LDLF = LDLFactorizations
 
+using ..KKT: AbstractKKTBackend, AbstractKKTSolver
+using ..KKT: AbstractKKTSystem, K1, K2
+import ..KKT: setup, update!, solve!, backend, linear_system
+
+
 """
-    LDLFactBackend
+    Backend
 
 LDLFactorizations backend for solving linear systems.
 """
-struct LDLFactBackend <: AbstractKKTBackend end
+struct Backend <: AbstractKKTBackend end
 
 mutable struct LDLFactSolver{T,S} <: AbstractKKTSolver{T}
     # Problem data
@@ -27,9 +37,9 @@ backend(::LDLFactSolver) = "LDLFactorizations"
 linear_system(::LDLFactSolver) = "Augmented system (K2)"
 
 # Convert A to sparse matrix if needed
-setup(A, system, backend::LDLFactBackend) = setup(convert(SparseMatrixCSC, A), system, backend)
+setup(A, system, backend::Backend) = setup(convert(SparseMatrixCSC, A), system, backend)
 
-function setup(A::SparseMatrixCSC{T,Int}, ::K2, ::LDLFactBackend) where{T}
+function setup(A::SparseMatrixCSC{T,Int}, ::K2, ::Backend) where{T}
     m, n = size(A)
 
     θ = ones(T, n)
@@ -106,3 +116,5 @@ function solve!(dx, dy, kkt::LDLFactSolver{T,K2}, ξp, ξd) where{T}
     # TODO: iterative refinement
     return nothing
 end
+
+end  # module
