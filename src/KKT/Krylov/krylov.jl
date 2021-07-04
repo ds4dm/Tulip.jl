@@ -35,5 +35,6 @@ Abstract type for Kyrlov-based linear solvers.
 abstract type AbstractKrylovSolver{T} <: AbstractKKTSolver{T} end
 
 include("spd.jl")
+include("sid.jl")
 
 end  # module
