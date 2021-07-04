@@ -36,5 +36,6 @@ abstract type AbstractKrylovSolver{T} <: AbstractKKTSolver{T} end
 
 include("spd.jl")
 include("sid.jl")
+include("sqd.jl")
 
 end  # module
