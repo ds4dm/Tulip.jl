@@ -29,7 +29,7 @@ end
 backend(kkt::SPDSolver) = "$(typeof(kkt.krylov_solver))"
 linear_system(kkt::SPDSolver) = "K1"
 
-function setup(A, ::K1, backend::Backend{KS,V}) where{KS<:KrylovSPD,V}
+function setup(A, ::K1, backend::Backend{KS,V}) where{KS<:Union{_KRYLOV_SPD,_KRYLOV_SID},V}
     Ta = typeof(A)
     T = eltype(A)
     T == eltype(V) || error("eltype(A)=$T incompatible with eltype of Krylov vector storage $V.")

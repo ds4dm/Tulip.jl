@@ -1,29 +1,48 @@
-const KrylovSPD = Union{
+const _KRYLOV_SPD = Union{
     Krylov.CgSolver,
     Krylov.CrSolver,
+}
+
+const _KRYLOV_SID = Union{
     Krylov.MinresSolver,
     Krylov.MinresQlpSolver,
     Krylov.SymmlqSolver
 }
 
-const KrylovSID = Union{
-    Krylov.MinresSolver,
-    Krylov.MinresQlpSolver,
-    Krylov.SymmlqSolver
-}
-
-const KrylovSQD = Union{
+const _KRYLOV_SQD = Union{
     Krylov.TricgSolver,
-    Krylov.TrimrSolver
+    Krylov.TrimrSolver,
+}
+
+const _KRYLOV_LN = Union{
+    Krylov.LnlqSolver,
+    Krylov.CraigSolver,
+    Krylov.CraigmrSolver,
+}
+
+const _KRYLOV_LS = Union{
+    Krylov.LslqSolver,
+    Krylov.LsqrSolver,
+    Krylov.LsmrSolver,
 }
 
 # Helper functions
-# TODO: use macros to generate those automatically
-@inline _krylov!(ksolver::CgSolver, A, b; kwargs...) = Krylov.cg!(ksolver, A, b; kwargs...)
-@inline _krylov!(ksolver::CrSolver, A, b; kwargs...) = Krylov.cr!(ksolver, A, b; kwargs...)
-@inline _krylov!(ksolver::MinresSolver, A, b; kwargs...) = Krylov.minres!(ksolver, A, b; kwargs...)
-@inline _krylov!(ksolver::MinresQlpSolver, A, b; kwargs...) = Krylov.minres_qlp!(ksolver, A, b; kwargs...)
-@inline _krylov!(ksolver::SymmlqSolver, A, b; kwargs...) = Krylov.symmlq!(ksolver, A, b; kwargs...)
-
-@inline _krylov!(ksolver::TricgSolver, A, b, c; kwargs...) = Krylov.tricg!(ksolver, A, b, c; kwargs...)
-@inline _krylov!(ksolver::TrimrSolver, A, b, c; kwargs...) = Krylov.trimr!(ksolver, A, b, c; kwargs...)
+for (KS, fun) in [
+    (Krylov.CgSolver,Krylov.cg!)
+    (Krylov.CrSolver,Krylov.cr!)
+    (Krylov.MinresSolver,Krylov.minres!)
+    (Krylov.MinresQlpSolver,Krylov.minres_qlp!)
+    (Krylov.SymmlqSolver,Krylov.symmlq!)
+    (Krylov.TricgSolver,Krylov.tricg!)
+    (Krylov.TrimrSolver,Krylov.trimr!)
+    (Krylov.LnlqSolver,Krylov.lnlq!)
+    (Krylov.CraigSolver,Krylov.craig!)
+    (Krylov.CraigmrSolver,Krylov.craigmr!)
+    (Krylov.LslqSolver,Krylov.lslq!)
+    (Krylov.LsqrSolver,Krylov.lsqr!)
+    (Krylov.LsmrSolver,Krylov.lsmr!)
+]
+    @eval begin
+        @inline _krylov!(solver::$KS, args...; kwargs...) = $(fun)(solver, args...; kwargs...)
+    end
+end

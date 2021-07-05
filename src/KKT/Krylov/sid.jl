@@ -29,7 +29,7 @@ end
 backend(kkt::SIDSolver) = "$(typeof(kkt.krylov_solver))"
 linear_system(kkt::SIDSolver) = "K2"
 
-function setup(A, ::K2, backend::Backend{KS,V}) where{KS<:KrylovSID,V}
+function setup(A, ::K2, backend::Backend{KS,V}) where{KS<:_KRYLOV_SID,V}
     Ta = typeof(A)
     T = eltype(A)
     T == eltype(V) || error("eltype(A)=$T incompatible with eltype of Krylov vector storage $V.")
