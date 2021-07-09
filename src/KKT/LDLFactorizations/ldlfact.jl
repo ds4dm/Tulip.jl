@@ -15,9 +15,30 @@ import ..KKT: setup, update!, solve!, backend, linear_system
     Backend
 
 LDLFactorizations backend for solving linear systems.
+
+See [`LDLFactSolver`](@ref) for further details.
 """
 struct Backend <: AbstractKKTBackend end
 
+"""
+    LDLFactSolver{T,S<:AbstractKKTSystem}
+
+[`LDLFactorizations.jl`](https://github.com/JuliaSmoothOptimizers/LDLFactorizations.jl)-based KKT solver.
+
+# Supported arithmetics
+* All arithmetics are supported
+
+# Supported systems
+* [`K2`](@ref) via ``LDLᵀ`` factorization
+
+# Examples
+
+To solve the augmented system with LDLFactorizations' ``LDL^{T}`` factorization:
+```julia
+set_parameter(tlp_model, "KKT_Backend", Tulip.KKT.TlpLDLFact.Backend())
+set_parameter(tlp_model, "KKT_System", Tulip.KKT.K2())
+```
+"""
 mutable struct LDLFactSolver{T,S} <: AbstractKKTSolver{T}
     # Problem data
     m::Int

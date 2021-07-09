@@ -11,19 +11,20 @@ import ..KKT: setup, update!, solve!, backend, linear_system
     Backend
 
 Dense linear algebra backend for solving linear systems.
+
+See [`DenseSolver`](@ref) for further details.
 """
 struct Backend <: AbstractKKTBackend end
 
 """
-    DenseSolver{T,S}
+    DenseSolver{T}
 
 Dense linear algebra-based KKT solver.
-
-Instantiated through [`Backend`](@ref).
 
 # Supported arithmetics
 
 All arithmetics are supported.
+
 BLAS/LAPACK routines are used automatically with `Float32` and `Float64` arithmetic.
 
 # Supported systems

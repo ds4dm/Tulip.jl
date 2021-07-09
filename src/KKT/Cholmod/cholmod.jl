@@ -9,25 +9,39 @@ using ..KKT: AbstractKKTSystem, K1, K2
 import ..KKT: setup, update!, solve!, backend, linear_system
 
 """
-    Cholmod.Backend
+    Backend
 
 CHOLMOD backend for solving linear systems.
+
+See [`CholmodSolver`](@ref) for further details.
 """
 struct Backend <: AbstractKKTBackend end
 
 """
-    Cholmod.KKTSolver{T,S}
+    CholmodSolver{T,S<:AbstractKKTSystem}
 
-CHOLMOD-based KKT solver for system `S` and arithmetic `T`.
-
-Instantiated by using [`CholmodBackend`](@ref).
+CHOLMOD-based KKT solver.
 
 # Supported arithmetics
 * `Float64`
 
 # Supported systems
-* [`K2`](@ref) via ``L×D×Lᵀ`` factorization
-* [`K1`](@ref) via Cholesky (``L×Lᵀ``) factorization
+* [`K2`](@ref) via ``LDLᵀ`` factorization
+* [`K1`](@ref) via Cholesky (``LLᵀ``) factorization
+
+# Examples
+
+* To solve the augmented system with CHOLMOD's ``LDL^{T}`` factorization:
+```julia
+set_parameter(tlp_model, "KKT_Backend", Tulip.KKT.TlpCholmod.Backend())
+set_parameter(tlp_model, "KKT_System", Tulip.KKT.K2())
+```
+
+* To solve the normal equations system with CHOLMOD's Cholesky factorization:
+```julia
+set_parameter(tlp_model, "KKT_Backend", Tulip.KKT.TlpCholmod.Backend())
+set_parameter(tlp_model, "KKT_System", Tulip.KKT.K1())
+```
 """
 mutable struct CholmodSolver{T,S} <: AbstractKKTSolver{T}
     # Problem data
