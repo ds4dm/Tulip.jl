@@ -1,9 +1,12 @@
 using Documenter, Tulip
 
+const _FAST = findfirst(isequal("--fast"), ARGS) !== nothing
+
 makedocs(
     sitename = "Tulip.jl",
     authors = "Mathieu Tanneau",
     format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
+    doctest = !_FAST,
     pages = [
         "Home" => "index.md",
         "Tutorials" => Any[
@@ -20,7 +23,10 @@ makedocs(
         ],
         "Reference" => Any[
             "Presolve" => "reference/Presolve/presolve.md",
-            "KKT solvers" => "reference/KKT/kkt_solvers.md",
+            "KKT" => [
+                "reference/KKT/kkt_systems.md",
+                "reference/KKT/kkt_solvers.md",
+            ],
             "Julia API" => "reference/API.md",
             "Attributes" => "reference/attributes.md",
             "Options" => "reference/options.md"
