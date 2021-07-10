@@ -13,7 +13,7 @@ end
 @testset "SID" begin
     for T in TvTYPES, ksolver in [MinresSolver, MinresQlpSolver, SymmlqSolver]
         @testset "$ksolver ($T)" begin
-            test_krylov_spd(T, ksolver)
+            test_krylov_sid(T, ksolver)
         end
     end
 end
