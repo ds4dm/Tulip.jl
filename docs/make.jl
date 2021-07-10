@@ -24,8 +24,11 @@ makedocs(
         "Reference" => Any[
             "Presolve" => "reference/Presolve/presolve.md",
             "KKT" => [
-                "reference/KKT/kkt_systems.md",
-                "reference/KKT/kkt_solvers.md",
+                "reference/KKT/kkt.md",
+                "reference/KKT/tlp_cholmod.md",
+                "reference/KKT/tlp_dense.md",
+                "reference/KKT/tlp_krylov.md",
+                "reference/KKT/tlp_ldlfact.md",
             ],
             "Julia API" => "reference/API.md",
             "Attributes" => "reference/attributes.md",

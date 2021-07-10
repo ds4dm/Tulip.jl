@@ -2,7 +2,14 @@
 CurrentModule = Tulip.KKT
 ```
 
-# KKT systems
+# Overview
+
+The `KKT` module provides a modular, customizable interface for developing and selecting various approaches to solve the KKT systems.
+
+## KKT backends
+
+
+## KKT systems
 
 All formulations below refer to a linear program in primal-dual standard form
 ```math
@@ -41,3 +48,23 @@ K2
 K1
 ```
 
+## KKT solvers
+
+```@docs
+AbstractKKTSolver
+```
+
+Custom linear solvers should (preferably) inherit from the `AbstractKKTSolver` class,
+and extend the following functions:
+
+```@docs
+setup
+```
+
+```@docs
+update!
+```
+
+```@docs
+solve!
+```
