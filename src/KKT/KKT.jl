@@ -29,8 +29,8 @@ abstract type AbstractKKTBackend end
 
 Default setting for KKT backend.
 
-Currently defaults to [`CholmodBackend`](@ref) for `Float64` arithmetic,
-    and [`LDLFactBackend`](@ref) otherwise.
+Currently defaults to [`TlpCholmod.Backend`](@ref) for `Float64` arithmetic,
+    and [`TlpLDLFact.Backend`](@ref) otherwise.
 """
 struct DefaultKKTBackend <: AbstractKKTBackend end
 

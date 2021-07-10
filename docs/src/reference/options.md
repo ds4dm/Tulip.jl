@@ -13,28 +13,7 @@ For instance, in double-precision arithmetic, i.e., `Tv=Float64`, we have ``\eps
 Factory
 ```
 
-## Presolve
-
-These parameters control the execution of the presolve phase.
-They should be called as `"Presolve_<Param>"`.
-
-
-## Linear Algebra
-
-These parameters control the linear algebra implementation
-
-| Parameter | Description | Default |
-|:----------|:------------|:--------|
-| `MatrixFactory` | See [`Factory`](@ref) | `Factory(SparseMatrixCSC)`
-
-
-## KKT solvers
-
-| Parameter | Description | Default |
-|:----------|:------------|:--------|
-| `Factory` | See [`Factory`](@ref) | [`KKT.CholmodSQD`](@ref) for `Float64`, [`KKT.LDLFactSQD`](@ref) otherwise |
-
-## Interior-Point
+## IPM
 
 ### Tolerances
 
@@ -65,6 +44,33 @@ Numerical tolerances for the interior-point algorithm.
 |:----------|:------------|:--------|
 | `IterationsLimit` | Maximum number of barrier iterations | `100` |
 | `TimeLimit` | Time limit, in seconds | `Inf` |
+
+
+
+
+
+
+
+
+## KKT
+
+| Parameter | Description | Default |
+|:----------|:------------|:--------|
+| `Backend` | See [KKT backends](@ref) | [`KKT.DefaultKKTBackend`](@ref) |
+| `System` | See [KKT systems](@ref) | [`KKT.DefaultKKTSystem`](@ref) |
+
+## Linear Algebra
+
+These parameters control the linear algebra implementation
+
+| Parameter | Description | Default |
+|:----------|:------------|:--------|
+| `MatrixFactory` | See [`Factory`](@ref) | `Factory(SparseMatrixCSC)`
+
+## Presolve
+
+These parameters control the execution of the presolve phase.
+They should be called as `"Presolve_<Param>"`.
 
 ## Others
 

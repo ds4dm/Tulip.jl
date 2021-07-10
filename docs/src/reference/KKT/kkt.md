@@ -8,6 +8,13 @@ The `KKT` module provides a modular, customizable interface for developing and s
 
 ## KKT backends
 
+```@docs
+AbstractKKTBackend
+```
+
+```@docs
+DefaultKKTBackend
+```
 
 ## KKT systems
 
