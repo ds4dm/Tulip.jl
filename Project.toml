@@ -1,11 +1,12 @@
 name = "Tulip"
 uuid = "6dd1b50a-3aae-11e9-10b5-ef983d2400fa"
 authors = ["Mathieu Tanneau <mathieu.tanneau@gmail.com>"]
-version = "0.7.5"
+version = "0.8.0"
 
 [deps]
 CodecBzip2 = "523fee87-0ab8-5b00-afb7-3ecf72e48cfd"
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
+Krylov = "ba0b0d4f-ebba-5204-a429-3ac8c609bfb7"
 LDLFactorizations = "40e66cde-538c-5869-a4ad-c39174c6795b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearOperators = "5c8ed15e-5a4c-59e4-a42b-c7e8811fb125"
@@ -21,6 +22,7 @@ TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 [compat]
 CodecBzip2 = "0.7.2"
 CodecZlib = "0.7.0"
+Krylov = "0.7.3"
 LDLFactorizations = "0.6, 0.7, 0.8"
 LinearOperators = "2.0"
 MathOptInterface = "0.9.5"

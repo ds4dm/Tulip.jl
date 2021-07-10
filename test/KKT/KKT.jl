@@ -1,6 +1,6 @@
 const KKT = Tulip.KKT
 
-include("lapack.jl")
-include("cholmod.jl")
-include("ldlfact.jl")
-include("krylov.jl")
+include("Dense/lapack.jl")
+include("Cholmod/cholmod.jl")
+include("LDLFactorizations/ldlfact.jl")
+include("Krylov/krylov.jl")

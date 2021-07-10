@@ -3,3 +3,9 @@
 *.jl.*.cov
 *.jl.mem
 Manifest.toml
+
+/app
+/dat
+/exp
+/.vscode
+/*.jl
