@@ -14,7 +14,6 @@ makedocs(
         ],
         "User manual" => Any[
             "Problem formulation" => "manual/formulation.md",
-            "Solving linear systems" => "manual/linear_systems.md",
             "Algorithms" => Any[
                 "Homogeneous Self-Dual" => "manual/IPM/HSD.md",
                 "Predictor-Corrector" => "manual/IPM/MPC.md"
