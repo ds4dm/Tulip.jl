@@ -97,6 +97,10 @@ When using Tulip through JuMP/MOI, parameters can be set either through MOI's ge
 
 See the [documentation](https://ds4dm.github.io/Tulip.jl/stable/reference/options/).
 
+## Command-line executable
+
+See [app building instructions](app/README.md).
+
 ## Citing `Tulip.jl`
 
 If you use Tulip in your work, we kindly ask that you cite the following [reference](https://doi.org/10.1007/s12532-020-00200-8) (preprint available [here](https://arxiv.org/abs/2006.08814)).
