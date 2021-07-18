@@ -1,0 +1,10 @@
+name = "TulipCL"
+uuid = "c587cd3b-9b28-46da-94c0-0791404bab14"
+authors = ["mtanneau <mathieu.tanneau@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+QPSReader = "10f199a5-22af-520b-b891-7ce84a7b1bd0"
+Tulip = "6dd1b50a-3aae-11e9-10b5-ef983d2400fa"

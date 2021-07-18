@@ -1,0 +1,4 @@
+# Julia
+Manifest.toml
+/*.so
+/tulip_cl
