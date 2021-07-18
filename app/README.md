@@ -48,9 +48,12 @@ Finally, follow the last step in the above installation guide to generate the co
 
 Once the build step is performed, the executable can be called from the command line as follows:
 ```bash
-tulip_cl [options] finst
+cd tulip_cl/bin
+./tulip_cl [options] finst
 ```
-where `finst` is the problem file. For instance,
+where `finst` is the problem file.
+
+For instance,
 ```bash
 tulip_cl --Threads 1 --TimeLimit 3600 afiro.mps
 ```
