@@ -92,8 +92,8 @@ function solve!(dx, dy, kkt::SQDSolver{T}, ξp, ξd) where{T}
     )
 
     # Recover dx, dy
-    copyto!(dx, kkt.krylov_solver.yₖ)
-    copyto!(dy, kkt.krylov_solver.xₖ)
+    copyto!(dx, kkt.krylov_solver.y)
+    copyto!(dy, kkt.krylov_solver.x)
 
     # TODO: iterative refinement (?)
     return nothing
