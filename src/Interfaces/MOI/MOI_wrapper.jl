@@ -146,6 +146,7 @@ function MOI.empty!(m::Optimizer)
     # Reset bound tracking
     m.bnd2name = Dict{MOI.ConstraintIndex, String}()
     m.var2bndtype  = Dict{MOI.VariableIndex, Set{MOI.ConstraintIndex}}()
+    return nothing
 end
 
 function MOI.is_empty(m::Optimizer)
@@ -168,10 +169,10 @@ end
 
 MOI.optimize!(m::Optimizer) = optimize!(m.inner)
 
-MOI.Utilities.supports_default_copy_to(::Optimizer, ::Bool) = true
+MOI.supports_incremental_interface(::Optimizer) = true
 
 function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike; kwargs...)
-    return MOI.Utilities.automatic_copy_to(dest, src; kwargs...)
+    return MOI.Utilities.default_copy_to(dest, src; kwargs...)
 end
 
 

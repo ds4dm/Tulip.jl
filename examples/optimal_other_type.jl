@@ -12,8 +12,8 @@ x = MOI.add_variable(lp)
 y = MOI.add_variable(lp)
 
 # Set variable bounds
-MOI.add_constraint(lp, MOI.SingleVariable(x), MOI.GreaterThan(T(0)))  # x >= 0
-MOI.add_constraint(lp, MOI.SingleVariable(y), MOI.GreaterThan(T(0)))  # y >= 0
+MOI.add_constraint(lp, x, MOI.GreaterThan(T(0)))  # x >= 0
+MOI.add_constraint(lp, y, MOI.GreaterThan(T(0)))  # y >= 0
 
 # Add constraints
 row1 = MOI.add_constraint(lp,

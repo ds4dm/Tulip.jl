@@ -20,9 +20,14 @@ const SUPPORTED_CONSTR_ATTR = Union{
 
 MOI.supports(::Optimizer, ::A, ::Type{<:MOI.ConstraintIndex}) where{A<:SUPPORTED_CONSTR_ATTR} = true
 
+# MOI boilerplate
+function MOI.supports(::Optimizer, ::MOI.ConstraintName, ::Type{<:MOI.ConstraintIndex{<:MOI.VariableIndex}})
+    throw(MOI.VariableIndexConstraintNameError())
+end
+
 # Variable bounds
 function MOI.supports_constraint(
-    ::Optimizer{T}, ::Type{MOI.SingleVariable}, ::Type{S}
+    ::Optimizer{T}, ::Type{MOI.VariableIndex}, ::Type{S}
 ) where {T, S<:SCALAR_SETS{T}}
     return true
 end
@@ -37,7 +42,7 @@ end
 
 function MOI.is_valid(
     m::Optimizer{T},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
+    c::MOI.ConstraintIndex{MOI.VariableIndex, S}
 ) where{T, S <:SCALAR_SETS{T}}
     v = MOI.VariableIndex(c.value)
     MOI.is_valid(m, v) || return false
@@ -60,20 +65,19 @@ end
 # To relax variable bounds, one should delete the associated bound constraint.
 function MOI.add_constraint(
     m::Optimizer{T},
-    f::MOI.SingleVariable,
+    v::MOI.VariableIndex,
     s::MOI.LessThan{T}
-) where{T}
+) where {T}
 
     # Check that variable exists
-    v = f.variable
     MOI.throw_if_not_valid(m, v)
     # Check if upper bound already exists
     if MOI.LessThan{T} ∈ m.var2bndtype[v]
-        throw(MOI.UpperBoundAlreadySet{MOI.LessThan{T}, MOI.LessThan{T}}(v.value))
+        throw(MOI.UpperBoundAlreadySet{MOI.LessThan{T}, MOI.LessThan{T}}(v))
     elseif MOI.EqualTo{T} ∈ m.var2bndtype[v]
-        throw(MOI.UpperBoundAlreadySet{MOI.EqualTo{T}, MOI.LessThan{T}}(v.value))
+        throw(MOI.UpperBoundAlreadySet{MOI.EqualTo{T}, MOI.LessThan{T}}(v))
     elseif MOI.Interval{T} ∈ m.var2bndtype[v]
-        throw(MOI.UpperBoundAlreadySet{MOI.Interval{T}, MOI.LessThan{T}}(v.value))
+        throw(MOI.UpperBoundAlreadySet{MOI.Interval{T}, MOI.LessThan{T}}(v))
     end
 
     # Update inner model
@@ -83,25 +87,24 @@ function MOI.add_constraint(
     # Update bound tracking
     push!(m.var2bndtype[v], MOI.LessThan{T})
     
-    return MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{T}}(v.value)
+    return MOI.ConstraintIndex{MOI.VariableIndex, MOI.LessThan{T}}(v.value)
 end
 
 function MOI.add_constraint(
     m::Optimizer{T},
-    f::MOI.SingleVariable,
+    v::MOI.VariableIndex,
     s::MOI.GreaterThan{T}
 ) where{T}
 
     # Check that variable exists
-    v = f.variable
     MOI.throw_if_not_valid(m, v)
     # Check if lower bound already exists
     if MOI.GreaterThan{T} ∈ m.var2bndtype[v]
-        throw(MOI.LowerBoundAlreadySet{MOI.GreaterThan{T}, MOI.GreaterThan{T}}(v.value))
+        throw(MOI.LowerBoundAlreadySet{MOI.GreaterThan{T}, MOI.GreaterThan{T}}(v))
     elseif MOI.EqualTo{T} ∈ m.var2bndtype[v]
-        throw(MOI.LowerBoundAlreadySet{MOI.EqualTo{T}, MOI.GreaterThan{T}}(v.value))
+        throw(MOI.LowerBoundAlreadySet{MOI.EqualTo{T}, MOI.GreaterThan{T}}(v))
     elseif MOI.Interval{T} ∈ m.var2bndtype[v]
-        throw(MOI.LowerBoundAlreadySet{MOI.Interval{T}, MOI.GreaterThan{T}}(v.value))
+        throw(MOI.LowerBoundAlreadySet{MOI.Interval{T}, MOI.GreaterThan{T}}(v))
     end
 
     # Update inner model
@@ -111,27 +114,26 @@ function MOI.add_constraint(
     # Update upper-bound
     push!(m.var2bndtype[v], MOI.GreaterThan{T})
 
-    return MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{T}}(v.value)
+    return MOI.ConstraintIndex{MOI.VariableIndex, MOI.GreaterThan{T}}(v.value)
 end
 
 function MOI.add_constraint(
     m::Optimizer{T},
-    f::MOI.SingleVariable,
+    v::MOI.VariableIndex,
     s::MOI.EqualTo{T}
 ) where{T}
 
     # Check that variable exists
-    v = f.variable
     MOI.throw_if_not_valid(m, v)
     # Check if a bound already exists
     if MOI.LessThan{T} ∈ m.var2bndtype[v]
-        throw(MOI.UpperBoundAlreadySet{MOI.LessThan{T}, MOI.EqualTo{T}}(v.value))
+        throw(MOI.UpperBoundAlreadySet{MOI.LessThan{T}, MOI.EqualTo{T}}(v))
     elseif MOI.GreaterThan{T} ∈ m.var2bndtype[v]
-        throw(MOI.LowerBoundAlreadySet{MOI.GreaterThan{T}, MOI.EqualTo{T}}(v.value))
+        throw(MOI.LowerBoundAlreadySet{MOI.GreaterThan{T}, MOI.EqualTo{T}}(v))
     elseif MOI.EqualTo{T} ∈ m.var2bndtype[v]
-        throw(MOI.UpperBoundAlreadySet{MOI.EqualTo{T}, MOI.EqualTo{T}}(v.value))
+        throw(MOI.UpperBoundAlreadySet{MOI.EqualTo{T}, MOI.EqualTo{T}}(v))
     elseif MOI.Interval{T} ∈ m.var2bndtype[v]
-        throw(MOI.UpperBoundAlreadySet{MOI.Interval{T}, MOI.EqualTo{T}}(v.value))
+        throw(MOI.UpperBoundAlreadySet{MOI.Interval{T}, MOI.EqualTo{T}}(v))
     end
 
     # Update inner model
@@ -142,27 +144,26 @@ function MOI.add_constraint(
     # Update bound tracking
     push!(m.var2bndtype[v], MOI.EqualTo{T})
 
-    return MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{T}}(v.value)
+    return MOI.ConstraintIndex{MOI.VariableIndex, MOI.EqualTo{T}}(v.value)
 end
 
 function MOI.add_constraint(
     m::Optimizer{T},
-    f::MOI.SingleVariable,
+    v::MOI.VariableIndex,
     s::MOI.Interval{T}
 ) where{T}
 
     # Check that variable exists
-    v = f.variable
     MOI.throw_if_not_valid(m, v)
     # Check if a bound already exists
     if MOI.LessThan{T} ∈ m.var2bndtype[v]
-        throw(MOI.UpperBoundAlreadySet{MOI.LessThan{T}, MOI.Interval{T}}(v.value))
+        throw(MOI.UpperBoundAlreadySet{MOI.LessThan{T}, MOI.Interval{T}}(v))
     elseif MOI.GreaterThan{T} ∈ m.var2bndtype[v]
-        throw(MOI.LowerBoundAlreadySet{MOI.GreaterThan{T}, MOI.Interval{T}}(v.value))
+        throw(MOI.LowerBoundAlreadySet{MOI.GreaterThan{T}, MOI.Interval{T}}(v))
     elseif MOI.EqualTo{T} ∈ m.var2bndtype[v]
-        throw(MOI.UpperBoundAlreadySet{MOI.EqualTo{T}, MOI.Interval{T}}(v.value))
+        throw(MOI.UpperBoundAlreadySet{MOI.EqualTo{T}, MOI.Interval{T}}(v))
     elseif MOI.Interval{T} ∈ m.var2bndtype[v]
-        throw(MOI.UpperBoundAlreadySet{MOI.Interval{T}, MOI.Interval{T}}(v.value))
+        throw(MOI.UpperBoundAlreadySet{MOI.Interval{T}, MOI.Interval{T}}(v))
     end
 
     # Update variable bounds
@@ -173,7 +174,7 @@ function MOI.add_constraint(
     # Update bound tracking
     push!(m.var2bndtype[v], MOI.Interval{T})
 
-    return MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{T}}(v.value)
+    return MOI.ConstraintIndex{MOI.VariableIndex, MOI.Interval{T}}(v.value)
 end
 
 # General linear constraints
@@ -196,7 +197,7 @@ function MOI.add_constraint(
     rval = Vector{T}(undef, nz)
     lb, ub = _bounds(s)
     for (k, t) in enumerate(fc.terms)
-        rind[k] = m.var_indices[t.variable_index]
+        rind[k] = m.var_indices[t.variable]
         rval[k] = t.coefficient
     end
 
@@ -219,7 +220,7 @@ end
 # =============================================
 function MOI.delete(
     m::Optimizer{T},
-    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
+    c::MOI.ConstraintIndex{MOI.VariableIndex, S}
 ) where{T, S<:SCALAR_SETS{T}}
 
     # Sanity check
@@ -304,26 +305,27 @@ end
 #
 function MOI.get(
     m::Optimizer{T},
-    ::MOI.ListOfConstraintIndices{MOI.SingleVariable, S}
+    ::MOI.ListOfConstraintIndices{MOI.VariableIndex, S}
 ) where{T, S<:SCALAR_SETS{T}}
-    indices = MOI.ConstraintIndex{MOI.SingleVariable, S}[]
+    indices = MOI.ConstraintIndex{MOI.VariableIndex, S}[]
 
     for (var, bounds_set) in m.var2bndtype
-        S ∈ bounds_set && push!(indices, MOI.ConstraintIndex{MOI.SingleVariable, S}(var.value))
+        S ∈ bounds_set && push!(indices, MOI.ConstraintIndex{MOI.VariableIndex, S}(var.value))
     end
-    return indices
+    return sort!(indices, by = v -> v.value)
 end
 
 function MOI.get(
     m::Optimizer{T},
     ::MOI.ListOfConstraintIndices{MOI.ScalarAffineFunction{T}, S}
 ) where{T, S<:SCALAR_SETS{T}}
-    return [
+    indices = [
         cidx
         for cidx in keys(m.con_indices) if isa(cidx,
             MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, S}
         )
     ]
+    return sort!(indices, by = v -> v.value)
 end
 
 #
@@ -331,7 +333,7 @@ end
 #
 function MOI.get(
     m::Optimizer{T},
-    ::MOI.NumberOfConstraints{MOI.SingleVariable, S}
+    ::MOI.NumberOfConstraints{MOI.VariableIndex, S}
 ) where{T, S<:SCALAR_SETS{T}}
     ncon = 0
     for (v, bound_sets) in m.var2bndtype
@@ -359,8 +361,8 @@ end
 
 function MOI.get(
     m::Optimizer{T}, ::MOI.ConstraintName,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
-) where{T, S<:SCALAR_SETS{T}}
+    c::MOI.ConstraintIndex{MOI.VariableIndex, S}
+) where {T, S<:SCALAR_SETS{T}}
     MOI.throw_if_not_valid(m, c)
     
     return get(m.bnd2name, c, "")
@@ -369,7 +371,7 @@ end
 function MOI.get(
     m::Optimizer{T}, ::MOI.ConstraintName,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, S}
-) where{T, S<:SCALAR_SETS{T}}
+) where {T, S<:SCALAR_SETS{T}}
     MOI.throw_if_not_valid(m, c)
 
     # Get name from inner model
@@ -377,28 +379,8 @@ function MOI.get(
     return get_attribute(m.inner, ConstraintName(), i)
 end
 
-function MOI.set(
-    m::Optimizer{T}, ::MOI.ConstraintName,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, S},
-    name::String
-) where{T, S<:SCALAR_SETS{T}}
-    # Sanity checks
-    MOI.throw_if_not_valid(m, c)
-    c_ = get(m.name2con, name, nothing)
-    c_ === nothing || c_ == c || error("Dupplicate constraint name $name")
-
-    # Remove old name
-    old_name = get(m.bnd2name, c, "")
-    delete!(m.name2con, old_name)
-
-    # Update new name
-    if name == ""
-        delete!(m.bnd2name, c)
-    else
-        m.bnd2name[c] = name
-        m.name2con[name] = c
-    end
-    return nothing
+function MOI.set(::Optimizer, ::MOI.ConstraintName, ::MOI.ConstraintIndex{<:MOI.VariableIndex}, ::String)
+    throw(MOI.VariableIndexConstraintNameError())
 end
 
 function MOI.set(
@@ -410,7 +392,7 @@ function MOI.set(
 
     # Check for dupplicate name
     c_ = get(m.name2con, name, nothing)
-    c_ === nothing || c_ == c || error("Dupplicate constraint name $name")
+    c_ === nothing || c_ == c || error("Duplicate constraint name $name")
 
     # Update inner model
     i = m.con_indices[c]
@@ -435,25 +417,25 @@ end
 #
 function MOI.get(
     m::Optimizer{T}, ::MOI.ConstraintFunction,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
-) where{T, S<:SCALAR_SETS{T}}
+    c::MOI.ConstraintIndex{MOI.VariableIndex, S}
+) where {T, S<:SCALAR_SETS{T}}
     MOI.throw_if_not_valid(m, c)  # Sanity check
 
-    return MOI.SingleVariable(MOI.VariableIndex(c.value))
+    return MOI.VariableIndex(c.value)
 end
 
 function MOI.set(
-    m::Optimizer{T}, ::MOI.ConstraintFunction,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, S},
-    ::MOI.SingleVariable
-) where{T, S<:SCALAR_SETS{T}}
-    return throw(MOI.SettingSingleVariableFunctionNotAllowed())
+    ::Optimizer{T}, ::MOI.ConstraintFunction,
+    c::MOI.ConstraintIndex{MOI.VariableIndex, S},
+    ::MOI.VariableIndex,
+) where {T, S<:SCALAR_SETS{T}}
+    return throw(MOI.SettingVariableIndexNotAllowed())
 end
 
 function MOI.get(
     m::Optimizer{T}, ::MOI.ConstraintFunction,
     c::MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, S}
-) where{T, S<:SCALAR_SETS{T}}
+) where {T, S<:SCALAR_SETS{T}}
     MOI.throw_if_not_valid(m, c)  # Sanity check
 
     # Get row from inner model
@@ -487,12 +469,12 @@ function MOI.set(
     # Set old row to zero
     f_old = MOI.get(m, MOI.ConstraintFunction(), c)
     for term in f_old.terms
-        j = m.var_indices[term.variable_index]
+        j = m.var_indices[term.variable]
         set_coefficient!(m.inner.pbdata, i, j, zero(T))
     end
     # Set new row coefficients
     for term in fc.terms
-        j = m.var_indices[term.variable_index]
+        j = m.var_indices[term.variable]
         set_coefficient!(m.inner.pbdata, i, j, term.coefficient)
     end
 
@@ -506,7 +488,7 @@ end
 #
 function MOI.get(
     m::Optimizer{T}, ::MOI.ConstraintSet,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.LessThan{T}}
+    c::MOI.ConstraintIndex{MOI.VariableIndex, MOI.LessThan{T}}
 ) where{T}
     # Sanity check
     MOI.throw_if_not_valid(m, c)
@@ -521,7 +503,7 @@ end
 
 function MOI.get(
     m::Optimizer{T}, ::MOI.ConstraintSet,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.GreaterThan{T}}
+    c::MOI.ConstraintIndex{MOI.VariableIndex, MOI.GreaterThan{T}}
 ) where{T}
     # Sanity check
     MOI.throw_if_not_valid(m, c)
@@ -536,7 +518,7 @@ end
 
 function MOI.get(
     m::Optimizer{T}, ::MOI.ConstraintSet,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.EqualTo{T}}
+    c::MOI.ConstraintIndex{MOI.VariableIndex, MOI.EqualTo{T}}
 ) where{T}
     # Sanity check
     MOI.throw_if_not_valid(m, c)
@@ -551,7 +533,7 @@ end
 
 function MOI.get(
     m::Optimizer{T}, ::MOI.ConstraintSet,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, MOI.Interval{T}}
+    c::MOI.ConstraintIndex{MOI.VariableIndex, MOI.Interval{T}}
 ) where{T}
     # Sanity check
     MOI.throw_if_not_valid(m, c)
@@ -589,7 +571,7 @@ end
 
 function MOI.set(
     m::Optimizer{T}, ::MOI.ConstraintSet,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, S},
+    c::MOI.ConstraintIndex{MOI.VariableIndex, S},
     s::S
 ) where{T, S<:SCALAR_SETS{T}}
     # Sanity check
@@ -647,7 +629,7 @@ end
 # 
 function MOI.get(
     m::Optimizer{T}, attr::MOI.ConstraintPrimal,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
+    c::MOI.ConstraintIndex{MOI.VariableIndex, S}
 ) where{T, S<:SCALAR_SETS{T}}
     MOI.throw_if_not_valid(m, c)
     MOI.check_result_index_bounds(m, attr)
@@ -674,7 +656,7 @@ end
 #
 function MOI.get(
     m::Optimizer{T}, attr::MOI.ConstraintDual,
-    c::MOI.ConstraintIndex{MOI.SingleVariable, S}
+    c::MOI.ConstraintIndex{MOI.VariableIndex, S}
 ) where{T, S<:SCALAR_SETS{T}}
     MOI.throw_if_not_valid(m, c)
     MOI.check_result_index_bounds(m, attr)

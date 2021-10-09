@@ -4,7 +4,7 @@
 function MOI.supports(
     ::Optimizer{T},
     ::MOI.ObjectiveFunction{F}
-) where{T, F<:Union{MOI.SingleVariable, MOI.ScalarAffineFunction{T}}}
+) where{T, F<:Union{MOI.VariableIndex, MOI.ScalarAffineFunction{T}}}
     return true
 end
 
@@ -13,10 +13,10 @@ end
 # =============================================
 function MOI.get(
     m::Optimizer{T},
-    ::MOI.ObjectiveFunction{MOI.SingleVariable}
+    ::MOI.ObjectiveFunction{MOI.VariableIndex}
 ) where{T}
     obj = MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}}())
-    return convert(MOI.SingleVariable, obj)
+    return convert(MOI.VariableIndex, obj)
 end
 
 function MOI.get(
@@ -40,7 +40,7 @@ function MOI.set(
     m::Optimizer{T},
     ::MOI.ObjectiveFunction{F},
     f::F
-) where{T, F <: MOI.SingleVariable}
+) where{T, F <: MOI.VariableIndex}
 
     MOI.set(
         m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}}(),
@@ -59,13 +59,13 @@ function MOI.set(
     # Sanity checks
     isfinite(f.constant) || error("Objective constant term must be finite")
     for t in f.terms
-        MOI.throw_if_not_valid(m, t.variable_index)
+        MOI.throw_if_not_valid(m, t.variable)
     end
 
     # Update inner model
     m.inner.pbdata.obj .= zero(T) # Reset inner objective to zero
     for t in f.terms
-        j = m.var_indices[t.variable_index]
+        j = m.var_indices[t.variable]
         m.inner.pbdata.obj[j] += t.coefficient  # there may be dupplicates
     end
     set_attribute(m.inner, ObjectiveConstant(), f.constant)  # objective offset
