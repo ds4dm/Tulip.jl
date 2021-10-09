@@ -2,6 +2,7 @@ import MathOptInterface
 const MOI = MathOptInterface
 const MOIT = MOI.Test
 const MOIU = MOI.Utilities
+const MOIB = MOI.Bridges
 
 const OPTIMIZER = TLP.Optimizer()
 
