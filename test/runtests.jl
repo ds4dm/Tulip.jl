@@ -6,8 +6,6 @@ using TOML
 using Tulip
 TLP = Tulip
 
-import Convex
-
 const TvTYPES = [Float32, Float64, BigFloat]
 
 @testset "Tulip" begin
@@ -49,14 +47,14 @@ end
     include("Interfaces/MOI_wrapper.jl")
 end
 
-@testset "Convex Problem Depot tests" begin
-    for T in TvTYPES
-        @testset "$T" begin
-            Convex.ProblemDepot.run_tests(;  exclude=[r"mip", r"exp", r"socp", r"sdp"], T = T) do problem
-                Convex.solve!(problem, () -> Tulip.Optimizer{T}())
-            end
-        end
-    end
-end
+# @testset "Convex Problem Depot tests" begin
+#     for T in TvTYPES
+#         @testset "$T" begin
+#             Convex.ProblemDepot.run_tests(;  exclude=[r"mip", r"exp", r"socp", r"sdp"], T = T) do problem
+#                 Convex.solve!(problem, () -> Tulip.Optimizer{T}())
+#             end
+#         end
+#     end
+# end
 
 end  # Tulip tests
