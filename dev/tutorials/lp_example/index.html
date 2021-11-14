@@ -58,8 +58,8 @@ x = MOI.add_variable(lp)
 y = MOI.add_variable(lp)
 
 # Set variable bounds
-MOI.add_constraint(lp, MOI.SingleVariable(x), MOI.GreaterThan(0.0))  # x &gt;= 0
-MOI.add_constraint(lp, MOI.SingleVariable(y), MOI.GreaterThan(0.0))  # y &gt;= 0
+MOI.add_constraint(lp, x, MOI.GreaterThan(0.0))  # x &gt;= 0
+MOI.add_constraint(lp, y, MOI.GreaterThan(0.0))  # y &gt;= 0
 
 # Add constraints
 row1 = MOI.add_constraint(lp,
@@ -84,7 +84,7 @@ MOI.set(lp, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 
 # Set some parameters
 MOI.set(lp, MOI.Silent(), true)               # disable output
-MOI.set(lp, MOI.RawParameter(&quot;Presolve_Level&quot;), 0)  # disable presolve
+MOI.set(lp, MOI.RawOptimizerAttribute(&quot;Presolve_Level&quot;), 0)  # disable presolve
 
 # Solve the problem
 MOI.optimize!(lp)
@@ -137,4 +137,4 @@ y_ = lp.solution.x[y]
 
 @printf &quot;Z* = %.4f\n&quot; objval
 @printf &quot;x* = %.4f\n&quot; x_
-@printf &quot;y* = %.4f\n&quot; y_</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../../manual/formulation/">Problem formulation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.6 on <span class="colophon-date" title="Saturday 18 September 2021 18:05">Saturday 18 September 2021</span>. Using Julia version 1.6.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+@printf &quot;y* = %.4f\n&quot; y_</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../../manual/formulation/">Problem formulation »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.10 on <span class="colophon-date" title="Sunday 14 November 2021 23:44">Sunday 14 November 2021</span>. Using Julia version 1.6.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
