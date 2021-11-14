@@ -83,7 +83,7 @@ When using Tulip through JuMP/MOI, parameters can be set either through MOI's ge
     ```julia
     moi_model = Tulip.Optimizer{Float64}()
 
-    MOI.set(moi_model, MOI.RawParameter("IPM_IterationsLimit"), 200)
+    MOI.set(moi_model, MOI.RawOptimizerAttribute("IPM_IterationsLimit"), 200)
     ```
 
 * Through Tulip's API

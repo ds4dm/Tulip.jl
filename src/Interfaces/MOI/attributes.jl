@@ -3,10 +3,10 @@
 # =============================================
 const SUPPORTED_OPTIMIZER_ATTR = Union{
     MOI.NumberOfThreads,
-    MOI.RawParameter,
+    MOI.RawOptimizerAttribute,
     MOI.SolverName,
     MOI.Silent,
-    MOI.TimeLimitSec
+    MOI.TimeLimitSec,
 }
 
 MOI.supports(::Optimizer, ::A) where{A<:SUPPORTED_OPTIMIZER_ATTR} = true
@@ -56,9 +56,9 @@ end
 #
 #   RawParameter
 #
-MOI.get(m::Optimizer, attr::MOI.RawParameter) = get_parameter(m.inner, attr.name)
+MOI.get(m::Optimizer, attr::MOI.RawOptimizerAttribute) = get_parameter(m.inner, attr.name)
 
-MOI.set(m::Optimizer, attr::MOI.RawParameter, val) = set_parameter(m.inner, attr.name, val)
+MOI.set(m::Optimizer, attr::MOI.RawOptimizerAttribute, val) = set_parameter(m.inner, attr.name, val)
 
 
 # =============================================
@@ -114,7 +114,7 @@ function MOI.get(
     m::Optimizer{T}, ::MOI.ObjectiveFunctionType
 ) where{T}
     if m._obj_type == _SINGLE_VARIABLE
-        return MOI.SingleVariable
+        return MOI.VariableIndex
     else
         return MOI.ScalarAffineFunction{T}
     end
@@ -148,7 +148,8 @@ end
 #
 function MOI.get(m::Optimizer{T}, attr::MOI.ObjectiveValue) where{T}
     MOI.check_result_index_bounds(m, attr)
-    return get_attribute(m.inner, ObjectiveValue())
+    raw_z = get_attribute(m.inner, ObjectiveValue())
+    return raw_z * !m.is_feas
 end
 
 #
@@ -158,6 +159,8 @@ function MOI.get(m::Optimizer{T}, attr::MOI.DualObjectiveValue) where{T}
     MOI.check_result_index_bounds(m, attr)
     return get_attribute(m.inner, DualObjectiveValue())
 end
+
+MOI.get(m::Optimizer, ::MOI.ObjectiveBound) = MOI.get(m, MOI.DualObjectiveValue())
 
 #
 #   RawSolver
@@ -213,7 +216,7 @@ end
 #
 # TODO: use inner query
 function MOI.get(m::Optimizer, attr::MOI.PrimalStatus)
-    attr.N == 1 || return MOI.NO_SOLUTION
+    attr.result_index == 1 || return MOI.NO_SOLUTION
 
     if isnothing(m.inner.solution)
         return MOI.NO_SOLUTION
@@ -227,7 +230,7 @@ end
 #
 # TODO: use inner query
 function MOI.get(m::Optimizer, attr::MOI.DualStatus)
-    attr.N == 1 || return MOI.NO_SOLUTION
+    attr.result_index == 1 || return MOI.NO_SOLUTION
     
     if isnothing(m.inner.solution)
         return MOI.NO_SOLUTION

@@ -98,7 +98,7 @@ function MOI.set(m::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex, name::S
 
     # Check that name is unique
     v_ = get(m.name2var, name, nothing)
-    v_ === nothing || v_ == v || error("Dupplicate variable name $name")
+    v_ === nothing || v_ == v || error("Duplicate variable name $name")
 
     # Update inner model
     j = m.var_indices[v]

@@ -2,86 +2,114 @@ import MathOptInterface
 const MOI = MathOptInterface
 const MOIT = MOI.Test
 const MOIU = MOI.Utilities
+const MOIB = MOI.Bridges
 
 const OPTIMIZER = TLP.Optimizer()
 
 MOI.set(OPTIMIZER, MOI.Silent(), true)
 
-const CONFIG = MOIT.TestConfig(basis=false, atol=1e-6, rtol=1e-6)
+const CONFIG = MOIT.Config(Float64, atol=1e-6, rtol=1e-6, exclude=Any[MOI.ConstraintBasisStatus, MOI.VariableBasisStatus])
 
-const MOI_EXCLUDE = [
-    # Unit tests
-    "delete_nonnegative_variables",         # Requires Vector-Of-Variables
-    "update_dimension_nonnegative_variables",
-    "delete_soc_variables",
-    "solve_func_vectoraffine_nonneg",       # Requires `VectorAffineFunction` and `Nonnegatives`
-    "get_objective_function",               # Require ScalarQuadratic objective
-    # "solve_result_index",
-    # "solve_singlevariable_obj",
-    # "solve_single_variable_dual_max",
-    # "solve_single_variable_dual_min",
-    "solve_integer_edge_cases",             # Requires integer variables
-    "solve_qcp_edge_cases",                 # Requires quadratic constraints
-    "solve_qp_edge_cases",                  # Requires quadratic objective
-    "solve_zero_one_with_bounds_1",         # Requires binary variables
-    "solve_zero_one_with_bounds_2",         # Requires binary variables
-    "solve_zero_one_with_bounds_3",         # Requires binary variables
-    "solve_affine_deletion_edge_cases",     # Requires VectorAffineFunction-in-Nonpositives
-    "solve_objbound_edge_cases",            # Requires integer variables
-    "solve_duplicate_terms_vector_affine",  # Requires `VectorAffineFunction`
-    "variablenames",                        # TODO, requires to settle the convention on variable names
-    "raw_status_string",                    # TODO
-    "solve_time",                           # TODO
-    # Modifications
-    "delete_variable_with_single_variable_obj",  # Requires SingleVariable objective function
-    "solve_const_vectoraffine_nonpos",      # Requires VectorAffineFunction-in-Nonpositives
-    "solve_multirow_vectoraffine_nonpos",   # Requires VectorAffineFunction-in-Nonpositives
-    # Linear tests
-    "linear7",                              # Requires `VectorAffineFunction` and `Nonnegatives`/`Nonpositives`
-    "linear15",                             # Requires `VectorAffineFunction` and `Zeros`
-    "partial_start"                         # Requires `VariablePrimalStart`
-]
+@testset "Direct optimizer" begin
 
-@testset "MOI Unit Tests" begin
-    @testset "Basic constraint tests" begin
-        MOIT.basic_constraint_tests(OPTIMIZER, CONFIG)
-    end
+    MOIT.runtests(
+        OPTIMIZER, CONFIG,
+        exclude=[
+            # already in TODO
+            "test_attribute_RawStatusString",
+            "test_attribute_SolveTimeSec",
+            # behaviour to implement: list of model, constraint attributes set
+            "test_model_ListOfConstraintAttributesSet",
+            "test_model_ModelFilter_AbstractModelAttribute",
+            "test_model_ModelFilter_ListOfConstraintIndices",
+            "test_model_ModelFilter_ListOfConstraintTypesPresent",
+            "test_model_Name",
+            "test_objective_set_via_modify",
+            # MOI expects to throw when getting duplicate cons / var names
+            "test_model_ScalarAffineFunction_ConstraintName",
+            "test_model_VariableName",
+            "test_model_duplicate_ScalarAffineFunction_ConstraintName",
+            "test_model_duplicate_VariableName",
+            "test_variable_VariableName",
+            # requires get quadratic objective
+            "test_objective_get_ObjectiveFunction_ScalarAffineFunction",
+        ]
+    )
 
-    @testset "Other unit tests" begin
-        MOIT.unittest(OPTIMIZER, CONFIG, MOI_EXCLUDE)
-    end
+end
 
-    @testset "Modifications" begin
-        MOIT.modificationtest(OPTIMIZER, CONFIG, MOI_EXCLUDE)
-    end
+@testset "MOI Bridged" begin
+    BRIDGED = MOIB.full_bridge_optimizer(Tulip.Optimizer(), Float64)
+    MOI.set(BRIDGED, MOI.Silent(), true)
+
+    MOIT.runtests(
+        BRIDGED, CONFIG,
+        exclude=[
+            # already in TODO
+            "test_attribute_RawStatusString",
+            "test_attribute_SolveTimeSec",
+            # behaviour to implement: list of model, constraint attributes set
+            "test_conic_NormInfinityCone_3",
+            "test_conic_NormInfinityCone_INFEASIBLE", # should be NO_SOLUTION or INFEASIBLE_POINT
+            # ListOfConstraintTypePresent
+            "test_conic_NormInfinityCone_VectorAffineFunction",
+            "test_conic_NormInfinityCone_VectorOfVariables",
+            "test_conic_NormOneCone",
+            "test_conic_linear_VectorAffineFunction",
+            "test_conic_linear_VectorOfVariables",
+            "test_model_delete",
+            # List of attributes set
+            "test_model_ListOfConstraintAttributesSet",
+            "test_model_ModelFilter_AbstractModelAttribute",
+            "test_model_ModelFilter_ListOfConstraintIndices",
+            "test_model_ModelFilter_ListOfConstraintTypesPresent",
+            "test_model_Name",
+            "test_objective_set_via_modify",
+            # MOI expects to throw when getting duplicate cons / var names
+            "test_model_ScalarAffineFunction_ConstraintName",
+            "test_model_VariableName",
+            "test_model_duplicate_ScalarAffineFunction_ConstraintName",
+            "test_model_duplicate_VariableName",
+            "test_variable_VariableName",
+            # requires get quadratic objective
+            "test_objective_get_ObjectiveFunction_ScalarAffineFunction",
+        ],
+    )
 end
 
 # Run the MOI tests with HSD and MPC algorithms
 for ipm in [Tulip.HSD, Tulip.MPC]
     @testset "MOI Linear tests - $ipm" begin
         OPTIMIZER.inner.params.IPM.Factory = Tulip.Factory(ipm)
-        MOIT.contlineartest(OPTIMIZER, CONFIG, MOI_EXCLUDE)
+        MOIT.runtests(OPTIMIZER, CONFIG, include=["linear"])
     end
 end
 
-MOI.empty!(OPTIMIZER)
-const BRIDGED = MOI.Bridges.full_bridge_optimizer(OPTIMIZER, Float64)
-MOI.set(BRIDGED, MOI.Silent(), true)
+MOIU.@model(ModelData,
+        (),
+        (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval),
+        (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives),
+        (),
+        (),
+        (MOI.ScalarAffineFunction,),
+        (MOI.VectorOfVariables,),
+        (MOI.VectorAffineFunction,)
+)
 
-@testset "Bridged tests" begin
-    MOIT.unittest(BRIDGED, CONFIG, [
-        "get_objective_function",               # Requires ScalarQuadratic objective
-        "delete_soc_variables",                 # Requires SOC constraints
-        "solve_integer_edge_cases",             # Requires integer variables
-        "solve_qcp_edge_cases",                 # Requires quadratic constraints
-        "solve_qp_edge_cases",                  # Requires quadratic objective
-        "solve_zero_one_with_bounds_1",         # Requires binary variables
-        "solve_zero_one_with_bounds_2",         # Requires binary variables
-        "solve_zero_one_with_bounds_3",         # Requires binary variables
-        "solve_objbound_edge_cases",            # Requires integer variables
-        "variablenames",                        # TODO, requires to settle the convention on variable names
-        "raw_status_string",                    # TODO
-        "solve_time",                           # TODO
-    ])
-    MOIT.contlineartest(BRIDGED, CONFIG, ["partial_start"])
+@testset "Cached optimizer" begin
+    CACHE = MOIU.UniversalFallback(ModelData{Float64}())
+    CACHED = MOIU.CachingOptimizer(CACHE, Tulip.Optimizer())
+    BRIDGED2 = MOIB.full_bridge_optimizer(CACHED, Float64)
+    MOI.set(BRIDGED2, MOI.Silent(), true)
+
+    MOIT.runtests(
+        BRIDGED2, CONFIG,
+        exclude=[
+            # already in TODO
+            "test_attribute_RawStatusString",
+            "test_attribute_SolveTimeSec",
+            # should be NO_SOLUTION or INFEASIBLE_POINT
+            "test_conic_NormInfinityCone_INFEASIBLE",
+            "test_conic_NormOneCone_INFEASIBLE",
+        ])
 end

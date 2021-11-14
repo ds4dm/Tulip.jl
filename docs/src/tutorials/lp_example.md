@@ -88,8 +88,8 @@ x = MOI.add_variable(lp)
 y = MOI.add_variable(lp)
 
 # Set variable bounds
-MOI.add_constraint(lp, MOI.SingleVariable(x), MOI.GreaterThan(0.0))  # x >= 0
-MOI.add_constraint(lp, MOI.SingleVariable(y), MOI.GreaterThan(0.0))  # y >= 0
+MOI.add_constraint(lp, x, MOI.GreaterThan(0.0))  # x >= 0
+MOI.add_constraint(lp, y, MOI.GreaterThan(0.0))  # y >= 0
 
 # Add constraints
 row1 = MOI.add_constraint(lp,
@@ -114,7 +114,7 @@ MOI.set(lp, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 
 # Set some parameters
 MOI.set(lp, MOI.Silent(), true)               # disable output
-MOI.set(lp, MOI.RawParameter("Presolve_Level"), 0)  # disable presolve
+MOI.set(lp, MOI.RawOptimizerAttribute("Presolve_Level"), 0)  # disable presolve
 
 # Solve the problem
 MOI.optimize!(lp)
