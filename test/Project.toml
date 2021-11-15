@@ -6,7 +6,6 @@ MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-Tulip = "6dd1b50a-3aae-11e9-10b5-ef983d2400fa"
 
 [compat]
 Convex = "0.14"
