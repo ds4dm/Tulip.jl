@@ -2,6 +2,7 @@ using LinearAlgebra
 using SparseArrays
 using Test
 using TOML
+using Convex
 
 using Tulip
 TLP = Tulip
@@ -12,7 +13,7 @@ const TvTYPES = [Float32, Float64, BigFloat]
 
 # Check That Tulip.version() matches what's in the Project.toml
 tlp_ver = Tulip.version()
-toml_ver = TOML.parsefile(joinpath(@__DIR__, "Project.toml"))["version"]
+toml_ver = TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"]
 @test tlp_ver == VersionNumber(toml_ver)
 
 @testset "Unit tests" begin
