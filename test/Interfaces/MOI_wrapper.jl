@@ -8,7 +8,12 @@ const OPTIMIZER = TLP.Optimizer()
 
 MOI.set(OPTIMIZER, MOI.Silent(), true)
 
-const CONFIG = MOIT.Config(Float64, atol=1e-6, rtol=1e-6, exclude=Any[MOI.ConstraintBasisStatus, MOI.VariableBasisStatus])
+const CONFIG = MOIT.Config(Float64, atol=1e-6, rtol=1e-6,
+    exclude=Any[
+        MOI.ConstraintBasisStatus,
+        MOI.VariableBasisStatus,
+    ]
+)
 
 @testset "Direct optimizer" begin
 
@@ -33,6 +38,9 @@ const CONFIG = MOIT.Config(Float64, atol=1e-6, rtol=1e-6, exclude=Any[MOI.Constr
             "test_variable_VariableName",
             # requires get quadratic objective
             "test_objective_get_ObjectiveFunction_ScalarAffineFunction",
+            # Tulip not compliant with MOI convention for primal/dual infeasible models
+            # See expected behavior at https://jump.dev/MathOptInterface.jl/dev/background/infeasibility_certificates/
+            "test_unbounded",
         ]
     )
 
@@ -73,6 +81,9 @@ end
             "test_variable_VariableName",
             # requires get quadratic objective
             "test_objective_get_ObjectiveFunction_ScalarAffineFunction",
+            # Tulip not compliant with MOI convention for primal/dual infeasible models
+            # See expected behavior at https://jump.dev/MathOptInterface.jl/dev/background/infeasibility_certificates/
+            "test_unbounded",
         ],
     )
 end
@@ -111,5 +122,8 @@ MOIU.@model(ModelData,
             # should be NO_SOLUTION or INFEASIBLE_POINT
             "test_conic_NormInfinityCone_INFEASIBLE",
             "test_conic_NormOneCone_INFEASIBLE",
+            # Tulip not compliant with MOI convention for primal/dual infeasible models
+            # See expected behavior at https://jump.dev/MathOptInterface.jl/dev/background/infeasibility_certificates/
+            "test_unbounded",
         ])
 end
