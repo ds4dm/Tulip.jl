@@ -5,6 +5,7 @@ const SUPPORTED_OPTIMIZER_ATTR = Union{
     MOI.NumberOfThreads,
     MOI.RawOptimizerAttribute,
     MOI.SolverName,
+    MOI.SolverVersion,
     MOI.Silent,
     MOI.TimeLimitSec,
 }
@@ -31,6 +32,11 @@ end
 #   SolverName
 #
 MOI.get(::Optimizer, ::MOI.SolverName) = "Tulip"
+
+#
+#   SolverVersion
+#
+MOI.get(::Optimizer, ::MOI.SolverVersion) = string(Tulip.version())
 
 #
 #   Silent
@@ -139,7 +145,7 @@ function MOI.set(m::Optimizer, ::MOI.ObjectiveSense, s::MOI.OptimizationSense)
     else
         error("Objetive sense not supported: $s")
     end
-    
+
     return nothing
 end
 
@@ -231,7 +237,7 @@ end
 # TODO: use inner query
 function MOI.get(m::Optimizer, attr::MOI.DualStatus)
     attr.result_index == 1 || return MOI.NO_SOLUTION
-    
+
     if isnothing(m.inner.solution)
         return MOI.NO_SOLUTION
     else
