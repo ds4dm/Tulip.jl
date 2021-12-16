@@ -106,18 +106,22 @@ mutable struct Optimizer{T} <: MOI.AbstractOptimizer
     # Keep track of bound constraints
     var2bndtype::Dict{MOI.VariableIndex, Set{Type{<:MOI.AbstractScalarSet}}}
 
+    # Tulip.Model does not record solution time...
+    solve_time::Float64
+
     function Optimizer{T}(;kwargs...) where{T}
         m = new{T}(
             Model{T}(), false, _SCALAR_AFFINE,
             # Variable and constraint counters
-            0, 0, 
+            0, 0,
             # Index mapping
             MOI.VariableIndex[], Dict{MOI.VariableIndex, Int}(),
             MOI.ConstraintIndex[], Dict{MOI.ConstraintIndex{MOI.ScalarAffineFunction, <:SCALAR_SETS{T}}, Int}(),
             # Name -> index mapping
             Dict{String, MOI.VariableIndex}(), Dict{String, MOI.ConstraintIndex}(),
             Dict{MOI.ConstraintIndex, String}(),  # Variable bounds tracking
-            Dict{MOI.VariableIndex, Set{Type{<:MOI.AbstractScalarSet}}}()
+            Dict{MOI.VariableIndex, Set{Type{<:MOI.AbstractScalarSet}}}(),
+            0.0
         )
 
         for (k, v) in kwargs
@@ -146,6 +150,8 @@ function MOI.empty!(m::Optimizer)
     # Reset bound tracking
     m.bnd2name = Dict{MOI.ConstraintIndex, String}()
     m.var2bndtype  = Dict{MOI.VariableIndex, Set{MOI.ConstraintIndex}}()
+
+    m.solve_time = 0.0
     return nothing
 end
 
@@ -167,7 +173,11 @@ function MOI.is_empty(m::Optimizer)
     return true
 end
 
-MOI.optimize!(m::Optimizer) = optimize!(m.inner)
+function MOI.optimize!(m::Optimizer)
+    t_solve = @elapsed optimize!(m.inner)
+    m.solve_time = t_solve
+    return nothing
+end
 
 MOI.supports_incremental_interface(::Optimizer) = true
 
