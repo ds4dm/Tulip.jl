@@ -86,7 +86,7 @@ const SUPPORTED_MODEL_ATTR = Union{
     MOI.SimplexIterations,
     MOI.BarrierIterations,
     MOI.RawSolver,
-    # MOI.RawStatusString,  # TODO
+    MOI.RawStatusString,
     MOI.ResultCount,
     MOI.TerminationStatus,
     MOI.PrimalStatus,
@@ -181,6 +181,13 @@ function MOI.get(m::Optimizer{T}, ::MOI.RelativeGap) where{T}
     zp = m.inner.solver.primal_objective
     zd = m.inner.solver.dual_objective
     return (abs(zp - zd) / (T(1 // 10^6)) + abs(zd))
+end
+
+#
+#   RawStatusString
+#
+function MOI.get(m::Optimizer, ::MOI.RawStatusString)
+    return string(m.inner.status)
 end
 
 #
