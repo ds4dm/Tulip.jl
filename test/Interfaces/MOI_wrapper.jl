@@ -20,9 +20,6 @@ const CONFIG = MOIT.Config(Float64, atol=1e-6, rtol=1e-6,
     MOIT.runtests(
         OPTIMIZER, CONFIG,
         exclude=[
-            # already in TODO
-            "test_attribute_RawStatusString",
-            "test_attribute_SolveTimeSec",
             # behaviour to implement: list of model, constraint attributes set
             "test_model_ListOfConstraintAttributesSet",
             "test_model_ModelFilter_AbstractModelAttribute",
@@ -53,9 +50,6 @@ end
     MOIT.runtests(
         BRIDGED, CONFIG,
         exclude=[
-            # already in TODO
-            "test_attribute_RawStatusString",
-            "test_attribute_SolveTimeSec",
             # behaviour to implement: list of model, constraint attributes set
             "test_conic_NormInfinityCone_3",
             "test_conic_NormInfinityCone_INFEASIBLE", # should be NO_SOLUTION or INFEASIBLE_POINT
@@ -116,9 +110,6 @@ MOIU.@model(ModelData,
     MOIT.runtests(
         BRIDGED2, CONFIG,
         exclude=[
-            # already in TODO
-            "test_attribute_RawStatusString",
-            "test_attribute_SolveTimeSec",
             # should be NO_SOLUTION or INFEASIBLE_POINT
             "test_conic_NormInfinityCone_INFEASIBLE",
             "test_conic_NormOneCone_INFEASIBLE",

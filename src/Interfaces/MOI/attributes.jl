@@ -6,6 +6,7 @@ const SUPPORTED_OPTIMIZER_ATTR = Union{
     MOI.RawOptimizerAttribute,
     MOI.SolverName,
     MOI.SolverVersion,
+    MOI.SolveTimeSec,
     MOI.Silent,
     MOI.TimeLimitSec,
 }
@@ -37,6 +38,11 @@ MOI.get(::Optimizer, ::MOI.SolverName) = "Tulip"
 #   SolverVersion
 #
 MOI.get(::Optimizer, ::MOI.SolverVersion) = string(Tulip.version())
+
+#
+#   SolveTimeSec
+#
+MOI.get(m::Optimizer, ::MOI.SolveTimeSec) = m.solve_time
 
 #
 #   Silent
