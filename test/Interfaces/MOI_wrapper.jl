@@ -28,9 +28,7 @@ const CONFIG = MOIT.Config(Float64, atol=1e-6, rtol=1e-6,
             "test_model_Name",
             "test_objective_set_via_modify",
             # MOI expects to throw when getting duplicate cons / var names
-            "test_model_ScalarAffineFunction_ConstraintName",
             "test_model_VariableName",
-            "test_model_duplicate_ScalarAffineFunction_ConstraintName",
             "test_model_duplicate_VariableName",
             "test_variable_VariableName",
             # requires get quadratic objective
