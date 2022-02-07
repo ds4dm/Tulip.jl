@@ -1,7 +1,7 @@
 # =============================================
 #   1. Supported variable attributes
 # =============================================
-    
+
 """
     SUPPORTED_VARIABLE_ATTR
 
@@ -29,7 +29,7 @@ function MOI.add_variable(m::Optimizer{T}) where{T}
     m.var_counter += 1
     x = MOI.VariableIndex(m.var_counter)
     j = Tulip.add_variable!(m.inner.pbdata, Int[], T[], zero(T), T(-Inf), T(Inf))
-    
+
     # Update tracking of variables
     m.var_indices[x] = j
     m.var2bndtype[x] = Set{Type{<:MOI.AbstractScalarSet}}()
@@ -62,12 +62,18 @@ function MOI.delete(m::Optimizer, v::MOI.VariableIndex)
 
     # Update inner model
     j = m.var_indices[v]
+    old_name = get_attribute(m.inner, VariableName(), j)
     delete_variable!(m.inner.pbdata, j)
-    
+
     # Remove bound tracking
     delete!(m.var2bndtype, v)
-    
-    # TODO: name update
+
+    # Name update
+    if old_name != ""
+        s = m.name2var[old_name]
+        delete!(s, v)
+        length(s) == 0 && delete!(m.name2var, old_name)
+    end
 
     # Update indices correspondence
     deleteat!(m.var_indices_moi, j)
@@ -82,7 +88,16 @@ end
 #   4. Get/set variable attributes
 # =============================================
 
-MOI.get(m::Optimizer, ::Type{MOI.VariableIndex}, name::String) = get(m.name2var, name, nothing)
+function MOI.get(m::Optimizer, ::Type{MOI.VariableIndex}, name::String)
+    s = get(m.name2var, name, Set{MOI.VariableIndex}())
+    if length(s) == 0
+        return nothing
+    elseif length(s) == 1
+        return first(s)
+    else
+        error("Duplicate variable name detected: $(name)")
+    end
+end
 
 function MOI.get(m::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex)
     MOI.throw_if_not_valid(m, v)
@@ -96,17 +111,25 @@ function MOI.set(m::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex, name::S
     # Check that variable does exist
     MOI.throw_if_not_valid(m, v)
 
-    # Check that name is unique
-    v_ = get(m.name2var, name, nothing)
-    v_ === nothing || v_ == v || error("Duplicate variable name $name")
+    s = get!(m.name2var, name, Set{MOI.VariableIndex}())
 
     # Update inner model
     j = m.var_indices[v]
+    old_name = get_attribute(m.inner, VariableName(), j)
     set_attribute(m.inner, VariableName(), j, name)
 
     # Update names mapping
-    m.name2var[name] = v
-    
+    push!(s, v)
+    # Delete old name
+    s_old = get(m.name2var, old_name, Set{MOI.ConstraintIndex}())
+    if length(s_old) == 0
+        # Variable didn't have name before
+    elseif length(s_old) == 1
+        # Delete this from mapping
+        delete!(m.name2var, old_name)
+    else
+        delete!(s_old, v)
+    end
     return nothing
 end
 
