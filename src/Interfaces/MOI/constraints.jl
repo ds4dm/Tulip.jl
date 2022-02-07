@@ -12,7 +12,7 @@ const SUPPORTED_CONSTR_ATTR = Union{
     MOI.ConstraintPrimal,
     MOI.ConstraintDual,
     # MOI.ConstraintPrimalStart,
-    # MOI.ConstraintDualStart, # once dual warm-start is supported 
+    # MOI.ConstraintDualStart, # once dual warm-start is supported
     # MOI.ConstraintBasisStatus,  # once cross-over is supported
     MOI.ConstraintFunction,
     MOI.ConstraintSet
@@ -86,7 +86,7 @@ function MOI.add_constraint(
 
     # Update bound tracking
     push!(m.var2bndtype[v], MOI.LessThan{T})
-    
+
     return MOI.ConstraintIndex{MOI.VariableIndex, MOI.LessThan{T}}(v.value)
 end
 
@@ -243,7 +243,11 @@ function MOI.delete(
 
     # Update name tracking
     old_name = get(m.bnd2name, c, "")
-    old_name != "" && delete!(m.name2con, old_name)  # delete old name
+    if old_name != "" && haskey(m.name2con, old_name)
+        s = m.name2con[old_name]
+        delete!(s, c)
+        length(s) == 0 && delete!(m.name2con, old_name)
+    end
     delete!(m.bnd2name, c)
 
     # Delete tracking of bounds
@@ -271,7 +275,11 @@ function MOI.delete(
     delete!(m.con_indices, c)
 
     # Update name tracking
-    old_name != "" && delete!(m.name2con, old_name)
+    if old_name != "" && haskey(m.name2con, old_name)
+        s = m.name2con[old_name]
+        delete!(s, c)
+        length(s) == 0 && delete!(m.name2con, old_name)
+    end
 
     return nothing
 end
@@ -351,7 +359,7 @@ function MOI.get(
     for cidx in keys(m.con_indices)
         ncon += isa(cidx, MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, S})
     end
-    
+
     return ncon
 end
 
@@ -364,7 +372,7 @@ function MOI.get(
     c::MOI.ConstraintIndex{MOI.VariableIndex, S}
 ) where {T, S<:SCALAR_SETS{T}}
     MOI.throw_if_not_valid(m, c)
-    
+
     return get(m.bnd2name, c, "")
 end
 
@@ -390,9 +398,7 @@ function MOI.set(
 ) where{T, S<:SCALAR_SETS{T}}
     MOI.throw_if_not_valid(m, c)
 
-    # Check for dupplicate name
-    c_ = get(m.name2con, name, nothing)
-    c_ === nothing || c_ == c || error("Duplicate constraint name $name")
+    s = get!(m.name2con, name, Set{MOI.ConstraintIndex}())
 
     # Update inner model
     i = m.con_indices[c]
@@ -400,16 +406,30 @@ function MOI.set(
     set_attribute(m.inner, ConstraintName(), i, name)
 
     # Update constraint name tracking
-    delete!(m.name2con, old_name)
-    if name != ""
-        m.name2con[name] = c
+    push!(s, c)
+    # Delete old name
+    s_old = get(m.name2con, old_name, Set{MOI.ConstraintIndex}())
+    if length(s_old) == 0
+        # Constraint previously didn't have name --> ignore
+    elseif length(s_old) == 1
+        delete!(m.name2con, old_name)
+    else
+        delete!(s_old, c)
     end
     return nothing
 end
 
 function MOI.get(m::Optimizer, CIType::Type{<:MOI.ConstraintIndex}, name::String)
-    c = get(m.name2con, name, nothing)
-    return isa(c, CIType) ? c : nothing
+    s = get(m.name2con, name, Set{MOI.ConstraintIndex}())
+    if length(s) == 0
+        return nothing
+    elseif length(s) == 1
+        c = first(s)
+        return isa(c, CIType) ? c : nothing
+    else
+        error("Duplicate constraint name detected: $(name)")
+    end
+    return nothing
 end
 
 #
@@ -604,7 +624,7 @@ function MOI.set(
     s::S
 ) where{T, S<:SCALAR_SETS{T}}
     MOI.throw_if_not_valid(m, c)
-    
+
     # Update inner bounds
     i = m.con_indices[c]
     if S == MOI.LessThan{T}
@@ -626,7 +646,7 @@ end
 
 #
 #   ConstraintPrimal
-# 
+#
 function MOI.get(
     m::Optimizer{T}, attr::MOI.ConstraintPrimal,
     c::MOI.ConstraintIndex{MOI.VariableIndex, S}

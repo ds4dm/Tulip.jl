@@ -96,8 +96,8 @@ mutable struct Optimizer{T} <: MOI.AbstractOptimizer
     con_indices::Dict{MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, <:SCALAR_SETS{T}}, Int}
 
     # Variable and constraint names
-    name2var::Dict{String, MOI.VariableIndex}
-    name2con::Dict{String, MOI.ConstraintIndex}
+    name2var::Dict{String, Set{MOI.VariableIndex}}
+    name2con::Dict{String, Set{MOI.ConstraintIndex}}
     # MOIIndex -> name mapping for SingleVariable constraints
     # Will be dropped with MOI 0.10
     #   => (https://github.com/jump-dev/MathOptInterface.jl/issues/832)
@@ -118,7 +118,8 @@ mutable struct Optimizer{T} <: MOI.AbstractOptimizer
             MOI.VariableIndex[], Dict{MOI.VariableIndex, Int}(),
             MOI.ConstraintIndex[], Dict{MOI.ConstraintIndex{MOI.ScalarAffineFunction, <:SCALAR_SETS{T}}, Int}(),
             # Name -> index mapping
-            Dict{String, MOI.VariableIndex}(), Dict{String, MOI.ConstraintIndex}(),
+            Dict{String, Set{MOI.VariableIndex}}(),
+            Dict{String, Set{MOI.ConstraintIndex}}(),
             Dict{MOI.ConstraintIndex, String}(),  # Variable bounds tracking
             Dict{MOI.VariableIndex, Set{Type{<:MOI.AbstractScalarSet}}}(),
             0.0
@@ -144,8 +145,8 @@ function MOI.empty!(m::Optimizer)
     m.con_indices = Dict{MOI.ConstraintIndex, Int}()
 
     # Reset name mappings
-    m.name2var = Dict{String, MOI.VariableIndex}()
-    m.name2con = Dict{String, MOI.ConstraintIndex}()
+    m.name2var = Dict{String, Set{MOI.VariableIndex}}()
+    m.name2con = Dict{String, Set{MOI.ConstraintIndex}}()
 
     # Reset bound tracking
     m.bnd2name = Dict{MOI.ConstraintIndex, String}()
