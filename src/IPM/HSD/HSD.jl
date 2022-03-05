@@ -113,7 +113,7 @@ function compute_residuals!(hsd::HSD{T}
 
     # Residuals norm
     res.rp_nrm = norm(res.rp, Inf)
-    res.rl_nrm = norm(res.ru, Inf)
+    res.rl_nrm = norm(res.rl, Inf)
     res.ru_nrm = norm(res.ru, Inf)
     res.rd_nrm = norm(res.rd, Inf)
     res.rg_nrm = norm(res.rg, Inf)

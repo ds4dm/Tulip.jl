@@ -73,26 +73,15 @@ function run_tests_hsd(T::Type)
     hsd.pt.y  .= T.([0, 1])
     hsd.pt.zl .= T.([0, 0])
     hsd.pt.zu .= T.([0, 0])
-    
+
     hsd.pt.τ  = 1
     hsd.pt.κ  = 0
     hsd.pt.μ  = 0
 
     ϵ = sqrt(eps(T))
-
-    @testset "Residuals" begin
-        @inferred TLP.compute_residuals!(hsd)
-        TLP.compute_residuals!(hsd)
-        
-        @test isapprox(hsd.res.rp_nrm, zero(T); atol=ϵ, rtol=ϵ)
-        @test isapprox(hsd.res.ru_nrm, zero(T); atol=ϵ, rtol=ϵ)
-        @test isapprox(hsd.res.rd_nrm, zero(T); atol=ϵ, rtol=ϵ)
-        @test isapprox(hsd.res.rg_nrm, zero(T); atol=ϵ, rtol=ϵ)
-        
-    end
+    TLP.compute_residuals!(hsd)
 
     @testset "Convergence" begin
-
         hsd.solver_status = TLP.Trm_Unknown
         TLP.update_solver_status!(hsd, ϵ, ϵ, ϵ, ϵ)
         @test hsd.solver_status == TLP.Trm_Optimal
@@ -106,8 +95,62 @@ function run_tests_hsd(T::Type)
     end
 end
 
+function test_hsd_residuals(T::Type)
+    # Simple example:
+    #=
+        min     x1 - x2
+        s.τ.    x1 + x2 = 1
+                x1 - x2 = 0
+                0 <= x1 <= 2
+                0 <= x2 <= 2
+    =#
+    kkt_options = TLP.KKTOptions{T}()
+    A = Matrix{T}([
+        [1    1];
+        [1   -1]
+    ])
+    b = Vector{T}([1,  0])
+    c = Vector{T}([1, -1])
+    c0 = zero(T)
+    l = Vector{T}([0, 0])
+    u = Vector{T}([2, 2])
+    dat = Tulip.IPMData(A, b, true, c, c0, l, u)
+
+    hsd = TLP.HSD(dat, kkt_options)
+    pt = hsd.pt
+    res = hsd.res
+
+    # Primal-dual solution
+    x  = pt.x  .= T[3, 5]
+    xl = pt.xl .= T[1, 8]
+    xu = pt.xu .= T[2, 1]
+    y  = pt.y  .= T[10, -2]
+    zl = pt.zl .= T[2, 1]
+    zu = pt.zu .= T[5, 7]
+    τ  = pt.τ  = T(1//2)
+    κ  = pt.κ  = T(1//10)
+    μ  = pt.μ  = 0
+
+    TLP.compute_residuals!(hsd)
+
+    @test res.rp ≈ (τ .* b) - A * x
+    @test res.rl ≈ (τ .* l) - (x - xl)
+    @test res.ru ≈ (τ .* u) - (x + xu)
+    @test res.rd ≈ (τ .* c) - A' * y - zl + zu
+    @test res.rg ≈ c'x - (b'y + l'zl - u'zu) + κ
+
+    @test res.rp_nrm == norm(res.rp, Inf)
+    @test res.rl_nrm == norm(res.rl, Inf)
+    @test res.ru_nrm == norm(res.ru, Inf)
+    @test res.rd_nrm == norm(res.rd, Inf)
+    @test res.rg_nrm == norm(res.rg, Inf)
+
+    return nothing
+end
+
 @testset "HSD" begin
-    for T in TvTYPES
-        @testset "$T" begin run_tests_hsd(T) end
+    @testset "$T" for T in TvTYPES
+        run_tests_hsd(T)
+        test_hsd_residuals(T)
     end
 end
