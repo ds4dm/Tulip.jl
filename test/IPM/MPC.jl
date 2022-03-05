@@ -73,27 +73,16 @@ function run_tests_mpc(T::Type)
     ipm.pt.y  .= T.([0, 1])
     ipm.pt.zl .= T.([0, 0])
     ipm.pt.zu .= T.([0, 0])
-    
+
     ipm.pt.τ  = 1
     ipm.pt.κ  = 0
     ipm.pt.μ  = 0
 
     ϵ = sqrt(eps(T))
-
-    @testset "Residuals" begin
-        @inferred TLP.compute_residuals!(ipm)
-        TLP.compute_residuals!(ipm)
-        
-        @test isapprox(ipm.res.rp_nrm, zero(T); atol=ϵ, rtol=ϵ)
-        @test isapprox(ipm.res.ru_nrm, zero(T); atol=ϵ, rtol=ϵ)
-        @test isapprox(ipm.res.rd_nrm, zero(T); atol=ϵ, rtol=ϵ)
-        @test isapprox(ipm.res.rg_nrm, zero(T); atol=ϵ, rtol=ϵ)
-        
-    end
+    TLP.compute_residuals!(ipm)
 
     @testset "Convergence" begin
-
-    ipm.solver_status = TLP.Trm_Unknown
+        ipm.solver_status = TLP.Trm_Unknown
         TLP.update_solver_status!(ipm, ϵ, ϵ, ϵ, ϵ)
         @test ipm.solver_status == TLP.Trm_Optimal
 
@@ -106,8 +95,62 @@ function run_tests_mpc(T::Type)
     end
 end
 
+function test_mpc_residuals(T::Type)
+    # Simple example:
+    #=
+        min     x1 - x2
+        s.τ.    x1 + x2 = 1
+                x1 - x2 = 0
+                0 <= x1 <= 2
+                0 <= x2 <= 2
+    =#
+    kkt_options = TLP.KKTOptions{T}()
+    A = Matrix{T}([
+        [1    1];
+        [1   -1]
+    ])
+    b = Vector{T}([1,  0])
+    c = Vector{T}([1, -1])
+    c0 = zero(T)
+    l = Vector{T}([0, 0])
+    u = Vector{T}([2, 2])
+    dat = Tulip.IPMData(A, b, true, c, c0, l, u)
+
+    ipm = TLP.MPC(dat, kkt_options)
+    pt = ipm.pt
+    res = ipm.res
+
+    # Primal-dual solution
+    x  = pt.x  .= T[3, 5]
+    xl = pt.xl .= T[1, 8]
+    xu = pt.xu .= T[2, 1]
+    y  = pt.y  .= T[10, -2]
+    zl = pt.zl .= T[2, 1]
+    zu = pt.zu .= T[5, 7]
+    pt.τ  = 1
+    pt.κ  = 0
+    pt.μ  = 0
+
+    TLP.compute_residuals!(ipm)
+
+    @test res.rp ≈ b - A*x
+    @test res.rl ≈ l - (x - xl)
+    @test res.ru ≈ u - (x + xu)
+    @test res.rd ≈ c - A' * y - zl + zu
+    @test res.rg == 0
+
+    @test res.rp_nrm == norm(res.rp, Inf)
+    @test res.rl_nrm == norm(res.rl, Inf)
+    @test res.ru_nrm == norm(res.ru, Inf)
+    @test res.rd_nrm == norm(res.rd, Inf)
+    @test res.rg_nrm == norm(res.rg, Inf)
+
+    return nothing
+end
+
 @testset "MPC" begin
-    for T in TvTYPES
-        @testset "$T" begin run_tests_mpc(T) end
+    @testset "$T" for T in TvTYPES
+        run_tests_mpc(T)
+        test_mpc_residuals(T)
     end
 end
