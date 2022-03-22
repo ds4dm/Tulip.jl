@@ -1,7 +1,7 @@
 name = "Tulip"
 uuid = "6dd1b50a-3aae-11e9-10b5-ef983d2400fa"
 authors = ["Mathieu Tanneau <mathieu.tanneau@gmail.com>"]
-version = "0.9.2"
+version = "0.9.3"
 
 [deps]
 CodecBzip2 = "523fee87-0ab8-5b00-afb7-3ecf72e48cfd"
@@ -16,6 +16,7 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 QPSReader = "10f199a5-22af-520b-b891-7ce84a7b1bd0"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
+TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 

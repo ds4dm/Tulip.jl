@@ -8,12 +8,12 @@ TLP = Tulip
 
 const TvTYPES = [Float32, Float64, BigFloat]
 
-@testset "Tulip" begin
-
 # Check That Tulip.version() matches what's in the Project.toml
 tlp_ver = Tulip.version()
-toml_ver = TOML.parsefile("../Project.toml")["version"]
-@test tlp_ver == VersionNumber(toml_ver)
+toml_ver = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
+@test tlp_ver == toml_ver
+
+@testset "Tulip" begin
 
 @testset "Unit tests" begin
 

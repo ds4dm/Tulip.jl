@@ -4,10 +4,19 @@ using LinearAlgebra
 using Logging
 using Printf
 using SparseArrays
+using TOML
 
 using TimerOutputs
 
-version() = v"0.9.2"
+const _TULIP_VERSION = Ref{VersionNumber}()
+
+function __init__()
+    # Read Tulip version from Project.toml file
+    tlp_ver = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
+    _TULIP_VERSION[] = tlp_ver
+end
+
+version() = _TULIP_VERSION[]
 
 include("utils.jl")
 
