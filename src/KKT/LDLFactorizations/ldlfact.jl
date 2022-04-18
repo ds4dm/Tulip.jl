@@ -46,12 +46,12 @@ mutable struct LDLFactSolver{T,S} <: AbstractKKTSolver{T}
     A::SparseMatrixCSC{T,Int}
 
     # Workspace
-    θ::Vector{T}                 # Diagonal scaling
-    regP::Vector{T}              # Primal regularization
-    regD::Vector{T}              # Dual regularization
-    K::SparseMatrixCSC{T,Int}    # KKT matrix
-    F::LDLF.LDLFactorization{T}  # Factorization
-    ξ::Vector{T}                 # RHS of KKT system
+    θ::Vector{T}                             # Diagonal scaling
+    regP::Vector{T}                          # Primal regularization
+    regD::Vector{T}                          # Dual regularization
+    K::SparseMatrixCSC{T,Int}                # KKT matrix
+    F::LDLF.LDLFactorization{T,Int,Int,Int}  # Factorization
+    ξ::Vector{T}                             # RHS of KKT system
 end
 
 backend(::LDLFactSolver) = "LDLFactorizations"
