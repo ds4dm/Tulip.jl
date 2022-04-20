@@ -20,8 +20,8 @@ function _open(f::Function, fname::String)
 end
 
 # Positive and negative part of a number
-pos_part(x::T) where{T} = x >= zero(T) ? x : zero(T)
-neg_part(x::T) where{T} = x >= zero(T) ? zero(T) : -x
+pos_part(x::T) where{T} = !signbit(x) ? x : zero(T)
+neg_part(x::T) where{T} = !signbit(x) ? zero(T) : -x
 
 
 @inline tones(Tv, n)  = fill!(Tv(undef, n),  one(eltype(Tv)))
