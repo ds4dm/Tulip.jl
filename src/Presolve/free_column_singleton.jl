@@ -41,7 +41,7 @@ function remove_free_column_singleton!(ps::PresolveData{T}, j::Int) where{T}
     l, u = ps.lcol[j], ps.ucol[j]
     if isfinite(l) || isfinite(u)
         # Not a free variable, compute implied bounds
-        if aij > zero(T)
+        if !signbit(aij)
             l_, u_ = lr, ur
             for (k, aik) in zip(row.nzind, row.nzval)
                 (ps.colflag[k] && k != j) || continue

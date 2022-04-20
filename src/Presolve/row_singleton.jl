@@ -37,7 +37,7 @@ function remove_row_singleton!(ps::PresolveData{T}, i::Int) where{T}
     end
 
     # Compute implied bounds
-    if aij > zero(T)
+    if !signbit(aij)
         l = ps.lrow[i] / aij
         u = ps.urow[i] / aij
     else
