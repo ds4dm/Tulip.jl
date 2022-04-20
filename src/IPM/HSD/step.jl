@@ -277,7 +277,7 @@ function max_step_length(x::Vector{T}, dx::Vector{T}) where{T}
     a = T(Inf)
 
     @inbounds for i in 1:n
-        if dx[i] < zero(T)
+        if signbit(dx[i])
             if (-x[i] / dx[i]) < a
                 a = (-x[i] / dx[i])
             end
@@ -297,8 +297,8 @@ function max_step_length(pt::Point{T, Tv}, δ::Point{T, Tv}) where{T, Tv<:Abstra
     azl = max_step_length(pt.zl, δ.zl)
     azu = max_step_length(pt.zu, δ.zu)
 
-    at = δ.τ < zero(T) ? (-pt.τ / δ.τ) : oneunit(T)
-    ak = δ.κ < zero(T) ? (-pt.κ / δ.κ) : oneunit(T)
+    at = signbit(δ.τ) ? (-pt.τ / δ.τ) : oneunit(T)
+    ak = signbit(δ.κ) ? (-pt.κ / δ.κ) : oneunit(T)
 
     α = min(one(T), axl, axu, azl, azu, at, ak)
 
