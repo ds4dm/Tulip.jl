@@ -84,7 +84,7 @@ function remove_free_column_singleton!(ps::PresolveData{T}, j::Int) where{T}
     y = ps.obj[j] / aij  # dual of row i
 
     # Update objective
-    ps.obj0 += (y >= zero(T)) ? y * lr : y * ur
+    ps.obj0 += !signbit(y) ? y * lr : y * ur
     row_ = Row{T}(Int[], T[])
     for (j_, aij_) in zip(row.nzind, row.nzval)
         ps.colflag[j_] && (j_ != j) || continue
@@ -117,7 +117,7 @@ function postsolve!(sol::Solution{T}, op::FreeColumnSingleton{T}) where{T}
     sol.s_upper[op.j] = zero(T)
 
     # Primal
-    sol.x[op.j] = sol.is_primal_ray ? zero(T) : (y >= zero(T) ? op.l : op.u)
+    sol.x[op.j] = sol.is_primal_ray ? zero(T) : (!signbit(y) ? op.l : op.u)
     for (k, aik) in zip(op.row.nzind, op.row.nzval)
         sol.x[op.j] -= aik * sol.x[k]
     end

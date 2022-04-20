@@ -20,7 +20,7 @@ function remove_forcing_row!(ps::PresolveData{T}, i::Int) where{T}
     l_ = u_ = zero(T)
     for (j, aij) in zip(row.nzind, row.nzval)
         ps.colflag[j] || continue
-        if aij < zero(T)
+        if signbit(aij)
             l_ += aij * ps.ucol[j]
             u_ += aij * ps.lcol[j]
         else
