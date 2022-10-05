@@ -111,14 +111,12 @@ function compute_residuals!(mpc::MPC{T}) where{T}
     # Lower-bound residual
     # rl_j = l_j - (x_j - xl_j)  if l_j ∈ R
     #      = 0                   if l_j = -∞
-    @. res.rl = (dat.l + pt.xl) - pt.x
-    res.rl .*= dat.lflag
+    @. res.rl = ((dat.l + pt.xl) - pt.x) * dat.lflag
 
     # Upper-bound residual
     # ru_j = u_j - (x_j + xu_j)  if u_j ∈ R
     #      = 0                   if u_j = +∞
-    @. res.ru = dat.u - (pt.x + pt.xu)
-    res.ru .*= dat.uflag
+    @. res.ru = (dat.u - (pt.x + pt.xu)) * dat.uflag
 
     # Dual residual
     # rd = c - (A'y + zl - zu)
@@ -188,8 +186,8 @@ function update_solver_status!(mpc::MPC{T}, ϵp::T, ϵd::T, ϵg::T, ϵi::T) wher
     # Check for infeasibility certificates
     if max(
         norm(dat.A * pt.x, Inf),
-        norm((pt.x - pt.xl) .* dat.lflag, Inf),
-        norm((pt.x + pt.xu) .* dat.uflag, Inf)
+        norm((pt.x .- pt.xl) .* dat.lflag, Inf),
+        norm((pt.x .+ pt.xu) .* dat.uflag, Inf)
     ) * (norm(dat.c, Inf) / max(1, norm(dat.b, Inf))) < - ϵi * dot(dat.c, pt.x)
         # Dual infeasible, i.e., primal unbounded
         mpc.primal_status = Sln_InfeasibilityCertificate
@@ -197,7 +195,7 @@ function update_solver_status!(mpc::MPC{T}, ϵp::T, ϵd::T, ϵg::T, ϵi::T) wher
         return nothing
     end
 
-    δ = dat.A' * pt.y + (pt.zl .* dat.lflag) - (pt.zu .* dat.uflag)
+    δ = dat.A' * pt.y .+ (pt.zl .* dat.lflag) .- (pt.zu .* dat.uflag)
     if norm(δ, Inf) * max(
         norm(dat.l .* dat.lflag, Inf),
         norm(dat.u .* dat.uflag, Inf),
@@ -367,11 +365,11 @@ function compute_starting_point(mpc::MPC{T}) where{T}
     # I. Recover positive primal-dual coordinates
     δx = one(T) + max(
         zero(T),
-        (-3 // 2) * minimum((pt.x - dat.l) .* dat.lflag),
-        (-3 // 2) * minimum((dat.u - pt.x) .* dat.uflag)
+        (-3 // 2) * minimum((pt.x .- dat.l) .* dat.lflag),
+        (-3 // 2) * minimum((dat.u .- pt.x) .* dat.uflag)
     )
-    pt.xl  .= ((pt.x - dat.l) .+ δx) .* dat.lflag
-    pt.xu  .= ((dat.u - pt.x) .+ δx) .* dat.uflag
+    @. pt.xl  = ((pt.x - dat.l) + δx) * dat.lflag
+    @. pt.xu  = ((dat.u - pt.x) + δx) * dat.uflag
 
     z = dat.c - dat.A' * pt.y
     #=
@@ -385,8 +383,8 @@ function compute_starting_point(mpc::MPC{T}) where{T}
          no |  no |     0  |      0  |
         ----+-----+--------+---------+
     =#
-    pt.zl .= ( z ./ (dat.lflag + dat.uflag)) .* dat.lflag
-    pt.zu .= (-z ./ (dat.lflag + dat.uflag)) .* dat.uflag
+    @. pt.zl = ( z / (dat.lflag + dat.uflag)) * dat.lflag
+    @. pt.zu = (-z / (dat.lflag + dat.uflag)) * dat.uflag
 
     δz = one(T) + max(zero(T), (-3 // 2) * minimum(pt.zl), (-3 // 2) * minimum(pt.zu))
     pt.zl[dat.lflag] .+= δz
