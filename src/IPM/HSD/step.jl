@@ -58,7 +58,7 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     # Compute hx, hy, hz from first augmented system solve
     hx = tzeros(Tv, n)
     hy = tzeros(Tv, m)
-    ξ_ = dat.c - ((pt.zl ./ pt.xl) .* dat.l) .* dat.lflag - ((pt.zu ./ pt.xu) .* dat.u) .* dat.uflag
+    ξ_ = @. (dat.c - ((pt.zl / pt.xl) * dat.l) * dat.lflag - ((pt.zu / pt.xu) * dat.u) * dat.uflag)
     KKT.solve!(hx, hy, hsd.kkt, dat.b, ξ_)
 
     # Recover h0 = ρg + κ / τ - c'hx + b'hy - u'hz
@@ -67,7 +67,7 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     h0 = (
           dot(dat.l .* dat.lflag, (dat.l .* θl) .* dat.lflag)
         + dot(dat.u .* dat.uflag, (dat.u .* θu) .* dat.uflag)
-        - dot(c + (θl .* dat.l) .* dat.lflag + (θu .* dat.u) .* dat.uflag, hx)
+        - dot((@. (c + (θl * dat.l) * dat.lflag + (θu * dat.u) * dat.uflag)), hx)
         + dot(b, hy)
         + pt.κ / pt.τ
         + hsd.regG
@@ -77,9 +77,9 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     @timeit hsd.timer "Newton" solve_newton_system!(Δ, hsd, hx, hy, h0,
         # Right-hand side of Newton system
         res.rp, res.rl, res.ru, res.rd, res.rg,
-        -(pt.xl .* pt.zl) .* dat.lflag,
-        -(pt.xu .* pt.zu) .* dat.uflag,
-        -pt.τ  * pt.κ
+        .-(pt.xl .* pt.zl) .* dat.lflag,
+        .-(pt.xu .* pt.zu) .* dat.uflag,
+        .-pt.τ  * pt.κ
     )
 
     # Step length for affine-scaling direction
@@ -91,8 +91,8 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     @timeit hsd.timer "Newton" solve_newton_system!(Δ, hsd, hx, hy, h0,
         # Right-hand side of Newton system
         η .* res.rp, η .* res.rl, η .* res.ru, η .* res.rd, η * res.rg,
-        (-pt.xl .* pt.zl .+ γ * pt.μ .- Δ.xl .* Δ.zl) .* dat.lflag,
-        (-pt.xu .* pt.zu .+ γ * pt.μ .- Δ.xu .* Δ.zu) .* dat.uflag,
+        (.-pt.xl .* pt.zl .+ γ * pt.μ .- Δ.xl .* Δ.zl) .* dat.lflag,
+        (.-pt.xu .* pt.zu .+ γ * pt.μ .- Δ.xu .* Δ.zu) .* dat.uflag,
         -pt.τ  * pt.κ  + γ * pt.μ  - Δ.τ  * Δ.κ
     )
     α = max_step_length(pt, Δ)
@@ -222,9 +222,9 @@ function solve_newton_system!(Δ::Point{T, Tv},
 
     @timeit hsd.timer "Δτ" Δ.τ = (
         ξg_
-        + dot(dat.c
-            + ((pt.zl ./ pt.xl) .* dat.l) .* dat.lflag
-            + ((pt.zu ./ pt.xu) .* dat.u) .* dat.uflag
+        + dot((@. (dat.c
+            + ((pt.zl / pt.xl) * dat.l) * dat.lflag
+            + ((pt.zu / pt.xu) * dat.u) * dat.uflag))
         , Δ.x)
         - dot(dat.b, Δ.y)
     ) / h0
@@ -236,12 +236,10 @@ function solve_newton_system!(Δ::Point{T, Tv},
 
     # III. Recover Δxl, Δxu
     @timeit hsd.timer "Δxl" begin
-        @. Δ.xl = -ξl + Δ.x - Δ.τ .* (dat.l .* dat.lflag)
-        Δ.xl .*= dat.lflag
+        @. Δ.xl = (-ξl + Δ.x - Δ.τ .* (dat.l .* dat.lflag)) * dat.lflag
     end
     @timeit hsd.timer "Δxu" begin
-        @. Δ.xu =  ξu - Δ.x + Δ.τ .* (dat.u .* dat.uflag)
-        Δ.xu .*= dat.uflag
+        @. Δ.xu = ( ξu - Δ.x + Δ.τ .* (dat.u .* dat.uflag)) * dat.uflag
     end
 
     # IV. Recover Δzl, Δzu

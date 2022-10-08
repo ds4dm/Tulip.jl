@@ -179,12 +179,10 @@ function solve_newton_system!(Δ::Point{T, Tv},
 
     # II. Recover Δxl, Δxu
     @timeit mpc.timer "Δxl" begin
-        @. Δ.xl = -ξl + Δ.x
-        Δ.xl .*= dat.lflag
+        @. Δ.xl = (-ξl + Δ.x) * dat.lflag
     end
     @timeit mpc.timer "Δxu" begin
-        @. Δ.xu =  ξu - Δ.x
-        Δ.xu .*= dat.uflag
+        @. Δ.xu = ( ξu - Δ.x) * dat.uflag
     end
 
     # III. Recover Δzl, Δzu
@@ -259,8 +257,8 @@ function compute_corrector!(mpc::MPC{T, Tv}) where{T, Tv<:AbstractVector{T}}
     # Step length for affine-scaling direction
     αp_aff, αd_aff = mpc.αp, mpc.αd
     μₐ = (
-        dot((pt.xl + αp_aff .* Δ.xl) .* dat.lflag, pt.zl + αd_aff .* Δ.zl)
-        + dot((pt.xu + αp_aff .* Δ.xu) .* dat.uflag, pt.zu + αd_aff .* Δ.zu)
+        dot((@. ((pt.xl + αp_aff * Δ.xl) * dat.lflag)), pt.zl .+ αd_aff .* Δ.zl)
+        + dot((@. ((pt.xu + αp_aff * Δ.xu) * dat.uflag)), pt.zu .+ αd_aff .* Δ.zu)
     ) / pt.p
     σ = clamp((μₐ / pt.μ)^3, sqrt(eps(T)), one(T) - sqrt(eps(T)))
 
@@ -296,8 +294,8 @@ function compute_extra_correction!(mpc::MPC{T, Tv};
     αd_ = min(αd + δ, one(T))
 
     g  = dot(pt.xl, pt.zl) + dot(pt.xu, pt.zu)
-    gₐ = dot((pt.xl + mpc.αp .* Δ.xl) .* dat.lflag, pt.zl + mpc.αd .* Δ.zl) +
-        dot((pt.xu + mpc.αp .* Δ.xu) .* dat.uflag, pt.zu + mpc.αd .* Δ.zu)
+    gₐ = dot((@. ((pt.xl + mpc.αp * Δ.xl) * dat.lflag)), pt.zl .+ mpc.αd .* Δ.zl) +
+        dot((@. ((pt.xu + mpc.αp * Δ.xu) * dat.uflag)), pt.zu .+ mpc.αd .* Δ.zu)
     μ = (gₐ / g) * (gₐ / g) * (gₐ / pt.p)
 
     # Newton RHS

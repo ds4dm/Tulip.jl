@@ -88,14 +88,12 @@ function compute_residuals!(hsd::HSD{T}
     # Lower-bound residual
     # rl_j = τ*l_j - (x_j - xl_j)  if l_j ∈ R
     #      = 0                     if l_j = -∞
-    @. res.rl = - pt.x + pt.xl + pt.τ * dat.l
-    res.rl .*= dat.lflag
+    @. res.rl = (- pt.x + pt.xl + pt.τ * dat.l) * dat.lflag
 
     # Upper-bound residual
     # ru_j = τ*u_j - (x_j + xu_j)  if u_j ∈ R
     #      = 0                     if u_j = +∞
-    @. res.ru = - pt.x - pt.xu + pt.τ * dat.u
-    res.ru .*= dat.uflag
+    @. res.ru = (- pt.x - pt.xu + pt.τ * dat.u) * dat.uflag
 
     # Dual residual
     # rd = t*c - A'y - zl + zu
@@ -173,8 +171,8 @@ function update_solver_status!(hsd::HSD{T}, ϵp::T, ϵd::T, ϵg::T, ϵi::T) wher
     # Check for infeasibility certificates
     if max(
         norm(dat.A * pt.x, Inf),
-        norm((pt.x - pt.xl) .* dat.lflag, Inf),
-        norm((pt.x + pt.xu) .* dat.uflag, Inf)
+        norm((pt.x .- pt.xl) .* dat.lflag, Inf),
+        norm((pt.x .+ pt.xu) .* dat.uflag, Inf)
     ) * (norm(dat.c, Inf) / max(1, norm(dat.b, Inf))) < - ϵi * dot(dat.c, pt.x)
         # Dual infeasible, i.e., primal unbounded
         hsd.primal_status = Sln_InfeasibilityCertificate
@@ -182,7 +180,7 @@ function update_solver_status!(hsd::HSD{T}, ϵp::T, ϵd::T, ϵg::T, ϵi::T) wher
         return nothing
     end
 
-    δ = dat.A' * pt.y + (pt.zl .* dat.lflag) - (pt.zu .* dat.uflag)
+    δ = dat.A' * pt.y .+ (pt.zl .* dat.lflag) .- (pt.zu .* dat.uflag)
     if norm(δ, Inf) * max(
         norm(dat.l .* dat.lflag, Inf),
         norm(dat.u .* dat.uflag, Inf),

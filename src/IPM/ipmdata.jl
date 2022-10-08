@@ -130,7 +130,7 @@ function IPMData(pb::ProblemData{T}, mfact::Factory) where{T}
     c0 = pb.obj0
     if !pb.objsense
         # Flip objective for maximization problem
-        c .= -c
+        c .= .-c
         c0 = -c0
     end
 
