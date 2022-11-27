@@ -337,6 +337,9 @@ function compute_higher_corrector!(Δc::Point{T, Tv},
     vu = ((pt.xu .+ α_ .* Δ.xu) .* (pt.zu .+ α_ .* Δ.zu)) .* dat.uflag
     vt = (pt.τ   + α_  * Δ.τ)   * (pt.κ   + α_  * Δ.κ)
 
+    # Preallocated zero, useful if T is a heavy type like BigFloat
+    zero_T = zero(T)
+
     # Compute target cross-products
     mu_l = β * pt.μ * γ
     mu_u = γ * pt.μ / β
@@ -347,7 +350,7 @@ function compute_higher_corrector!(Δc::Point{T, Tv},
         elseif vl[i] > mu_u
             vl[i] = mu_u - vl[i]
         else
-            vl[i] = zero(T)
+            vl[i] = zero_T
         end
     end
     for i in 1:pt.n
@@ -357,7 +360,7 @@ function compute_higher_corrector!(Δc::Point{T, Tv},
         elseif vu[i] > mu_u
             vu[i] = mu_u - vu[i]
         else
-            vu[i] = zero(T)
+            vu[i] = zero_T
         end
     end
     if vt < mu_l
@@ -365,7 +368,7 @@ function compute_higher_corrector!(Δc::Point{T, Tv},
     elseif vt > mu_u
         vt = mu_u - vt
     else
-        vt = zero(T)
+        vt = zero_T
     end
 
     # Shift target cross-product to satisfy `v' * e = 0`
@@ -377,7 +380,7 @@ function compute_higher_corrector!(Δc::Point{T, Tv},
     # Compute corrector
     @timeit hsd.timer "Newton" solve_newton_system!(Δc, hsd, hx, hy, h0,
         # Right-hand sides
-        tzeros(Tv, pt.m), tzeros(Tv, pt.n), tzeros(Tv, pt.n), tzeros(Tv, pt.n), zero(T),
+        tzeros(Tv, pt.m), tzeros(Tv, pt.n), tzeros(Tv, pt.n), tzeros(Tv, pt.n), zero_T,
         vl,
         vu,
         vt
