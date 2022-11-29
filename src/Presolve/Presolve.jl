@@ -676,7 +676,7 @@ function remove_dominated_columns!(ps::PresolveData{T}) where{T}
             # TODO
         elseif isfinite(l) && !isfinite(u)
             # Lower-bounded variable: `aij * yi ≤ cj`
-            if aij > zero(T)
+            if !signbit(aij)
                 # yi ≤ cj / aij
                 @debug "Col $j forces y$i <= $y_"
                 ps.uy[i] = min(ps.uy[i],  y_)
@@ -688,7 +688,7 @@ function remove_dominated_columns!(ps::PresolveData{T}) where{T}
 
         elseif !isfinite(l) && isfinite(u)
             # Upper-bounded variable: `aij * yi ≥ cj`
-            if aij > zero(T)
+            if !signbit(aij)
                 # yi ≥ cj / aij
                 @debug "Col $j forces y$i >= $y_"
                 ps.ly[i] = max(ps.ly[i],  y_)

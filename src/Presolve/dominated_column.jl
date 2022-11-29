@@ -14,8 +14,8 @@ function remove_dominated_column!(ps::PresolveData{T}, j::Int; tol::T=100*sqrt(e
     for (i, aij) in zip(col.nzind, col.nzval)
         (ps.rowflag[i] && !iszero(aij)) || continue
 
-        ls += aij * ( (aij >= zero(T)) ? ps.ly[i] : ps.uy[i] )
-        us += aij * ( (aij >= zero(T)) ? ps.uy[i] : ps.ly[i] )
+        ls += aij * ( !signbit(aij) ? ps.ly[i] : ps.uy[i] )
+        us += aij * ( !signbit(aij) ? ps.uy[i] : ps.ly[i] )
     end
 
     # Check if column is dominated
