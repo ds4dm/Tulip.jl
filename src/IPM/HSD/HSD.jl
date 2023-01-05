@@ -64,6 +64,8 @@ mutable struct HSD{T, Tv, Tb, Ta, Tk} <: AbstractIPMOptimizer{T}
 
 end
 
+include("dot_for_mutable.jl")
+
 include("step.jl")
 
 
@@ -101,13 +103,22 @@ function compute_residuals!(hsd::HSD{T}
     mul!(res.rd, transpose(dat.A), pt.y, -one(T), one(T))
     @. res.rd += pt.zu .* dat.uflag - pt.zl .* dat.lflag
 
+    dot_buf = buffer_for_dot_weighted_sum(T)
+
     # Gap residual
     # rg = c'x - (b'y + l'zl - u'zu) + k
-    res.rg = pt.κ + (dot(dat.c, pt.x) - (
-        dot(dat.b, pt.y)
-        + dot(dat.l .* dat.lflag, pt.zl)
-        - dot(dat.u .* dat.uflag, pt.zu)
-    ))
+    res.rg = pt.κ + buffered_dot_weighted_sum!!(
+        dot_buf,
+        (
+            (dat.c, pt.x),
+            (dat.b, pt.y),
+            (dat.l .* dat.lflag, pt.zl),
+            (dat.u .* dat.uflag, pt.zu),
+        ),
+        (
+            1, -1, -1, 1,
+        ),
+    )
 
     # Residuals norm
     res.rp_nrm = norm(res.rp, Inf)
@@ -117,11 +128,17 @@ function compute_residuals!(hsd::HSD{T}
     res.rg_nrm = norm(res.rg, Inf)
 
     # Compute primal and dual bounds
-    hsd.primal_objective = dot(dat.c, pt.x) / pt.τ + dat.c0
-    hsd.dual_objective = (
-        dot(dat.b, pt.y)
-        + dot(dat.l .* dat.lflag, pt.zl)
-        - dot(dat.u .* dat.uflag, pt.zu)
+    hsd.primal_objective = buffered_dot_product!!(dot_buf.dot, dat.c, pt.x) / pt.τ + dat.c0
+    hsd.dual_objective = buffered_dot_weighted_sum!!(
+        dot_buf,
+        (
+            (dat.b, pt.y),
+            (dat.l .* dat.lflag, pt.zl),
+            (dat.u .* dat.uflag, pt.zu),
+        ),
+        (
+            1, 1, -1,
+        ),
     ) / pt.τ + dat.c0
 
     return nothing
@@ -168,12 +185,15 @@ function update_solver_status!(hsd::HSD{T}, ϵp::T, ϵd::T, ϵg::T, ϵi::T) wher
         return nothing
     end
 
+    dot_buf = buffer_for_dot_weighted_sum(T)
+
     # Check for infeasibility certificates
     if max(
         norm(dat.A * pt.x, Inf),
         norm((pt.x .- pt.xl) .* dat.lflag, Inf),
         norm((pt.x .+ pt.xu) .* dat.uflag, Inf)
-    ) * (norm(dat.c, Inf) / max(1, norm(dat.b, Inf))) < - ϵi * dot(dat.c, pt.x)
+    ) * (norm(dat.c, Inf) / max(1, norm(dat.b, Inf))) <
+        -ϵi * buffered_dot_product!!(dot_buf.dot, dat.c, pt.x)
         # Dual infeasible, i.e., primal unbounded
         hsd.primal_status = Sln_InfeasibilityCertificate
         hsd.solver_status = Trm_DualInfeasible
@@ -185,7 +205,18 @@ function update_solver_status!(hsd::HSD{T}, ϵp::T, ϵd::T, ϵg::T, ϵi::T) wher
         norm(dat.l .* dat.lflag, Inf),
         norm(dat.u .* dat.uflag, Inf),
         norm(dat.b, Inf)
-    ) / (max(one(T), norm(dat.c, Inf)))  < (dot(dat.b, pt.y) + dot(dat.l .* dat.lflag, pt.zl)- dot(dat.u .* dat.uflag, pt.zu)) * ϵi
+    ) / (max(one(T), norm(dat.c, Inf)))  < buffered_dot_weighted_sum!!(
+        dot_buf,
+        (
+            (dat.b, pt.y),
+            (dat.l .* dat.lflag, pt.zl),
+            (dat.u .* dat.uflag, pt.zu),
+        ),
+        (
+            1, 1, -1,
+        ),
+    ) * ϵi
+
         # Primal infeasible
         hsd.dual_status = Sln_InfeasibilityCertificate
         hsd.solver_status = Trm_PrimalInfeasible
