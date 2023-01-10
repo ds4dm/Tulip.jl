@@ -112,8 +112,8 @@ function compute_residuals!(hsd::HSD{T}
         (
             (dat.c, pt.x),
             (dat.b, pt.y),
-            (dat.l .* dat.lflag, pt.zl),
-            (dat.u .* dat.uflag, pt.zu),
+            (dat.l[dat.lflag], pt.zl[dat.lflag]),
+            (dat.u[dat.uflag], pt.zu[dat.uflag]),
         ),
         (
             1, -1, -1, 1,
@@ -133,8 +133,8 @@ function compute_residuals!(hsd::HSD{T}
         dot_buf,
         (
             (dat.b, pt.y),
-            (dat.l .* dat.lflag, pt.zl),
-            (dat.u .* dat.uflag, pt.zu),
+            (dat.l[dat.lflag], pt.zl[dat.lflag]),
+            (dat.u[dat.uflag], pt.zu[dat.uflag]),
         ),
         (
             1, 1, -1,
@@ -209,8 +209,8 @@ function update_solver_status!(hsd::HSD{T}, ϵp::T, ϵd::T, ϵg::T, ϵi::T) wher
         dot_buf,
         (
             (dat.b, pt.y),
-            (dat.l .* dat.lflag, pt.zl),
-            (dat.u .* dat.uflag, pt.zu),
+            (dat.l[dat.lflag], pt.zl[dat.lflag]),
+            (dat.u[dat.uflag], pt.zu[dat.uflag]),
         ),
         (
             1, 1, -1,

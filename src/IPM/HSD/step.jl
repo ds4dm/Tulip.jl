@@ -69,8 +69,8 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     h0 = buffered_dot_weighted_sum!!(
         dot_buf,
         (
-            (dat.l .* dat.lflag, (dat.l .* θl) .* dat.lflag),
-            (dat.u .* dat.uflag, (dat.u .* θu) .* dat.uflag),
+            (dat.l[dat.lflag], (dat.l .* θl)[dat.lflag]),
+            (dat.u[dat.uflag], (dat.u .* θu)[dat.uflag]),
             ((@. (c + (θl * dat.l) * dat.lflag + (θu * dat.u) * dat.uflag)), hx),
             (b, hy),
         ),
@@ -225,10 +225,10 @@ function solve_newton_system!(Δ::Point{T, Tv},
         buffered_dot_weighted_sum!!(
             dot_buf,
             (
-                ((ξxzl ./ pt.xl) .* dat.lflag, dat.l .* dat.lflag),            # l'(Xl)^-1 * ξxzl
-                ((ξxzu ./ pt.xu) .* dat.uflag, dat.u .* dat.uflag),
-                (((pt.zl ./ pt.xl) .* ξl) .* dat.lflag, dat.l .* dat.lflag),
-                (((pt.zu ./ pt.xu) .* ξu) .* dat.uflag, dat.u .* dat.uflag),
+                ((ξxzl ./ pt.xl)[dat.lflag], dat.l[dat.lflag]),            # l'(Xl)^-1 * ξxzl
+                ((ξxzu ./ pt.xu)[dat.uflag], dat.u[dat.uflag]),
+                (((pt.zl ./ pt.xl) .* ξl)[dat.lflag], dat.l[dat.lflag]),
+                (((pt.zu ./ pt.xu) .* ξu)[dat.uflag], dat.u[dat.uflag]),
             ),
             (
                 -1, 1, -1, -1,
