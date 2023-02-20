@@ -8,15 +8,12 @@ using TOML
 
 using TimerOutputs
 
-const _TULIP_VERSION = Ref{VersionNumber}()
-
-function __init__()
-    # Read Tulip version from Project.toml file
-    tlp_ver = VersionNumber(TOML.parsefile(joinpath(@__DIR__, "..", "Project.toml"))["version"])
-    _TULIP_VERSION[] = tlp_ver
+# Read Tulip version from Project.toml file
+const TULIP_VERSION = let project = joinpath(@__DIR__, "..", "Project.toml")
+    Base.include_dependency(project)
+    VersionNumber(TOML.parsefile(project)["version"])
 end
-
-version() = _TULIP_VERSION[]
+version() = TULIP_VERSION
 
 include("utils.jl")
 
