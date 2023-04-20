@@ -32,6 +32,8 @@ const CONFIG = MOIT.Config(Float64, atol=1e-6, rtol=1e-6,
             # Tulip not compliant with MOI convention for primal/dual infeasible models
             # See expected behavior at https://jump.dev/MathOptInterface.jl/dev/background/infeasibility_certificates/
             "test_unbounded",
+            # Tulip is not compliant with the MOI.ListOfModelAttributesSet attribute
+            "_in_ListOfModelAttributesSet",
         ]
     )
 
@@ -66,6 +68,8 @@ end
             # Tulip not compliant with MOI convention for primal/dual infeasible models
             # See expected behavior at https://jump.dev/MathOptInterface.jl/dev/background/infeasibility_certificates/
             "test_unbounded",
+            # Tulip is not compliant with the MOI.ListOfModelAttributesSet attribute
+            "_in_ListOfModelAttributesSet",
         ],
     )
 end
