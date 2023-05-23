@@ -57,34 +57,29 @@ model = Tulip.Optimizer{BigFloat}()  # Create a model in BigFloat precision
 
 ## Solver parameters
 
-### Setting parameters
+See the [documentation](https://ds4dm.github.io/Tulip.jl/stable/reference/options/) for a full list of parameters.
 
-When using Tulip through JuMP/MOI, parameters can be set either through MOI's generic `OptimizerAttribute`s, for example, `MOI.TimeLimitSec` and `MOI.Silent`, or by name.
+To set parameters in JuMP, use:
+```julia
+using JuMP, Tulip
+model = Model(Tulip.Optimizer)
+set_attribute(model, "IPM_IterationsLimit", 200)
+```
 
-* Through JuMP
-    ```julia
-    jump_model = JuMP.Model(Tulip.Optimizer)
+To set parameters in MathOptInterface, use:
+```julia
+using Tulip
+import MathOptInterface as MOI
+model = Tulip.Optimizer{Float64}()
+MOI.set(model, MOI.RawOptimizerAttribute("IPM_IterationsLimit"), 200)
+```
 
-    JuMP.set_optimizer_attribute(jump_model, "IPM_IterationsLimit", 200)
-    ```
-
-* Through MOI
-    ```julia
-    moi_model = Tulip.Optimizer{Float64}()
-
-    MOI.set(moi_model, MOI.RawOptimizerAttribute("IPM_IterationsLimit"), 200)
-    ```
-
-* Through Tulip's API
-    ```julia
-    model = Tulip.Model{Float64}()
-
-    Tulip.set_parameter(model, "IPM_IterationsLimit", 200)
-    ```
-
-### Parameters description
-
-See the [documentation](https://ds4dm.github.io/Tulip.jl/stable/reference/options/).
+To set parameters in the Tulip API, use:
+```julia
+using Tulip
+model = Tulip.Model{Float64}()
+Tulip.set_parameter(model, "IPM_IterationsLimit", 200)
+```
 
 ## Command-line executable
 
