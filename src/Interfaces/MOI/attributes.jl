@@ -58,10 +58,13 @@ end
 #
 #   TimeLimitSec
 #
-MOI.get(m::Optimizer, ::MOI.TimeLimitSec) = m.inner.params.IPM.TimeLimit
+function MOI.get(m::Optimizer, ::MOI.TimeLimitSec)
+    value = m.inner.params.IPM.TimeLimit
+    return value == Inf ? nothing : value
+end
 
-function MOI.set(m::Optimizer, ::MOI.TimeLimitSec, t)
-    m.inner.params.IPM.TimeLimit = t
+function MOI.set(m::Optimizer, ::MOI.TimeLimitSec, t::Union{Real,Nothing})
+    m.inner.params.IPM.TimeLimit = convert(Float64, something(t, Inf))
     return nothing
 end
 
