@@ -21,7 +21,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 
 [compat]
-CodecBzip2 = "0.7.2"
+CodecBzip2 = "0.7.2, 0.8"
 CodecZlib = "0.7.0"
 Krylov = "0.8, 0.9"
 LDLFactorizations = "0.8, 0.9, 0.10"
