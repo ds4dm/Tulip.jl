@@ -1,4 +1,5 @@
 using QPSReader
+using TimerOutputs: tottime
 
 # TODO: user-facing API in Julia
 # Other APIs should wrap this one
@@ -58,6 +59,20 @@ Query the `Status` attribute from `model`
 """
 function get_attribute(m::Model, ::Status)
     return m.status
+end
+
+"""
+    get_attribute(model::Model, ::SolutionTime)
+
+Query the `SolutionTime` attribute from `model`
+"""
+function get_attribute(m::Model, ::SolutionTime)
+    if isnothing(m.solver)
+        return 0
+    else
+      local ns = tottime(m.solver.timer)
+      return ns * 1e-9
+    end
 end
 
 """
