@@ -2,6 +2,7 @@ module Tulip
 
 using LinearAlgebra
 using Logging
+using MutableArithmetics
 using Printf
 using SparseArrays
 using TOML
