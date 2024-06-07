@@ -59,7 +59,9 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
     hx = tzeros(Tv, n)
     hy = tzeros(Tv, m)
     ξ_ = @. (dat.c - ((pt.zl / pt.xl) * dat.l) * dat.lflag - ((pt.zu / pt.xu) * dat.u) * dat.uflag)
-    KKT.solve!(hx, hy, hsd.kkt, dat.b, ξ_)
+    @timeit hsd.timer "Newton" begin
+      @timeit hsd.timer "KKT" KKT.solve!(hx, hy, hsd.kkt, dat.b, ξ_)
+    end
 
     # Recover h0 = ρg + κ / τ - c'hx + b'hy - u'hz
     # Some of the summands may take large values,
