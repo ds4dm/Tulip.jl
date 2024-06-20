@@ -63,17 +63,23 @@ function compute_step!(hsd::HSD{T, Tv}, params::IPMOptions{T}) where{T, Tv<:Abst
       @timeit hsd.timer "KKT" KKT.solve!(hx, hy, hsd.kkt, dat.b, ξ_)
     end
 
+    dot_buf = buffer_for_dot_weighted_sum(T)
+
     # Recover h0 = ρg + κ / τ - c'hx + b'hy - u'hz
     # Some of the summands may take large values,
     # so care must be taken for numerical stability
-    h0 = (
-          dot(dat.l .* dat.lflag, (dat.l .* θl) .* dat.lflag)
-        + dot(dat.u .* dat.uflag, (dat.u .* θu) .* dat.uflag)
-        - dot((@. (c + (θl * dat.l) * dat.lflag + (θu * dat.u) * dat.uflag)), hx)
-        + dot(b, hy)
-        + pt.κ / pt.τ
-        + hsd.regG
-    )
+    h0 = buffered_dot_weighted_sum!!(
+        dot_buf,
+        (
+            (dat.l[dat.lflag], (dat.l .* θl)[dat.lflag]),
+            (dat.u[dat.uflag], (dat.u .* θu)[dat.uflag]),
+            ((@. (c + (θl * dat.l) * dat.lflag + (θu * dat.u) * dat.uflag)), hx),
+            (b, hy),
+        ),
+        (
+            1, 1, -1, 1,
+        ),
+    ) + pt.κ / pt.τ + hsd.regG
 
     # Affine-scaling direction
     @timeit hsd.timer "Newton" solve_newton_system!(Δ, hsd, hx, hy, h0,
@@ -213,22 +219,42 @@ function solve_newton_system!(Δ::Point{T, Tv},
     end
     @timeit hsd.timer "KKT" KKT.solve!(Δ.x, Δ.y, hsd.kkt, ξp, ξd_)
 
+    dot_buf = buffer_for_dot_weighted_sum(T)
+
     # II. Recover Δτ, Δx, Δy
     # Compute Δτ
-    @timeit hsd.timer "ξg_" ξg_ = (ξg + ξtk / pt.τ
-        - dot((ξxzl ./ pt.xl) .* dat.lflag, dat.l .* dat.lflag)            # l'(Xl)^-1 * ξxzl
-        + dot((ξxzu ./ pt.xu) .* dat.uflag, dat.u .* dat.uflag)
-        - dot(((pt.zl ./ pt.xl) .* ξl) .* dat.lflag, dat.l .* dat.lflag)
-        - dot(((pt.zu ./ pt.xu) .* ξu) .* dat.uflag, dat.u .* dat.uflag)  #
-    )
+    @timeit hsd.timer "ξg_" ξg_ = ξg + ξtk / pt.τ +
+        buffered_dot_weighted_sum!!(
+            dot_buf,
+            (
+                ((ξxzl ./ pt.xl)[dat.lflag], dat.l[dat.lflag]),            # l'(Xl)^-1 * ξxzl
+                ((ξxzu ./ pt.xu)[dat.uflag], dat.u[dat.uflag]),
+                (((pt.zl ./ pt.xl) .* ξl)[dat.lflag], dat.l[dat.lflag]),
+                (((pt.zu ./ pt.xu) .* ξu)[dat.uflag], dat.u[dat.uflag]),
+            ),
+            (
+                -1, 1, -1, -1,
+            ),
+        )
 
     @timeit hsd.timer "Δτ" Δ.τ = (
-        ξg_
-        + dot((@. (dat.c
-            + ((pt.zl / pt.xl) * dat.l) * dat.lflag
-            + ((pt.zu / pt.xu) * dat.u) * dat.uflag))
-        , Δ.x)
-        - dot(dat.b, Δ.y)
+        ξg_ +
+        buffered_dot_weighted_sum!!(
+            dot_buf,
+            (
+                (
+                    (@. (
+                        dat.c +
+                        ((pt.zl / pt.xl) * dat.l) * dat.lflag +
+                        ((pt.zu / pt.xu) * dat.u) * dat.uflag)),
+                    Δ.x,
+                ),
+                (dat.b, Δ.y),
+            ),
+            (
+                1, -1,
+            ),
+        )
     ) / h0
 
 
