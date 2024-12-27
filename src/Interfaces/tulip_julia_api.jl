@@ -289,6 +289,10 @@ function get_attribute(m::Model{T}, ::DualObjectiveValue) where{T}
             - dot(su, Diagonal(isfinite.(xu)), xu)
         )
 
+        # If problem is maximization, we need to negate the dual value
+        #   to comply with MOI duality convention
+        z = m.pbdata.objsense ? z : -z
+
         # If solution is a ray, ignore constant objective term
         is_ray = m.solution.is_dual_ray
         z0 = !is_ray * m.pbdata.obj0
