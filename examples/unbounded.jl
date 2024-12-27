@@ -26,14 +26,12 @@ function ex_unbounded(::Type{Tv};
         TLP.set_parameter(m, String(k), val)
     end
 
-    # Read problem from .mps file and solve    
+    # Read problem from .mps file and solve
     TLP.load_problem!(m, joinpath(INSTANCE_DIR, "lpex_ubd.mps"))
     TLP.optimize!(m)
 
     # Check status
     @test TLP.get_attribute(m, TLP.Status()) == TLP.Trm_DualInfeasible
-    z = TLP.get_attribute(m, TLP.ObjectiveValue())
-    @test z == -Tv(Inf)
     @test m.solution.primal_status == TLP.Sln_InfeasibilityCertificate
     @test m.solution.dual_status   == TLP.Sln_Unknown
 
@@ -46,6 +44,14 @@ function ex_unbounded(::Type{Tv};
     @test x2 >= -atol
     @test isapprox(Ax1, 0, atol=atol, rtol=rtol)
     @test -x1 - x2 <= -atol
+
+
+    zp = TLP.get_attribute(m, TLP.ObjectiveValue())
+    @test zp == (-x1 - x2)
+
+    zd = TLP.get_attribute(m, TLP.DualObjectiveValue())
+    @test zd == zero(Tv)
+
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

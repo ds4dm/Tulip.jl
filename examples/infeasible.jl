@@ -28,16 +28,16 @@ function ex_infeasible(::Type{Tv};
         TLP.set_parameter(m, String(k), val)
     end
 
-    # Read problem from .mps file and solve    
+    # Read problem from .mps file and solve
     TLP.load_problem!(m, joinpath(INSTANCE_DIR, "lpex_inf.mps"))
     TLP.optimize!(m)
 
     # Check status
     @test TLP.get_attribute(m, TLP.Status()) == TLP.Trm_PrimalInfeasible
-    z = TLP.get_attribute(m, TLP.ObjectiveValue())
-    @test z == Inf
     @test m.solution.primal_status == TLP.Sln_Unknown
     @test m.solution.dual_status   == TLP.Sln_InfeasibilityCertificate
+    z = TLP.get_attribute(m, TLP.ObjectiveValue())
+    @test z == zero(Tv)  # Primal infeasible --> solution is zero
 
     # Check unbounded dual ray
     y1 = m.solution.y_lower[1] - m.solution.y_upper[1]
