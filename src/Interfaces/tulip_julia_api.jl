@@ -243,9 +243,19 @@ Query the `ObjectiveValue` attribute from `model`
 function get_attribute(m::Model{T}, ::ObjectiveValue) where{T}
     if isnothing(m.solution)
         error("Model has no solution")
+    end
+
+    pst = m.solution.primal_status
+
+    if pst != Sln_Unknown
+        z  = dot(m.solution.x, m.pbdata.obj)
+        # If solution is a ray, ignore constant objective term
+        is_ray = m.solution.is_primal_ray
+        z0 = !is_ray * m.pbdata.obj0
+        return (z + z0)
     else
-        z = m.solution.z_primal
-        return m.pbdata.objsense ? z : -z
+        # No solution, return zero
+        return zero(T)
     end
 end
 
@@ -257,8 +267,38 @@ Query the `DualObjectiveValue` attribute from `model`
 function get_attribute(m::Model{T}, ::DualObjectiveValue) where{T}
     if isnothing(m.solution)
         error("Model has no solution")
+    end
+
+    dst = m.solution.dual_status
+
+    if dst != Sln_Unknown
+        yl = m.solution.y_lower
+        yu = m.solution.y_upper
+        sl = m.solution.s_lower
+        su = m.solution.s_upper
+
+        bl = m.pbdata.lcon
+        bu = m.pbdata.ucon
+        xl = m.pbdata.lvar
+        xu = m.pbdata.uvar
+
+        z = (
+              dot(yl, Diagonal(isfinite.(bl)), bl)
+            - dot(yu, Diagonal(isfinite.(bu)), bu)
+            + dot(sl, Diagonal(isfinite.(xl)), xl)
+            - dot(su, Diagonal(isfinite.(xu)), xu)
+        )
+
+        # If problem is maximization, we need to negate the dual value
+        #   to comply with MOI duality convention
+        z = m.pbdata.objsense ? z : -z
+
+        # If solution is a ray, ignore constant objective term
+        is_ray = m.solution.is_dual_ray
+        z0 = !is_ray * m.pbdata.obj0
+        return (z + z0)
     else
-        z = m.solution.z_dual
-        return m.pbdata.objsense ? z : -z
+        # No solution, return zero
+        return zero(T)
     end
 end
