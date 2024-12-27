@@ -284,9 +284,9 @@ function get_attribute(m::Model{T}, ::DualObjectiveValue) where{T}
 
         z = (
               dot(yl, Diagonal(isfinite.(bl)), bl)
-            + dot(yu, Diagonal(isfinite.(bu)), bu)
+            - dot(yu, Diagonal(isfinite.(bu)), bu)
             + dot(sl, Diagonal(isfinite.(xl)), xl)
-            + dot(su, Diagonal(isfinite.(xu)), xu)
+            - dot(su, Diagonal(isfinite.(xu)), xu)
         )
 
         # If solution is a ray, ignore constant objective term
