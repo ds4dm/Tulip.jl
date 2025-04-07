@@ -1,5 +1,4 @@
-import MathOptInterface
-const MOI = MathOptInterface
+import MathOptInterface as MOI
 
 # ==============================================================================
 #           HELPER FUNCTIONS
@@ -84,8 +83,8 @@ Wrapper for MOI.
 mutable struct Optimizer{T} <: MOI.AbstractOptimizer
     inner::Model{T}
 
-    is_feas::Bool  # Model is feasibility problem if true
-    _obj_type::ObjType
+    objective_sense::Union{Nothing,MOI.OptimizationSense}
+    _obj_type::Union{Nothing,ObjType}
 
     # Map MOI Variable/Constraint indices to internal indices
     var_counter::Int  # Should never be reset
@@ -98,10 +97,6 @@ mutable struct Optimizer{T} <: MOI.AbstractOptimizer
     # Variable and constraint names
     name2var::Dict{String, Set{MOI.VariableIndex}}
     name2con::Dict{String, Set{MOI.ConstraintIndex}}
-    # MOIIndex -> name mapping for SingleVariable constraints
-    # Will be dropped with MOI 0.10
-    #   => (https://github.com/jump-dev/MathOptInterface.jl/issues/832)
-    bnd2name::Dict{MOI.ConstraintIndex, String}
 
     # Keep track of bound constraints
     var2bndtype::Dict{MOI.VariableIndex, Set{Type{<:MOI.AbstractScalarSet}}}
@@ -111,7 +106,9 @@ mutable struct Optimizer{T} <: MOI.AbstractOptimizer
 
     function Optimizer{T}(;kwargs...) where{T}
         m = new{T}(
-            Model{T}(), false, _SCALAR_AFFINE,
+            Model{T}(),
+            nothing,  # objective_sense
+            nothing,  # _obj_type
             # Variable and constraint counters
             0, 0,
             # Index mapping
@@ -120,7 +117,6 @@ mutable struct Optimizer{T} <: MOI.AbstractOptimizer
             # Name -> index mapping
             Dict{String, Set{MOI.VariableIndex}}(),
             Dict{String, Set{MOI.ConstraintIndex}}(),
-            Dict{MOI.ConstraintIndex, String}(),  # Variable bounds tracking
             Dict{MOI.VariableIndex, Set{Type{<:MOI.AbstractScalarSet}}}(),
             0.0
         )
@@ -138,6 +134,8 @@ Optimizer(;kwargs...) = Optimizer{Float64}(;kwargs...)
 function MOI.empty!(m::Optimizer)
     # Inner model
     empty!(m.inner)
+    m.objective_sense = nothing
+    m._obj_type = nothing
     # Reset index mappings
     m.var_indices_moi = MOI.VariableIndex[]
     m.con_indices_moi = MOI.ConstraintIndex[]
@@ -149,7 +147,6 @@ function MOI.empty!(m::Optimizer)
     m.name2con = Dict{String, Set{MOI.ConstraintIndex}}()
 
     # Reset bound tracking
-    m.bnd2name = Dict{MOI.ConstraintIndex, String}()
     m.var2bndtype  = Dict{MOI.VariableIndex, Set{MOI.ConstraintIndex}}()
 
     m.solve_time = 0.0
@@ -157,6 +154,8 @@ function MOI.empty!(m::Optimizer)
 end
 
 function MOI.is_empty(m::Optimizer)
+    m.objective_sense === nothing || return false
+    m._obj_type === nothing || return false
     m.inner.pbdata.nvar == 0 || return false
     m.inner.pbdata.ncon == 0 || return false
 
@@ -168,7 +167,6 @@ function MOI.is_empty(m::Optimizer)
     length(m.name2var) == 0 || return false
     length(m.name2con) == 0 || return false
 
-    length(m.bnd2name) == 0 || return false
     length(m.var2bndtype) == 0 || return false
 
     return true
@@ -182,8 +180,8 @@ end
 
 MOI.supports_incremental_interface(::Optimizer) = true
 
-function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike; kwargs...)
-    return MOI.Utilities.default_copy_to(dest, src; kwargs...)
+function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
+    return MOI.Utilities.default_copy_to(dest, src)
 end
 
 
