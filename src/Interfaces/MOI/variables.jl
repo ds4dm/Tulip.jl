@@ -38,22 +38,6 @@ function MOI.add_variable(m::Optimizer{T}) where{T}
     return x
 end
 
-# TODO: dispatch to inner model
-function MOI.add_variables(m::Optimizer, N::Int)
-    N >= 0 || error("Cannot add negative number of variables")
-
-    N == 0 && return MOI.VariableIndex[]
-
-    vars = Vector{MOI.VariableIndex}(undef, N)
-    for j in 1:N
-        x = MOI.add_variable(m)
-        vars[j] = x
-    end
-
-    return vars
-end
-
-
 # =============================================
 #   3. Delete variables
 # =============================================
@@ -111,12 +95,15 @@ function MOI.set(m::Optimizer, ::MOI.VariableName, v::MOI.VariableIndex, name::S
     # Check that variable does exist
     MOI.throw_if_not_valid(m, v)
 
-    s = get!(m.name2var, name, Set{MOI.VariableIndex}())
-
     # Update inner model
     j = m.var_indices[v]
     old_name = get_attribute(m.inner, VariableName(), j)
+    if name == old_name
+        return  # It's the same name!
+    end
     set_attribute(m.inner, VariableName(), j, name)
+
+    s = get!(m.name2var, name, Set{MOI.VariableIndex}())
 
     # Update names mapping
     push!(s, v)

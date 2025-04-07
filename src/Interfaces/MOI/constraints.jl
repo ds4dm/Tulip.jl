@@ -20,6 +20,34 @@ const SUPPORTED_CONSTR_ATTR = Union{
 
 MOI.supports(::Optimizer, ::A, ::Type{<:MOI.ConstraintIndex}) where{A<:SUPPORTED_CONSTR_ATTR} = true
 
+function MOI.get(
+    m::Optimizer,
+    ::MOI.ListOfConstraintAttributesSet{F,S},
+) where {F,S}
+    ret = MOI.AbstractConstraintAttribute[]
+    for set in values(m.name2con)
+        if any(ci -> ci isa MOI.ConstraintIndex{F,S}, set)
+            push!(ret, MOI.ConstraintName())
+            break
+        end
+    end
+    return ret
+end
+
+_type_tuple(::MOI.ConstraintIndex{F,S}) where {F,S} = (F, S)
+
+function MOI.get(m::Optimizer, ::MOI.ListOfConstraintTypesPresent)
+    ret = Tuple{Type,Type}[]
+    append!(ret, unique!(_type_tuple.(m.con_indices_moi)))
+    for set in values(m.var2bndtype)
+        for S in set
+           push!(ret, (MOI.VariableIndex, S))
+        end
+    end
+    unique!(ret)
+    return ret
+end
+
 # MOI boilerplate
 function MOI.supports(::Optimizer, ::MOI.ConstraintName, ::Type{<:MOI.ConstraintIndex{<:MOI.VariableIndex}})
     throw(MOI.VariableIndexConstraintNameError())
@@ -241,15 +269,6 @@ function MOI.delete(
         set_attribute(m.inner, VariableUpperBound(), j, T(Inf))
     end
 
-    # Update name tracking
-    old_name = get(m.bnd2name, c, "")
-    if old_name != "" && haskey(m.name2con, old_name)
-        s = m.name2con[old_name]
-        delete!(s, c)
-        length(s) == 0 && delete!(m.name2con, old_name)
-    end
-    delete!(m.bnd2name, c)
-
     # Delete tracking of bounds
     delete!(m.var2bndtype[v], S)
 
@@ -366,15 +385,6 @@ end
 #
 #   ConstraintName
 #
-
-function MOI.get(
-    m::Optimizer{T}, ::MOI.ConstraintName,
-    c::MOI.ConstraintIndex{MOI.VariableIndex, S}
-) where {T, S<:SCALAR_SETS{T}}
-    MOI.throw_if_not_valid(m, c)
-
-    return get(m.bnd2name, c, "")
-end
 
 function MOI.get(
     m::Optimizer{T}, ::MOI.ConstraintName,

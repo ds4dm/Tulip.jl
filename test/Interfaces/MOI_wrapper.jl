@@ -1,108 +1,82 @@
-import MathOptInterface
-const MOI = MathOptInterface
-const MOIT = MOI.Test
-const MOIU = MOI.Utilities
-const MOIB = MOI.Bridges
+#  Copyright 2018-2019: Mathieu Tanneau
+#  This Source Code Form is subject to the terms of the Mozilla Public
+#  License, v. 2.0. If a copy of the MPL was not distributed with this
+#  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-const OPTIMIZER = TLP.Optimizer()
+using Test
 
-MOI.set(OPTIMIZER, MOI.Silent(), true)
-
-const CONFIG = MOIT.Config(Float64, atol=1e-6, rtol=1e-6,
-    exclude=Any[
-        MOI.ConstraintBasisStatus,
-        MOI.VariableBasisStatus,
-    ]
-)
+import MathOptInterface as MOI
+import Tulip
 
 @testset "Direct optimizer" begin
-
-    MOIT.runtests(
-        OPTIMIZER, CONFIG,
-        exclude=[
-            # behaviour to implement: list of model, constraint attributes set
-            "test_model_ListOfConstraintAttributesSet",
-            "test_model_ModelFilter_AbstractModelAttribute",
-            "test_model_ModelFilter_ListOfConstraintIndices",
-            "test_model_ModelFilter_ListOfConstraintTypesPresent",
-            "test_model_Name",
-            "test_objective_set_via_modify",
-            # requires get quadratic objective
-            "test_objective_get_ObjectiveFunction_ScalarAffineFunction",
-            # Tulip is not compliant with the MOI.ListOfModelAttributesSet attribute
-            "_in_ListOfModelAttributesSet",
-        ]
+    model = Tulip.Optimizer()
+    MOI.set(model, MOI.Silent(), true)
+    MOI.Test.runtests(
+        model,
+        MOI.Test.Config(
+            Float64;
+            atol = 1e-6,
+            rtol = 1e-6,
+            exclude = Any[MOI.ConstraintBasisStatus, MOI.VariableBasisStatus],
+        ),
     )
-
 end
 
 @testset "MOI Bridged" begin
-    BRIDGED = MOIB.full_bridge_optimizer(Tulip.Optimizer(), Float64)
-    MOI.set(BRIDGED, MOI.Silent(), true)
-
-    MOIT.runtests(
-        BRIDGED, CONFIG,
+    model = MOI.Bridges.full_bridge_optimizer(Tulip.Optimizer(), Float64)
+    MOI.set(model, MOI.Silent(), true)
+    MOI.Test.runtests(
+        model,
+        MOI.Test.Config(
+            Float64;
+            atol = 1e-6,
+            rtol = 1e-6,
+            exclude = Any[MOI.ConstraintBasisStatus, MOI.VariableBasisStatus],
+        ),
         exclude=[
-            # behaviour to implement: list of model, constraint attributes set
-            "test_conic_NormInfinityCone_3",
-            "test_conic_NormInfinityCone_INFEASIBLE", # should be NO_SOLUTION or INFEASIBLE_POINT
-            # ListOfConstraintTypePresent
-            "test_conic_NormInfinityCone_VectorAffineFunction",
-            "test_conic_NormInfinityCone_VectorOfVariables",
-            "test_conic_NormOneCone",
-            "test_conic_linear_VectorAffineFunction",
-            "test_conic_linear_VectorOfVariables",
-            "test_model_delete",
-            # List of attributes set
-            "test_model_ListOfConstraintAttributesSet",
-            "test_model_ModelFilter_AbstractModelAttribute",
-            "test_model_ModelFilter_ListOfConstraintIndices",
-            "test_model_ModelFilter_ListOfConstraintTypesPresent",
-            "test_model_Name",
-            "test_objective_set_via_modify",
-            # requires get quadratic objective
-            "test_objective_get_ObjectiveFunction_ScalarAffineFunction",
-            # Tulip is not compliant with the MOI.ListOfModelAttributesSet attribute
-            "_in_ListOfModelAttributesSet",
+            r"^test_conic_NormInfinityCone_INFEASIBLE$",
+            r"^test_conic_NormOneCone_INFEASIBLE$",
         ],
     )
 end
 
 # Run the MOI tests with HSD and MPC algorithms
-for ipm in [Tulip.HSD, Tulip.MPC]
-    @testset "MOI Linear tests - $ipm" begin
-        OPTIMIZER.inner.params.IPM.Factory = Tulip.Factory(ipm)
-        MOIT.runtests(OPTIMIZER, CONFIG, include=["linear"])
-    end
+@testset "MOI Linear tests - $ipm" for ipm in [Tulip.HSD, Tulip.MPC]
+    model = Tulip.Optimizer()
+    model.inner.params.IPM.Factory = Tulip.Factory(ipm)
+    MOI.set(model, MOI.Silent(), true)
+    MOI.Test.runtests(
+        model,
+        MOI.Test.Config(
+            Float64;
+            atol = 1e-6,
+            rtol = 1e-6,
+            exclude = Any[MOI.ConstraintBasisStatus, MOI.VariableBasisStatus],
+        ),
+        include=["linear"],
+    )
 end
 
-MOIU.@model(ModelData,
-        (),
-        (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval),
-        (MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives),
-        (),
-        (),
-        (MOI.ScalarAffineFunction,),
-        (MOI.VectorOfVariables,),
-        (MOI.VectorAffineFunction,)
-)
-
 @testset "Cached optimizer" begin
-    CACHE = MOIU.UniversalFallback(ModelData{Float64}())
-    CACHED = MOIU.CachingOptimizer(CACHE, Tulip.Optimizer())
-    BRIDGED2 = MOIB.full_bridge_optimizer(CACHED, Float64)
-    MOI.set(BRIDGED2, MOI.Silent(), true)
-
-    MOIT.runtests(
-        BRIDGED2, CONFIG,
+    inner = MOI.Utilities.CachingOptimizer(
+        MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
+        Tulip.Optimizer(),
+    )
+    model = MOI.Bridges.full_bridge_optimizer(inner, Float64)
+    MOI.set(model, MOI.Silent(), true)
+    MOI.Test.runtests(
+        model,
+        MOI.Test.Config(
+            Float64;
+            atol = 1e-6,
+            rtol = 1e-6,
+            exclude = Any[MOI.ConstraintBasisStatus, MOI.VariableBasisStatus],
+        ),
         exclude=[
-            # should be NO_SOLUTION or INFEASIBLE_POINT
-            "test_conic_NormInfinityCone_INFEASIBLE",
-            "test_conic_NormOneCone_INFEASIBLE",
-            # Tulip not compliant with MOI convention for primal/dual infeasible models
-            # See expected behavior at https://jump.dev/MathOptInterface.jl/dev/background/infeasibility_certificates/
-            "test_unbounded",
-        ])
+            r"^test_conic_NormInfinityCone_INFEASIBLE$",
+            r"^test_conic_NormOneCone_INFEASIBLE$",
+        ],
+    )
 end
 
 @testset "test_attribute_TimeLimitSec" begin

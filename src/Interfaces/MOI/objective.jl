@@ -13,10 +13,10 @@ end
 # =============================================
 function MOI.get(
     m::Optimizer{T},
-    ::MOI.ObjectiveFunction{MOI.VariableIndex}
-) where{T}
+    ::MOI.ObjectiveFunction{F}
+) where{T,F}
     obj = MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}}())
-    return convert(MOI.VariableIndex, obj)
+    return convert(F, obj)
 end
 
 function MOI.get(
@@ -77,7 +77,7 @@ end
 
 # =============================================
 #   3. Modify objective
-# ============================================= 
+# =============================================
 function MOI.modify(
     m::Optimizer{T},
     c::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}},
@@ -90,6 +90,7 @@ function MOI.modify(
     # Update inner model
     j = m.var_indices[v]
     m.inner.pbdata.obj[j] = chg.new_coefficient  # TODO: use inner API
+    m._obj_type = _SCALAR_AFFINE
     return nothing
 end
 
@@ -100,5 +101,6 @@ function MOI.modify(
 ) where{T}
     isfinite(chg.new_constant) || error("Objective constant term must be finite")
     m.inner.pbdata.obj0 = chg.new_constant
+    m._obj_type = _SCALAR_AFFINE
     return nothing
 end

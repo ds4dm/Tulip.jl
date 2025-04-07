@@ -105,6 +105,25 @@ const SUPPORTED_MODEL_ATTR = Union{
 MOI.supports(::Optimizer, ::SUPPORTED_MODEL_ATTR) = true
 
 #
+#   ListOfModelAttributesSet
+#
+function MOI.get(m::Optimizer{T}, ::MOI.ListOfModelAttributesSet) where {T}
+    ret = MOI.AbstractModelAttribute[]
+    if !isempty(m.inner.pbdata.name)
+        push!(ret, MOI.Name())
+    end
+    if m.objective_sense !== nothing
+        push!(ret, MOI.ObjectiveSense())
+    end
+    if m._obj_type == _SINGLE_VARIABLE
+        push!(ret, MOI.ObjectiveFunction{MOI.VariableIndex}())
+    elseif m._obj_type == _SCALAR_AFFINE
+        push!(ret, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{T}}())
+    end
+    return ret
+end
+
+#
 #   ListOfVariableIndices
 #
 function MOI.get(m::Optimizer, ::MOI.ListOfVariableIndices)
@@ -125,36 +144,28 @@ MOI.get(m::Optimizer, ::MOI.NumberOfVariables) = m.inner.pbdata.nvar
 #
 #   ObjectiveFunctionType
 #
-function MOI.get(
-    m::Optimizer{T}, ::MOI.ObjectiveFunctionType
-) where{T}
+function MOI.get(m::Optimizer{T}, ::MOI.ObjectiveFunctionType) where{T}
     if m._obj_type == _SINGLE_VARIABLE
         return MOI.VariableIndex
-    else
-        return MOI.ScalarAffineFunction{T}
     end
+    return MOI.ScalarAffineFunction{T}
 end
 
 #
 #   ObjectiveSense
 #
 function MOI.get(m::Optimizer, ::MOI.ObjectiveSense)
-    m.is_feas && return MOI.FEASIBILITY_SENSE
-
-    return m.inner.pbdata.objsense ? MOI.MIN_SENSE : MOI.MAX_SENSE
+    return something(m.objective_sense, MOI.FEASIBILITY_SENSE)
 end
 
 function MOI.set(m::Optimizer, ::MOI.ObjectiveSense, s::MOI.OptimizationSense)
-    m.is_feas = (s == MOI.FEASIBILITY_SENSE)
-
+    m.objective_sense = s
     if s == MOI.MIN_SENSE || s == MOI.FEASIBILITY_SENSE
         m.inner.pbdata.objsense = true
-    elseif s == MOI.MAX_SENSE
-        m.inner.pbdata.objsense = false
     else
-        error("Objetive sense not supported: $s")
+        @assert s == MOI.MAX_SENSE
+        m.inner.pbdata.objsense = false
     end
-
     return nothing
 end
 
@@ -164,7 +175,8 @@ end
 function MOI.get(m::Optimizer{T}, attr::MOI.ObjectiveValue) where{T}
     MOI.check_result_index_bounds(m, attr)
     raw_z = get_attribute(m.inner, ObjectiveValue())
-    return raw_z * !m.is_feas
+    is_feas = MOI.get(m, MOI.ObjectiveSense()) == MOI.FEASIBILITY_SENSE
+    return raw_z * !is_feas
 end
 
 #
