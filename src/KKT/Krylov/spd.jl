@@ -97,7 +97,7 @@ function solve!(dx, dy, kkt::SPDSolver{T}, ξp, ξd) where{T}
     mul!(kkt.ξ, kkt.A, kkt.D * ξd, true, true)
 
     # Solve the normal equations
-    _krylov!(kkt.krylov_solver, kkt.opK, kkt.ξ; atol=kkt.atol, rtol=kkt.rtol)
+    krylov_solve!(kkt.krylov_solver, kkt.opK, kkt.ξ; atol=kkt.atol, rtol=kkt.rtol)
     copyto!(dy, kkt.krylov_solver.x)
 
     # Recover dx

@@ -1,7 +1,7 @@
 """
     SIDSolver
 """
-mutable struct SIDSolver{T,V,Ta,KL,KS} <: AbstractKrylovSolver{T}
+mutable struct SIDSolver{T,V,Ta,KL,KW} <: AbstractKrylovSolver{T}
     # Problem data
     m::Int
     n::Int
@@ -21,15 +21,15 @@ mutable struct SIDSolver{T,V,Ta,KL,KS} <: AbstractKrylovSolver{T}
     # Krylov solver & related options
     atol::T
     rtol::T
-    krylov_solver::KS
+    krylov_workspace::KW
 
     # TODO: preconditioner
 end
 
-backend(kkt::SIDSolver) = "$(typeof(kkt.krylov_solver))"
+backend(kkt::SIDSolver) = "$(typeof(kkt.krylov_workspace))"
 linear_system(kkt::SIDSolver) = "K2"
 
-function setup(A, ::K2, backend::Backend{KS,V}) where{KS<:_KRYLOV_SID,V}
+function setup(A, ::K2, backend::Backend{KW,V}) where{KW<:_KRYLOV_SID,V}
     Ta = typeof(A)
     T = eltype(A)
     T == eltype(V) || error("eltype(A)=$T incompatible with eltype of Krylov vector storage $V.")
@@ -66,15 +66,15 @@ function setup(A, ::K2, backend::Backend{KS,V}) where{KS<:_KRYLOV_SID,V}
     # Allocate Krylov solver's workspace
     atol = sqrt(eps(T))
     rtol = sqrt(eps(T))
-    krylov_solver = KS(m+n, m+n, V)
+    krylov_workspace = KW(m+n, m+n, V)
 
-    return SIDSolver{T,V,Ta,typeof(opK),typeof(krylov_solver)}(
+    return SIDSolver{T,V,Ta,typeof(opK),typeof(krylov_workspace)}(
         m, n, A,
         θ, regP, regD,
         Θp, Θd, ξ,
         opK,
         atol, rtol,
-        krylov_solver
+        krylov_workspace
     )
 end
 
@@ -97,11 +97,11 @@ function solve!(dx, dy, kkt::SIDSolver{T}, ξp, ξd) where{T}
     @views copyto!(kkt.ξ[(m+1):(m+n)], ξd)
 
     # Solve the augmented system
-    _krylov!(kkt.krylov_solver, kkt.opK, kkt.ξ; atol=kkt.atol, rtol=kkt.rtol)
+    krylov_solve!(kkt.krylov_workspace, kkt.opK, kkt.ξ; atol=kkt.atol, rtol=kkt.rtol)
 
     # Recover dx, dy
-    copyto!(dx, kkt.krylov_solver.x[1:n])
-    copyto!(dy, kkt.krylov_solver.x[(n+1):(m+n)])
+    copyto!(dx, kkt.krylov_workspace.x[1:n])
+    copyto!(dy, kkt.krylov_workspace.x[(n+1):(m+n)])
 
     # TODO: iterative refinement (?)
     return nothing

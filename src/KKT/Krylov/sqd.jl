@@ -84,7 +84,7 @@ function solve!(dx, dy, kkt::SQDSolver{T}, ξp, ξd) where{T}
     copyto!(kkt.ξd, ξd)
 
     # Solve the augmented system
-    _krylov!(kkt.krylov_solver, kkt.A, kkt.ξp, kkt.ξd;
+    krylov_solve!(kkt.krylov_solver, kkt.A, kkt.ξp, kkt.ξd;
         M=kkt.Θd⁻¹,
         N=kkt.Θp⁻¹,
         atol=kkt.atol,
