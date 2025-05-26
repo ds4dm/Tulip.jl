@@ -11,7 +11,7 @@ function test_krylov_spd(T, ksolver)
 end
 
 @testset "SPD" begin
-    for T in TvTYPES, ksolver in [CgSolver, MinresSolver]
+    for T in TvTYPES, ksolver in [CgWorkspace, MinresWorkspace]
         @testset "$ksolver ($T)" begin
             test_krylov_spd(T, ksolver)
         end

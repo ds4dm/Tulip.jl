@@ -11,7 +11,7 @@ function test_krylov_sqd(T, ksolver)
 end
 
 @testset "SQD" begin
-    for T in TvTYPES, ksolver in [TricgSolver, TrimrSolver]
+    for T in TvTYPES, ksolver in [TricgWorkspace, TrimrWorkspace]
         @testset "$ksolver ($T)" begin
             test_krylov_sqd(T, ksolver)
         end

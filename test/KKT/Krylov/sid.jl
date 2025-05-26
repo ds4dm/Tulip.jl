@@ -11,7 +11,7 @@ function test_krylov_sid(T, ksolver)
 end
 
 @testset "SID" begin
-    for T in TvTYPES, ksolver in [MinresSolver, MinresQlpSolver, SymmlqSolver]
+    for T in TvTYPES, ksolver in [MinresWorkspace, MinresQlpWorkspace, SymmlqWorkspace]
         @testset "$ksolver ($T)" begin
             test_krylov_sid(T, ksolver)
         end

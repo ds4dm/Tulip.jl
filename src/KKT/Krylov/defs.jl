@@ -1,47 +1,68 @@
+if isdefined(Krylov, :CgWorkspace)
+    const _Krylov = Krylov
+else
+    @eval module _Krylov
+    using Krylov
+    const MinresWorkspace = Krylov.MinresSolver
+    const CgWorkspace = Krylov.CgSolver
+    const CrWorkspace = Krylov.CrSolver
+    const SymmlqWorkspace = Krylov.SymmlqSolver
+    const MinresQlpWorkspace = Krylov.MinresQlpSolver
+    const TricgWorkspace = Krylov.TricgSolver
+    const TrimrWorkspace = Krylov.TrimrSolver
+    const LslqWorkspace = Krylov.LslqSolver
+    const LsqrWorkspace = Krylov.LsqrSolver
+    const LsmrWorkspace = Krylov.LsmrSolver
+    const LnlqWorkspace = Krylov.LnlqSolver
+    const CraigWorkspace = Krylov.CraigSolver
+    const CraigmrWorkspace = Krylov.CraigmrSolver
+    end
+end
+
 const _KRYLOV_SPD = Union{
-    Krylov.CgSolver,
-    Krylov.CrSolver,
+    _Krylov.CgWorkspace,
+    _Krylov.CrWorkspace,
 }
 
 const _KRYLOV_SID = Union{
-    Krylov.MinresSolver,
-    Krylov.MinresQlpSolver,
-    Krylov.SymmlqSolver
+    _Krylov.MinresWorkspace,
+    _Krylov.MinresQlpWorkspace,
+    _Krylov.SymmlqWorkspace
 }
 
 const _KRYLOV_SQD = Union{
-    Krylov.TricgSolver,
-    Krylov.TrimrSolver,
+    _Krylov.TricgWorkspace,
+    _Krylov.TrimrWorkspace,
 }
 
 const _KRYLOV_LN = Union{
-    Krylov.LnlqSolver,
-    Krylov.CraigSolver,
-    Krylov.CraigmrSolver,
+    _Krylov.LnlqWorkspace,
+    _Krylov.CraigWorkspace,
+    _Krylov.CraigmrWorkspace,
 }
 
 const _KRYLOV_LS = Union{
-    Krylov.LslqSolver,
-    Krylov.LsqrSolver,
-    Krylov.LsmrSolver,
+    _Krylov.LslqWorkspace,
+    _Krylov.LsqrWorkspace,
+    _Krylov.LsmrWorkspace,
 }
 
 # Helper functions
 for (KS, fun) in [
-    (Krylov.CgSolver,Krylov.cg!)
-    (Krylov.CrSolver,Krylov.cr!)
-    (Krylov.MinresSolver,Krylov.minres!)
-    (Krylov.MinresQlpSolver,Krylov.minres_qlp!)
-    (Krylov.SymmlqSolver,Krylov.symmlq!)
-    (Krylov.TricgSolver,Krylov.tricg!)
-    (Krylov.TrimrSolver,Krylov.trimr!)
-    (Krylov.LnlqSolver,Krylov.lnlq!)
-    (Krylov.CraigSolver,Krylov.craig!)
-    (Krylov.CraigmrSolver,Krylov.craigmr!)
-    (Krylov.LslqSolver,Krylov.lslq!)
-    (Krylov.LsqrSolver,Krylov.lsqr!)
-    (Krylov.LsmrSolver,Krylov.lsmr!)
-]
+    (_Krylov.CgWorkspace,Krylov.cg!)
+    (_Krylov.CrWorkspace,Krylov.cr!)
+    (_Krylov.MinresWorkspace,Krylov.minres!)
+    (_Krylov.MinresQlpWorkspace,Krylov.minres_qlp!)
+    (_Krylov.SymmlqWorkspace,Krylov.symmlq!)
+    (_Krylov.TricgWorkspace,Krylov.tricg!)
+    (_Krylov.TrimrWorkspace,Krylov.trimr!)
+    (_Krylov.LnlqWorkspace,Krylov.lnlq!)
+    (_Krylov.CraigWorkspace,Krylov.craig!)
+    (_Krylov.CraigmrWorkspace,Krylov.craigmr!)
+    (_Krylov.LslqWorkspace,Krylov.lslq!)
+    (_Krylov.LsqrWorkspace,Krylov.lsqr!)
+    (_Krylov.LsmrWorkspace,Krylov.lsmr!)
+    ]
     @eval begin
         @inline _krylov!(solver::$KS, args...; kwargs...) = $(fun)(solver, args...; kwargs...)
     end
