@@ -28,6 +28,8 @@ makedocs(
                 "reference/KKT/tlp_dense.md",
                 "reference/KKT/tlp_krylov.md",
                 "reference/KKT/tlp_ldlfact.md",
+                "reference/KKT/tlp_pardiso.md",
+                "reference/KKT/tlp_MKLpardiso.md",
             ],
             "Julia API" => "reference/API.md",
             "Attributes" => "reference/attributes.md",
