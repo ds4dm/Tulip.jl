@@ -79,7 +79,7 @@ function IPMData(pb::ProblemData{T}, mfact::Factory) where{T}
             # Equality row
             b[i] = lb
 
-        elseif -T(Inf) == lb && T(Inf) == ub
+        elseif !isfinite(lb) && !isfinite(ub)
             # Free row
             push!(sind, i)
             push!(sval, one(T))
@@ -87,7 +87,7 @@ function IPMData(pb::ProblemData{T}, mfact::Factory) where{T}
             push!(uslack, T(Inf))
             b[i] = zero(T)
 
-        elseif -T(Inf) == lb && isfinite(ub)
+        elseif !isfinite(lb) && isfinite(ub)
             # a'x <= b --> a'x + s = b
             push!(sind, i)
             push!(sval, one(T))
@@ -95,7 +95,7 @@ function IPMData(pb::ProblemData{T}, mfact::Factory) where{T}
             push!(uslack, T(Inf))
             b[i] = ub
 
-        elseif isfinite(lb) && ub == Inf
+        elseif isfinite(lb) && !isfinite(ub)
             # a'x >= b --> a'x - s = b
             push!(sind, i)
             push!(sval, -one(T))
