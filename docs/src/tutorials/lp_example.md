@@ -23,6 +23,15 @@ whose optimal value and solution are ``Z^{*} = -8`` and ``(x^{*}, y^{*}) = (3, 2
 
 ## JuMP
 
+The default `Model(Tulip.Optimizer)` uses `Float64` arithmetic.
+To use a different numeric type, use `JuMP.GenericModel{T}`:
+
+```julia
+using JuMP
+import Tulip
+model = JuMP.GenericModel{BigFloat}(Tulip.Optimizer{BigFloat})
+```
+
 ```jldoctest; output = false
 using Printf
 using JuMP
