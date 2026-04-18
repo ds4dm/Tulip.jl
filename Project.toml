@@ -1,7 +1,7 @@
 name = "Tulip"
 uuid = "6dd1b50a-3aae-11e9-10b5-ef983d2400fa"
-authors = ["Mathieu Tanneau <mathieu.tanneau@gmail.com>"]
 version = "0.9.8"
+authors = ["Mathieu Tanneau <mathieu.tanneau@gmail.com>"]
 
 [deps]
 CodecBzip2 = "523fee87-0ab8-5b00-afb7-3ecf72e48cfd"
@@ -26,7 +26,14 @@ Krylov = "0.10"
 LDLFactorizations = "0.10"
 LinearOperators = "2.0"
 MathOptInterface = "1"
+MultiFloats = "3.2.6"
 QPSReader = "0.2"
 TOML = "1"
 TimerOutputs = "0.5.6"
 julia = "1.10"
+
+[extras]
+MultiFloats = "bdf0d083-296b-4888-a5b6-7498122e68a5"
+
+[targets]
+test = ["MultiFloats"]

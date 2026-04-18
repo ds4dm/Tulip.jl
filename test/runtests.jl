@@ -2,11 +2,12 @@ using LinearAlgebra
 using SparseArrays
 using Test
 using TOML
+using MultiFloats
 
 using Tulip
 TLP = Tulip
 
-const TvTYPES = [Float32, Float64, BigFloat]
+const TvTYPES = (Float32, Float64, Float64x2, BigFloat)
 
 # Check That Tulip.version() matches what's in the Project.toml
 tlp_ver = Tulip.version()
