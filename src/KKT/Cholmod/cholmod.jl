@@ -2,7 +2,7 @@ module TlpCholmod
 
 using LinearAlgebra
 using SparseArrays
-using SuiteSparse.CHOLMOD
+using SparseArrays.CHOLMOD
 
 using ..KKT: AbstractKKTBackend, AbstractKKTSolver
 using ..KKT: AbstractKKTSystem, K1, K2
