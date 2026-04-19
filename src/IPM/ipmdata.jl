@@ -95,7 +95,7 @@ function IPMData(pb::ProblemData{T}, mfact::Factory) where{T}
             push!(uslack, T(Inf))
             b[i] = ub
 
-        elseif isfinite(lb) && ub == Inf
+        elseif isfinite(lb) && T(Inf) == ub
             # a'x >= b --> a'x - s = b
             push!(sind, i)
             push!(sval, -one(T))
