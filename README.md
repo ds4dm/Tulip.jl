@@ -27,21 +27,46 @@ Pkg.add("Tulip")
 The recommended way of using Tulip is through [JuMP](https://github.com/jump-dev/JuMP.jl) or [MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl) (MOI).
 
 The low-level interface is still under development and is likely change in the future.
-The MOI interface is more stable.
+The JuMP/MOI interface is more stable and regularly tested.
 
 ### Using with JuMP
 
-Tulip follows the syntax convention `PackageName.Optimizer`:
+Tulip can be used with JuMP in indirect and [direct](https://jump.dev/JuMP.jl/stable/manual/models/#Direct-mode) modes.
+Linear objectives, linear constraints and lower/upper bounds on variables are supported.
 
 ```julia
 using JuMP
 import Tulip
+
+# With a JuMP-level cache
 model = Model(Tulip.Optimizer)
+# Direct mode (faster incremental modifications)
+model = direct_model(Tulip.Optimizer())
+# You can also add the optimizer later
+model = Model()
+...
+set_optimizer(model, Tulip.Optimizer)
 ```
 
-Linear objectives, linear constraints and lower/upper bounds on variables are supported.
+To use a non-default numeric type (e.g., `BigFloat`), use `JuMP.GenericModel{T}` (requires JuMP v1.13):
+```julia
+using JuMP
+import Tulip
+model = JuMP.GenericModel{BigFloat}(Tulip.Optimizer{BigFloat})
+```
+Note that The correct syntax is `JuMP.GenericModel{T}(Tulip.Optimizer{T})`, i.e.,
+the type parameter **must** match between Tulip and JuMP.
+```julia
+# Both examples below will error when calling optimize!
+# because the JuMP- and Tulip-level numerical types are different
+model = JuMP.GenericModel{BigFloat}(Tulip.Optimizer)
+model = JuMP.GenericModel{Float64}(Tulip.Optimizer{BigFloat})
+```
+
 
 ### Using with MOI
+
+The MOI-level interface is not recommended for most users, and is considered an advanced feature.
 
 The type `Tulip.Optimizer` is parametrized by the model's arithmetic, for example, `Float64` or `BigFloat`.
 This allows to solve problem in higher numerical precision.
