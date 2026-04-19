@@ -47,30 +47,30 @@ function remove_free_column_singleton!(ps::PresolveData{T}, j::Int) where{T}
                 (ps.colflag[k] && k != j) || continue
                 # Update bounds
                 if aik > 0
-                    l_ -= aik * ps.ucol[k]
-                    u_ -= aik * ps.lcol[k]
+                    l_ = infminus(l_, inftimes(aik, ps.ucol[k]))
+                    u_ = infminus(u_, inftimes(aik, ps.lcol[k]))
                 else
-                    l_ -= aik * ps.lcol[k]
-                    u_ -= aik * ps.ucol[k]
+                    l_ = infminus(l_, inftimes(aik, ps.lcol[k]))
+                    u_ = infminus(u_, inftimes(aik, ps.ucol[k]))
                 end
             end
-            l_ /= aij
-            u_ /= aij
+            l_ = infdiv(l_, aij)
+            u_ = infdiv(u_, aij)
         else
             l_, u_ = ur, lr
             for (k, aik) in zip(row.nzind, row.nzval)
                 (ps.colflag[k] && k != j) || continue
                 # Update bounds
                 if aik > 0
-                    l_ -= aik * ps.lcol[k]
-                    u_ -= aik * ps.ucol[k]
+                    l_ = infminus(l_, inftimes(aik, ps.lcol[k]))
+                    u_ = infminus(u_, inftimes(aik, ps.ucol[k]))
                 else
-                    l_ -= aik * ps.ucol[k]
-                    u_ -= aik * ps.lcol[k]
+                    l_ = infminus(l_, inftimes(aik, ps.ucol[k]))
+                    u_ = infminus(u_, inftimes(aik, ps.lcol[k]))
                 end
             end
-            l_ /= aij
-            u_ /= aij
+            l_ = infdiv(l_, aij)
+            u_ = infdiv(u_, aij)
         end
         @debug """Column singleton $j
             Original bounds: [$l, $u]

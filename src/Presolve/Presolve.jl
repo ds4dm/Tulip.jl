@@ -173,6 +173,31 @@ mutable struct PresolveData{T}
     end
 end
 
+const IEEEFloat = Union{Float16, Float32, Float64, BigFloat}
+
+infminus(x::T, y::T) where {T<:IEEEFloat} = x - y
+function infminus(x::T, y::T) where {T<:AbstractFloat}
+    isfinite(x) && isfinite(y) && return x - y
+    isfinite(x) && !isfinite(y) && return -y
+    !isfinite(x) && isfinite(y) && return x
+    !isfinite(x) && !isfinite(y) && return signbit(x) != signbit(y) ? x : T(NaN)
+end
+
+inftimes(x::T, y::T) where {T<:IEEEFloat} = x * y
+function inftimes(x::T, y::T) where {T<:AbstractFloat}
+    isfinite(x) && isfinite(y) && return x * y
+    isfinite(x) && !isfinite(y) && return signbit(x) ? -y : y
+    !isfinite(x) && isfinite(y) && return signbit(y) ? -x : x
+    !isfinite(x) && !isfinite(y) && return signbit(x) == signbit(y) ? abs(x) : -abs(x)
+end
+
+infdiv(x::T, y::T) where {T<:IEEEFloat} = x / y
+function infdiv(x::T, y::T) where {T<:AbstractFloat}
+    isfinite(x) && !isfinite(y) && return zero(T)
+    !isfinite(x) && isfinite(y) && return signbit(x) == signbit(y) ? abs(x) : -abs(x)
+    return x / y
+end
+
 # Extract pre-solved problem data, to be passed to the IPM solver
 function extract_reduced_problem!(ps::PresolveData{T}) where{T}
 
@@ -279,8 +304,8 @@ function extract_reduced_problem!(ps::PresolveData{T}) where{T}
             row.nzval[k] /= (rscale[i] * cscale[j])
         end
         # Scale row bounds
-        pb.lcon[i] /= rscale[i]
-        pb.ucon[i] /= rscale[i]
+        pb.lcon[i] = infdiv(pb.lcon[i], rscale[i])
+        pb.ucon[i] = infdiv(pb.ucon[i], rscale[i])
     end
     # Columns
     for (j, col) in enumerate(pb.acols)
