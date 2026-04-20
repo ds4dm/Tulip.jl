@@ -129,6 +129,8 @@ include("Cholmod/cholmod.jl")
 include("LDLFactorizations/ldlfact.jl")
 const TlpLDLFact = TlpLDLFactorizations
 include("Krylov/krylov.jl")
+include("Pardiso/pardiso.jl")
+include("Pardiso/MKLPardiso.jl")
 
 # Default backend and system choices
 function setup(A, ::DefaultKKTSystem, ::DefaultKKTBackend)
