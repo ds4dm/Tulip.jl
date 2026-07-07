@@ -121,6 +121,7 @@ mutable struct Optimizer{T} <: MOI.AbstractOptimizer
             0.0
         )
 
+        set_parameter(m.inner, "OutputLevel", 1)
         for (k, v) in kwargs
             set_parameter(m.inner, string(k), v)
         end
