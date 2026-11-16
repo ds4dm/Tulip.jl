@@ -8,6 +8,20 @@ struct FreeColumnSingleton{T} <: PresolveTransformation{T}
     row::Row{T}
 end
 
+function _free_column_singleton_rhs(y::T, lr::T, ur::T) where{T}
+    if y > zero(T)
+        return lr
+    elseif y < zero(T)
+        return ur
+    elseif isfinite(lr)
+        return lr
+    elseif isfinite(ur)
+        return ur
+    else
+        return zero(T)
+    end
+end
+
 function remove_free_column_singleton!(ps::PresolveData{T}, j::Int) where{T}
 
     ps.colflag[j] && ps.nzcol[j] == 1 || return nothing  # only column singletons
@@ -84,7 +98,8 @@ function remove_free_column_singleton!(ps::PresolveData{T}, j::Int) where{T}
     y = ps.obj[j] / aij  # dual of row i
 
     # Update objective
-    ps.obj0 += (y >= zero(T)) ? y * lr : y * ur
+    rhs = _free_column_singleton_rhs(y, lr, ur)
+    ps.obj0 += y * rhs
     row_ = Row{T}(Int[], T[])
     for (j_, aij_) in zip(row.nzind, row.nzval)
         ps.colflag[j_] && (j_ != j) || continue
@@ -117,7 +132,7 @@ function postsolve!(sol::Solution{T}, op::FreeColumnSingleton{T}) where{T}
     sol.s_upper[op.j] = zero(T)
 
     # Primal
-    sol.x[op.j] = sol.is_primal_ray ? zero(T) : (y >= zero(T) ? op.l : op.u)
+    sol.x[op.j] = sol.is_primal_ray ? zero(T) : _free_column_singleton_rhs(y, op.l, op.u)
     for (k, aik) in zip(op.row.nzind, op.row.nzval)
         sol.x[op.j] -= aik * sol.x[k]
     end
